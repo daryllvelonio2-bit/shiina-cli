@@ -1,0 +1,4 @@
+name: kiro
+version: "1.0.0"
+description: "Kiro CLI native provider for Shiina"
+author: "Shiina"

@@ -1,0 +1,5 @@
+name: qoder
+kind: model-provider
+version: 1.0.0
+description: Qoder AI native provider for Shiina (Qwen3.8, Sonus, Cantus, DeepSeek, Kimi, GLM, MiniMax)
+author: Shiina

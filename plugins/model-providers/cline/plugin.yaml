@@ -1,0 +1,5 @@
+name: cline
+kind: model-provider
+version: 1.0.0
+description: Cline native provider for Shiina (Space Bunny, Pixel Canary, LFM, Nemotron, Gemma, MiMo)
+author: Shiina

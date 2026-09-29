@@ -1,0 +1,5 @@
+name: tokenharbor-provider
+kind: model-provider
+version: 1.0.0
+description: TokenHarbor — one key, every model
+author: janelle
