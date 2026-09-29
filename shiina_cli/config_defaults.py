@@ -758,6 +758,7 @@ DEFAULT_CONFIG = {
 
     "display": {
         "compact": False,
+        "tui_compact": True,
         "personality": "",
         "resume_display": "full",
         # Recap tuning for /resume and startup resume.
@@ -834,12 +835,12 @@ DEFAULT_CONFIG = {
         # /focus off restores. Never affects what the model sees (focus_view.py).
         "focus_view": False,
         "focus_saved_tool_progress": "all",
-        "skin": "default",
+        "skin": "shiina",
         # UI language for static messages (approval prompts, some gateway slash replies); not agent
         # responses/logs/tool outputs. en, zh, ja, de, es, fr, tr, uk; unknown → en.
         "language": "en",
         # TUI busy indicator: kaomoji | emoji | unicode (braille) | ascii. `/indicator <style>`.
-        "tui_status_indicator": "kaomoji",
+        "tui_status_indicator": "unicode",
         # Seconds between idle prompt_toolkit redraws in the classic CLI; keeps wall-clock
         # status-bar read-outs ticking and the bottom chrome from going stale. 0 disables it if it
         # fights terminal auto-scroll in non-fullscreen mode.
@@ -915,7 +916,7 @@ DEFAULT_CONFIG = {
         # stash, battery, title, total_tokens (session Σ, opt-in only). Narrow terminals still drop
         # context_detail/prompt_elapsed/idle_since.
         "status_bar": {
-            "fields": [],
+            "fields": ["model", "context_detail"],
         },
         "copy_shortcut": "auto",  # "auto" (platform default) | ctrl_c | ctrl_shift_c | disabled
         # Petdex animated mascot (github.com/crafter-station/petdex): cosmetic sprite across
