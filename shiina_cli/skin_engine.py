@@ -58,41 +58,51 @@ def _wings(*glyphs) -> List[List[str]]:
 
 
 # Branding shared by every Shiina-named built-in (mono/daylight override help_header).
-_SHIINA_BRANDING: Dict[str, str] = _branding(
-    "Shiina", "★", "Goodbye! ★", prompt="❯", help_header="(^_^)? Available Commands")
+_SHIINA_BRANDING: Dict[str, str] = {
+    "agent_name": "Shiina Agent",
+    "symbol": "★",
+    "icon": "★",
+    "welcome": "Welcome to Shiina Agent! Type your message or /help for commands.",
+    "goodbye": "Goodbye!",
+    "response_label": " Shiina ",
+    "prompt_symbol": "❯",
+    "help_header": "(^_^)? Available Commands",
+}
 
 _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
     "default": {
-        "name": "default", "description": "Classic Shiina — gold and kawaii",
-        # Dark-authored; values match the TUI's DARK_THEME so both render the same gold.
+        "name": "default", "description": "Classic Shiina — clean startup, blue theme",
+        # Dark-authored; values match the TUI's DARK_THEME so both render the same blue.
         "colors": {
-            "banner_border": "#CD7F32", "banner_title": "#FFD700", "banner_accent": "#FFBF00",
-            "banner_dim": "#B8860B", "banner_text": "#FFF8DC", "ui_accent": "#FFBF00",
-            "ui_label": "#DAA520", "ui_ok": "#4caf50", "ui_error": "#ef5350", "ui_warn": "#ffa726",
-            "prompt": "#FFF8DC", "input_rule": "#CD7F32", "response_border": "#FFD700",
+            "banner_border": "#3b82f6", "banner_title": "#60a5fa", "banner_accent": "#38bdf8",
+            "banner_dim": "#5c7cfa", "banner_text": "#FFF8DC", "ui_accent": "#38bdf8",
+            "ui_label": "#60a5fa", "ui_ok": "#4caf50", "ui_error": "#ef5350", "ui_warn": "#38bdf8",
+            "prompt": "#FFF8DC", "input_rule": "#3b82f6", "response_border": "#60a5fa",
             "status_bar_bg": "#1a1a2e", "status_bar_text": "#C0C0C0",
-            "status_bar_strong": "#FFD700", "status_bar_dim": "#8A7A4A",
-            "status_bar_good": "#8FBC8F", "status_bar_warn": "#FFD700", "status_bar_bad": "#FF8C00",
-            "status_bar_critical": "#FF6B6B", "session_label": "#DAA520",
-            "session_border": "#8B8682", "completion_menu_bg": "#1a1a2e",
-            "completion_menu_current_bg": "#333355", "selection_bg": "#3a3a55",
-            "shell_dollar": "#4dabf7", "voice_status_bg": "#1a1a2e"},
-        # Light overlay (merged onto `colors`). Goldenrod ladder: on white the vivid
-        # #FFD700/#FFBF00 read as glare and WCAG-darkened mustard (#867000) as mud; the
-        # statusbar's goldenrod family (#B8860B/#DAA520) keeps the hue, tames saturation.
-        # Hierarchy on white: ink body 8.9:1 > fade 5.2 > label 3.7 > muted 3.3 > title 2.7 >
-        # headers 2.4. Fills (*_bg) flip the dark navy surfaces to light polarity.
-        "light_colors": {
-            "banner_title": "#C8961E", "banner_accent": "#D89B04", "banner_dim": "#B8860B",
-            "banner_text": "#5C4718", "ui_accent": "#D89B04", "ui_label": "#A97E10",
-            "ui_ok": "#2E7D32", "ui_error": "#C62828", "ui_warn": "#D97706", "prompt": "#5C4718",
-            "response_border": "#C8961E", "session_label": "#A97E10", "status_bar_text": "#6F6F6F",
-            "status_bar_strong": "#C8961E", "status_bar_dim": "#9A8A5A",
-            "status_bar_good": "#2E7D32", "status_bar_warn": "#C8961E", "status_bar_bad": "#C2410C",
-            "status_bar_critical": "#B91C1C", "shell_dollar": "#1E6FC0",
-            "completion_menu_bg": "#F5F5F5", "completion_menu_current_bg": "#E0D1BF",
-            "selection_bg": "#D4E4F7", "status_bar_bg": "#F5F5F5", "voice_status_bg": "#F5F5F5"},
+            "status_bar_strong": "#60a5fa", "status_bar_dim": "#4a6fa5",
+            "status_bar_good": "#8FBC8F", "status_bar_warn": "#60a5fa", "status_bar_bad": "#ef5350",
+            "status_bar_critical": "#FF6B6B", "session_label": "#60a5fa",
+            "session_border": "#3b82f6", "completion_menu_bg": "#1a1a2e",
+            "completion_menu_current_bg": "#243b55", "selection_bg": "#1e3a5f",
+            "shell_dollar": "#38bdf8", "voice_status_bg": "#1a1a2e"},
         "spinner": {},  # empty = hardcoded defaults in display.py
+        "branding": _SHIINA_BRANDING,
+        "tool_prefix": "┊"},
+    "shiina": {
+        "name": "shiina", "description": "Shiina Agent — clean startup, blue theme",
+        "colors": {
+            "banner_border": "#3b82f6", "banner_title": "#60a5fa", "banner_accent": "#38bdf8",
+            "banner_dim": "#5c7cfa", "banner_text": "#FFF8DC", "ui_accent": "#38bdf8",
+            "ui_label": "#60a5fa", "ui_ok": "#4caf50", "ui_error": "#ef5350", "ui_warn": "#38bdf8",
+            "prompt": "#FFF8DC", "input_rule": "#3b82f6", "response_border": "#60a5fa",
+            "status_bar_bg": "#1a1a2e", "status_bar_text": "#C0C0C0",
+            "status_bar_strong": "#60a5fa", "status_bar_dim": "#4a6fa5",
+            "status_bar_good": "#8FBC8F", "status_bar_warn": "#60a5fa", "status_bar_bad": "#ef5350",
+            "status_bar_critical": "#FF6B6B", "session_label": "#60a5fa",
+            "session_border": "#3b82f6", "completion_menu_bg": "#1a1a2e",
+            "completion_menu_current_bg": "#243b55", "selection_bg": "#1e3a5f",
+            "shell_dollar": "#38bdf8", "voice_status_bg": "#1a1a2e"},
+        "spinner": {},
         "branding": _SHIINA_BRANDING,
         "tool_prefix": "┊"},
     "ares": {
@@ -343,7 +353,7 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
     }}
 
 _active_skin: Optional[SkinConfig] = None
-_active_skin_name: str = "default"
+_active_skin_name: str = "shiina"
 # Routed multiplex profiles: (name, skin) per home key. ``display.skin`` and ``<home>/skins/*.yaml``
 # are per profile, and the relay display name / TUI skin payload are read under each profile's
 # override — one module slot would be last-writer-wins across profiles. Unscoped keeps the module slot.

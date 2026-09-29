@@ -256,7 +256,7 @@ const BRAND: ThemeBrand = {
   icon: '★',
   prompt: '❯',
   welcome: 'Type your message or /help for commands.',
-  goodbye: 'Goodbye! ★',
+  goodbye: 'Goodbye!',
   tool: '┊',
   helpHeader: '(^_^)? Commands'
 }
@@ -370,26 +370,26 @@ export function buildPalette(seeds: ThemeSeeds, isLight: boolean): ThemeColors {
 }
 
 export const DARK_SEEDS: ThemeSeeds = {
-  accent: '#FFBF00',
+  accent: '#38bdf8',
   // The classic Shiina navy surfaces are IDENTITY, not derivation drift —
   // keep them as explicit fill seeds (the ladder derives them for skins
   // that don't care).
-  activeRow: '#333355',
+  activeRow: '#243b55',
   bg: '#101014',
-  border: '#CD7F32',
+  border: '#3b82f6',
   error: '#ef5350',
   ok: '#4caf50',
-  primary: '#FFD700',
+  primary: '#60a5fa',
   prompt: '#FFF8DC',
-  selection: '#3a3a55',
-  shellDollar: '#4dabf7',
-  statusBad: '#FF8C00',
+  selection: '#1e3a5f',
+  shellDollar: '#38bdf8',
+  statusBad: '#ef5350',
   statusCritical: '#FF6B6B',
   statusGood: '#8FBC8F',
-  statusWarn: '#FFD700',
+  statusWarn: '#60a5fa',
   surface: '#1a1a2e',
   text: '#FFF8DC',
-  warn: '#ffa726'
+  warn: '#38bdf8'
 }
 
 // Light-terminal seeds: darker golds/ambers that stay legible on white.

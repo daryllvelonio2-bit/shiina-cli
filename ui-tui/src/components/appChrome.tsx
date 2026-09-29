@@ -564,16 +564,28 @@ export function StatusRule({
       ? noticeReserve
       : stringWidth(status)
 
+  // Model is pinned left; the usage readout (ctx number + bar + %) is pinned
+  // on the RIGHT ahead of the title/cwd label, so it is reserved out of the
+  // right side (see usageRightText below) instead of the left essentials.
   const essentialWidth =
     stringWidth('─ ') +
     batteryWidth +
     slotWidth +
     stringWidth(' │ ') +
-    stringWidth(modelText) +
-    (ctxLabel ? stringWidth(' │ ') + stringWidth(ctxLabel) : 0)
+    stringWidth(modelText)
 
   const rightLabel = sessionTitle && ok('title') ? ` ${sessionTitle} ` : cwdLabel
-  const { leftWidth, rightWidth, separatorWidth } = statusRuleWidths(cols, rightLabel, essentialWidth)
+  // Usage readout pinned on the right, ahead of the title/cwd label:
+  // `│ 73.2k/1M │ [bar] 7%`. Measured into the right reservation (not the
+  // tail budget) so the label yields first on narrow terminals while usage
+  // stays visible. Previously the bar consumed left tail budget via `fits`.
+  const usageBarText = !!bar ? `[${bar}]${pct != null ? ` ${contextMark}${pct}%` : ''}` : ''
+  const usageRightText = `${ctxLabel ? ` │ ${ctxLabel}` : ''}${usageBarText ? ` │ ${usageBarText}` : ''}`
+  const { leftWidth, rightWidth, separatorWidth } = statusRuleWidths(
+    cols,
+    `${usageRightText}${rightLabel}`,
+    essentialWidth
+  )
 
   // Whole-segment progressive disclosure for the tail: a segment renders only
   // if it fits in the space left after the pinned essentials, evaluated in
@@ -605,7 +617,8 @@ export function StatusRule({
       ? `Δ ${(usage.dev_credits_spent_micros / 10000).toFixed(1)}¢`
       : ''
 
-  const showBar = !!bar && fits(SEP + stringWidth(`[${bar}] ${pct != null ? `${contextMark}${pct}%` : ''}`))
+  // (usage bar + % now render pinned on the right — see usageRightText — so
+  // they no longer consume left tail budget here.)
   const showDuration = segs.duration && ok('duration') && !!sessionStartedAt && fits(SEP + MAX_DURATION_WIDTH)
 
   // Idle clock — time since the last final agent response. Hidden while busy
@@ -705,7 +718,8 @@ export function StatusRule({
             </Text>
           </Box>
         ) : null}
-        {/* Pinned essentials — model + context never shrink, always visible. */}
+        {/* Pinned essentials — model never shrinks, always visible. Usage
+            moved to the right box (usageRightText). */}
         <Box flexDirection="row" flexShrink={0}>
           {DEV_CREDITS_MODE ? (
             <Text color={t.color.warn} wrap="truncate-end">
@@ -716,25 +730,12 @@ export function StatusRule({
             {' │ '}
             {modelText}
           </Text>
-          {ctxLabel ? (
-            <Text color={t.color.muted} wrap="truncate-end">
-              {' │ '}
-              {ctxLabel}
-            </Text>
-          ) : null}
         </Box>
         {showFocus ? (
           <Box flexDirection="row" flexShrink={0}>
             <Text color={t.color.muted}>{' │ '}</Text>
             <Text color={t.color.warn}>◉ focus</Text>
           </Box>
-        ) : null}
-        {showBar ? (
-          <Text color={t.color.muted} wrap="truncate-end">
-            {' │ '}
-            <Text color={barColor}>[{bar}]</Text>{' '}
-            <Text color={barColor}>{pct != null ? `${contextMark}${pct}%` : ''}</Text>
-          </Text>
         ) : null}
         {showDuration ? (
           <Text color={t.color.muted} wrap="truncate-end">
@@ -844,10 +845,29 @@ export function StatusRule({
           ) : (
             <Text color={t.color.border}>{separatorWidth >= 3 ? ' ─ ' : ' '}</Text>
           )}
-          <Box flexShrink={0} width={rightWidth}>
-            <Text bold={!!sessionTitle} color={sessionTitle ? t.color.accent : t.color.label} wrap="truncate-end">
-              {rightLabel}
-            </Text>
+          <Box flexDirection="row" flexShrink={0} width={rightWidth} overflow="hidden">
+            {ctxLabel ? (
+              <Box flexShrink={0}>
+                <Text color={t.color.muted} wrap="truncate-end">
+                  {' │ '}
+                  {ctxLabel}
+                </Text>
+              </Box>
+            ) : null}
+            {usageBarText ? (
+              <Box flexShrink={0}>
+                <Text color={t.color.muted} wrap="truncate-end">
+                  {' │ '}
+                  <Text color={barColor}>[{bar}]</Text>
+                  {pct != null ? <Text color={barColor}>{` ${contextMark}${pct}%`}</Text> : null}
+                </Text>
+              </Box>
+            ) : null}
+            <Box flexShrink={1} overflow="hidden">
+              <Text bold={!!sessionTitle} color={sessionTitle ? t.color.accent : t.color.label} wrap="truncate-end">
+                {rightLabel}
+              </Text>
+            </Box>
           </Box>
         </>
       ) : null}
