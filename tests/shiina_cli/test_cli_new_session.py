@@ -227,7 +227,9 @@ def test_run_cleanup_flushes_pending_memory_manager_work(tmp_path):
 
 
 
-def test_clear_command_starts_new_session_before_redrawing(tmp_path):
+def test_clear_command_starts_new_session_before_redrawing(tmp_path, capsys):
+    """`/clear` resets the session and wipes the screen, then prints the one-line
+    fresh-start notice — not the full startup banner, which stays on startup only."""
     cli = _prepare_cli_with_active_session(tmp_path)
     cli.console = MagicMock()
     cli.show_banner = MagicMock()
@@ -239,7 +241,8 @@ def test_clear_command_starts_new_session_before_redrawing(tmp_path):
     assert cli._session_db.get_session(old_session_id)["end_reason"] == "new_session"
     assert cli._session_db.get_session(cli.session_id) is not None
     cli.console.clear.assert_called_once()
-    cli.show_banner.assert_called_once()
+    cli.show_banner.assert_not_called()
+    assert "Fresh start!" in capsys.readouterr().out
     assert cli.conversation_history == []
 
 

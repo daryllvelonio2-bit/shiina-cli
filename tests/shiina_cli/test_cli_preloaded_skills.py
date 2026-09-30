@@ -135,7 +135,12 @@ def test_main_raises_for_unknown_preloaded_skill(monkeypatch):
 
 
 def test_show_banner_does_not_print_skills():
-    """show_banner() no longer prints the activated skills line — it moved to run()."""
+    """show_banner() never prints the activated skills line — it moved to run().
+
+    The startup banner itself was removed on 2026-09-18 (logo header and tools/skills box
+    dropped; see the backup note in ``show_banner``), so the welcome banner must not be built
+    at all — not merely built without the skills line.
+    """
     cli_obj = _make_real_cli(compact=False)
     cli_obj.preloaded_skills = ["shiina-agent-dev", "github-auth"]
     cli_obj.console = MagicMock()
@@ -152,4 +157,4 @@ def test_show_banner_does_not_print_skills():
     ]
     startup_lines = [line for line in print_calls if "Activated skills:" in line]
     assert len(startup_lines) == 0
-    assert mock_banner.call_count == 1
+    assert mock_banner.call_count == 0

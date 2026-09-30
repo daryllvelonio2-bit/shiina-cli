@@ -3399,19 +3399,40 @@ def _build_cli_parser():
     return parser, subparsers
 
 
+def _iter_cli_parsers(parser, subparsers):
+    """``parser`` plus every subparser nested at any depth.
+
+    ``profile create`` sits one level below its top-level subcommand, so a walk that
+    stops at the direct children misses flags like ``--blank``."""
+    stack = [parser, *getattr(subparsers, "choices", {}).values()]
+    seen = set()
+    while stack:
+        current = stack.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        yield current
+        for action in getattr(current, "_actions", []):
+            # Only subparser actions hold parsers; a plain option's `choices` is a list.
+            if isinstance(action, argparse._SubParsersAction):
+                stack.extend(action.choices.values())
+
+
 def _rewrite_named_session_flags(argv: list, parser, subparsers) -> tuple[list, bool]:
     """Rewrite unknown ``--<name>`` flags into ``['--resume', '<name>']`` so users can
     start or resume a named session via e.g. ``shiina --shiina`` or ``shiina --tui --shiina``."""
     if not argv:
         return argv, False
 
-    known_opts = set()
-    for action in getattr(parser, "_actions", []):
-        known_opts.update(action.option_strings)
-    if hasattr(subparsers, "choices"):
-        for sub in subparsers.choices.values():
-            for action in getattr(sub, "_actions", []):
-                known_opts.update(action.option_strings)
+    # Every flag defined anywhere in the tree is "known"; only genuinely unknown ones are
+    # session names. Missing nested flags mangled real invocations into `--resume <flag>`
+    # (e.g. `profile create dev-1 --blank` → `--resume blank`).
+    known_opts = {
+        opt
+        for current in _iter_cli_parsers(parser, subparsers)
+        for action in getattr(current, "_actions", [])
+        for opt in action.option_strings
+    }
 
     # If --resume or -c is already explicitly present, don't inject another
     if any(a in {"-r", "--resume", "-c", "--continue"} for a in argv):

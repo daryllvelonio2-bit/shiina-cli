@@ -16,6 +16,25 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _fresh_home_resolution():
+    """Clear the process-wide home memo around every test.
+
+    ``shiina_constants._get_platform_default_shiina_home`` memoizes ``Path.home()`` the first
+    time anything resolves a Shiina home (importing ``shiina_cli.main`` is enough), and the
+    memo is keyed on nothing — so a test that monkeypatches ``Path.home`` is silently ignored
+    and resolves against the real ``~/.shiina`` instead of its tmp_path. Reset either side so
+    the patch takes effect and no tmp_path leaks into the next test.
+    """
+    from shiina_constants import reset_shiina_home_key_cache
+
+    reset_shiina_home_key_cache()
+    yield
+    reset_shiina_home_key_cache()
+
 
 def _run_apply_profile_override(
     tmp_path, monkeypatch, *, shiina_home: str | None, active_profile: str | None,
