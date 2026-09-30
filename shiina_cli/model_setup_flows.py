@@ -207,7 +207,7 @@ def _nous_model_catalog(free_tier: bool, portal_url: str, model_ids: list, prici
         model_ids, unavailable_models = partition_nous_models_by_tier(model_ids, pricing, free_tier=True)
 
     if not model_ids and not unavailable_models:
-        print("No models available for Nous Portal after filtering.")
+        print("No models available for Shiina Portal after filtering.")
         return None
     if free_tier and not model_ids:
         print("No free models currently available.")
@@ -231,7 +231,7 @@ def _nous_verified_credentials(creds_or_none=None):
         relogin = isinstance(exc, AuthError) and exc.relogin_required
         msg = format_auth_error(exc) if isinstance(exc, AuthError) else str(exc)
         if relogin:
-            _say(f"Session expired: {msg}", "Re-authenticating with Nous Portal...\n")
+            _say(f"Session expired: {msg}", "Re-authenticating with Shiina Portal...\n")
             try:
                 _login_nous(_nous_login_args(None), PROVIDER_REGISTRY["nous"])
             except Exception as login_exc:
@@ -280,7 +280,7 @@ def _model_flow_nous(config, current_model="", args=None):
     from shiina_cli.nous_subscription import prompt_enable_tool_gateway
     state = get_provider_auth_state("nous")
     if not state or not state.get("access_token"):
-        _say("Not logged into Nous Portal. Starting login...", "")
+        _say("Not logged into Shiina Portal. Starting login...", "")
 
         def _login_then_offer_gateway(login_args, pconfig):
             _login_nous(login_args, pconfig)
@@ -313,7 +313,7 @@ def _model_flow_nous(config, current_model="", args=None):
         return
     model_ids = get_curated_nous_model_ids()
     if not model_ids:
-        print("No curated models available for Nous Portal.")
+        print("No curated models available for Shiina Portal.")
         return
 
     # Verify credentials are still valid (catches expired sessions early)
@@ -356,7 +356,7 @@ def _model_flow_nous(config, current_model="", args=None):
         print("No change.")
         return
     config = _nous_persist_selection(selected, creds)
-    print(f"Default model set to: {selected} (via Nous Portal)")
+    print(f"Default model set to: {selected} (via Shiina Portal)")
     # Offer Tool Gateway enablement for paid subscribers
     prompt_enable_tool_gateway(config)
 

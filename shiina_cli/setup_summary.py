@@ -223,7 +223,7 @@ def _print_setup_summary(config: dict, shiina_home):
         _setup.print_warning("No inference provider is configured — Shiina cannot chat yet.")
         _setup._info("  Finish this one step with either of:",
               "    shiina model            (pick any provider/model)",
-              "    shiina setup --portal   (Nous Portal OAuth, no API key)")
+              "    shiina setup --portal   (Shiina Portal OAuth, no API key)")
 
     print()
     _setup.print_header("Tool Availability Summary")

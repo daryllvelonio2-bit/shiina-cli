@@ -55,12 +55,12 @@ def _run_nous_flow(config: dict, *, context: str, cancel_exc: tuple, cancel_line
 
 
 def _run_portal_one_shot(config: dict) -> None:
-    """One-shot Nous Portal setup (``shiina setup --portal`` / ``shiina portal``)."""
+    """One-shot Shiina Portal setup (``shiina setup --portal`` / ``shiina portal``)."""
     from shiina_cli.setup import _info, _print_banner, print_error, print_info, print_success
-    _print_banner("│     ☤ Shiina Setup — Nous Portal (one-shot)             │")
+    _print_banner("│     ☤ Shiina Setup — Shiina Portal (one-shot)             │")
     _info(None, "  One subscription, 300+ models, plus the Tool Gateway:",
           "    web search, image generation, TTS, browser automation",
-          "    — all routed through your Nous Portal sub.", None,
+          "    — all routed through your Shiina Portal sub.", None,
           "  Sign up: https://portal.nousresearch.com/manage-subscription", None)
 
     def _on_error(exc: Exception) -> None:
@@ -92,7 +92,7 @@ def _run_first_time_quick_setup(config: dict, shiina_home, is_existing: bool):
         print_warning, prompt_choice, save_config, setup_gateway, setup_terminal_backend
     )
     # Step 1: Nous Portal — OAuth login + model selection (provider set to "nous" by the save).
-    print_header("Nous Portal", gap=True)
+    print_header("Shiina Portal", gap=True)
     _info("One subscription, 300+ models, plus the Tool Gateway:",
           "  web search, image generation, TTS, browser automation.",
           "Sign up: https://portal.nousresearch.com/manage-subscription", None)
@@ -105,7 +105,7 @@ def _run_first_time_quick_setup(config: dict, shiina_home, is_existing: bool):
             print_info(line)
 
     _run_nous_flow(config, context="quick setup", cancel_exc=(KeyboardInterrupt, EOFError),
-                   cancel_lines=(None, "Nous Portal setup cancelled."), print_error=_on_error)
+                   cancel_lines=(None, "Shiina Portal setup cancelled."), print_error=_on_error)
     # The wizard's later save_config(config) must not clobber the login/model save.
     _reload_config_into(config)
 

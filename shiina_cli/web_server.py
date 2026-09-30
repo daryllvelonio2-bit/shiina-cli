@@ -1041,19 +1041,19 @@ def _no_auth_provider_message(host: str) -> str:
         fix_hint = ""
 
     fix_hint += (
-        "Configure an auth provider before exposing the dashboard:\n"
-        "  • Password: set dashboard.basic_auth.username + "
-        "password_hash in config.yaml\n"
-        "    (hash with: python -c \"from "
-        "plugins.dashboard_auth.basic import hash_password; "
-        "print(hash_password('your-password'))\")\n"
-        "  • OAuth: run `shiina dashboard register` (Nous Portal) or "
-        "install a DashboardAuthProvider plugin.\n"
-        "There is no unauthenticated public-dashboard option. For "
-        "local-only use, bind 127.0.0.1 and leave dashboard.public_url "
-        "unset; a configured external public URL requires auth even "
-        "when a local reverse proxy reaches a loopback backend."
-    )
+            "Configure an auth provider before exposing the dashboard:\n"
+            "  • Password: set dashboard.basic_auth.username + "
+            "password_hash in config.yaml\n"
+            "    (hash with: python -c \"from "
+            "plugins.dashboard_auth.basic import hash_password; "
+            "print(hash_password('your-password'))\")\n"
+            "  • OAuth: run `shiina dashboard register` (Shiina Portal) or "
+            "install a DashboardAuthProvider plugin.\n"
+            "There is no unauthenticated public-dashboard option. For "
+            "local-only use, bind 127.0.0.1 and leave dashboard.public_url "
+            "unset; a configured external public URL requires auth even "
+            "when a local reverse proxy reaches a loopback backend.\n"
+        )
     # Credentials exist but the bundled provider is disabled (#54489). Basic
     # auth needs a username AND a credential; a half-configured block is silent.
     try:

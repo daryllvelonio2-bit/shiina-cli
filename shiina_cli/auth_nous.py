@@ -83,9 +83,9 @@ def _portal_entitlement_message(capability: str) -> str:
 
 def _format_nous_entitlement_auth_error(error: AuthError) -> str:
     with suppress(Exception):
-        if message := _portal_entitlement_message("Nous model access"):
+        if message := _portal_entitlement_message("Shiina model access"):
             return message
-    return f"{error} Check credits or billing in Nous Portal, then retry."
+    return f"{error} Check credits or billing in Shiina Portal, then retry."
 
 
 def _migrate_stale_nous_portal_url(providers: Dict[str, Any]) -> None:
@@ -616,12 +616,12 @@ def _refresh_access_token(
     # server retired the original and revoked the whole session chain as a token-theft signal.
     if code == "refresh_token_reused" or "reuse" in description.lower():
         description = (
-            "Nous Portal detected refresh-token reuse and revoked this session.\n"
+            "Shiina Portal detected refresh-token reuse and revoked this session.\n"
             "This usually means an external process (monitoring script, "
             "custom self-heal hook, or another Shiina install sharing "
             "~/.shiina/auth.json) called POST /api/oauth/token with Shiina's "
             "refresh token without persisting the rotated token back.\n"
-            "Nous refresh tokens are single-use — only Shiina may call the "
+            "Shiina refresh tokens are single-use — only Shiina may call the "
             "refresh endpoint. For health checks, use `shiina auth status` "
             "instead.\n"
             "Re-authenticate with: shiina auth add nous")
@@ -786,7 +786,7 @@ def refresh_nous_oauth_from_state(
                 if current_invoke_jwt_status is not None:
                     raise _unusable_invoke_jwt_error(
                         current_invoke_jwt_status, no_refresh_token=True)
-                raise _nous_err("No refresh token is available for Nous Portal.", relogin=True)
+                raise _nous_err("No refresh token is available for Shiina Portal.", relogin=True)
             refreshed = _refresh_access_token(
                 client=client, portal_base_url=state["portal_base_url"],
                 client_id=state["client_id"], refresh_token=refresh_token_value)
@@ -996,7 +996,7 @@ class _NousRuntimeResolve:
                 if self.merge_shared():
                     self.persist("runtime_shared_merge_missing_access_token")
         if not self.has_access_token():
-            raise _nous_err("No access token found for Nous Portal login.", relogin=True)
+            raise _nous_err("No access token found for Shiina Portal login.", relogin=True)
         invoke_jwt_status = self.invoke_jwt_status()
         self.skip_refresh_if_peer_rotated()
         if not (self.force_refresh or invoke_jwt_status is not None):
@@ -1054,7 +1054,7 @@ def _resolve_nous_runtime_credentials(
         _tls_state_from_verify)
     with _provider_state_transaction("nous") as (auth_store, state, state_source_path):
         if not state:
-            raise _nous_err("Shiina is not logged into Nous Portal.", relogin=True)
+            raise _nous_err("Shiina is not logged into Shiina Portal.", relogin=True)
         run = _NousRuntimeResolve(
             auth_store, state, state_source_path, force_refresh=force_refresh,
             stale_access_token=stale_access_token, timeout_seconds=timeout_seconds)
@@ -1488,7 +1488,7 @@ def _pick_nous_model_after_login(
         print("No free models currently available.")
         print(unavailable_message or f"Upgrade at {_url} to access paid models.")
     else:
-        print("No curated models available for Nous Portal.")
+        print("No curated models available for Shiina Portal.")
     return None
 
 
@@ -1580,7 +1580,7 @@ def _login_nous(args, pconfig: ProviderConfig) -> None:
             _restore_active_provider(prior_active_provider)
             print()
             print("No provider change. Nous credentials saved for future use.")
-            print("  Run `shiina model` again to switch to Nous Portal.")
+            print("  Run `shiina model` again to switch to Shiina Portal.")
             return
         config_path = _update_config_for_provider(
             "nous", inference_base_url, default_model=selected_model)

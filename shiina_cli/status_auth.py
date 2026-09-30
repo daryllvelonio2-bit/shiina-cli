@@ -127,7 +127,7 @@ def _render_auth_providers(ctx):
     if nous_status.get("free_tier"):
         # Free tier: never rendered as an account login (no account ids, no refresh row).
         from shiina_cli.anon_auth import FREE_TIER_LABEL, GUEST_MODEL, UPGRADE_HINT
-        _status._row("Nous Portal", True, f"{FREE_TIER_LABEL} · {GUEST_MODEL}")
+        _status._row("Shiina Portal", True, f"{FREE_TIER_LABEL} · {GUEST_MODEL}")
         _status._detail("", UPGRADE_HINT)
         inference_url = nous_status.get("inference_base_url")
         if inference_url:
@@ -136,7 +136,7 @@ def _render_auth_providers(ctx):
             _oauth_block(name, statuses.get(getter, {}), hint, rows)
         return
     nous_error = nous_status.get("error")
-    _status._row("Nous Portal", logged_in,
+    _status._row("Shiina Portal", logged_in,
          "logged in" if logged_in else "not logged in (Nous inference key configured)" if inference
          else "not logged in (run: shiina portal)")
     portal_url = nous_status.get("portal_base_url") or "(unknown)"
@@ -161,8 +161,8 @@ def _render_nous_gateway(ctx):
     if managed_nous_tools_enabled():
         features = get_nous_subscription_features(ctx.config)
         _status._section("Nous Tool Gateway")
-        print("  Nous Portal   ✓ managed tools available" if features.nous_auth_present
-              else "  Nous Portal   ✗ not logged in")
+        print("  Shiina Portal   ✓ managed tools available" if features.nous_auth_present
+              else "  Shiina Portal   ✗ not logged in")
         for f in features.items():
             state = next((text(f) for match, text in _FEATURE_STATES if match(f, features.nous_auth_present)),
                          "not configured")

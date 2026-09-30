@@ -570,7 +570,7 @@ def _run_debug_share_nous(args, *, log_lines: int, redact: bool) -> None:
           "(via Google login) can open it.\n"
           "\nPick up the discussion in:\n"
           "  GitHub Issues        https://github.com/NousResearch/shiina-agent/issues\n"
-          "  Nous Portal Support  https://portal.nousresearch.com/help\n"
+          "  Shiina Portal Support  https://portal.nousresearch.com/help\n"
           "  Discord              https://discord.gg/NousResearch")
 
 

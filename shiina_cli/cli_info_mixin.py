@@ -143,7 +143,7 @@ class CLIInfoMixin:
         if is_nous_shiina_non_agentic(getattr(self, "model", "") or ""):
             self._console_print()
             self._console_print(
-                "[bold yellow]⚠  Nous Research Shiina 3 & 4 models are NOT agentic and are not "
+                "[bold yellow]⚠  Shiina 3 & 4 models are NOT agentic and are not "
                 "designed for use with Shiina Agent.[/]")
             self._console_print(
                 "[dim]   They lack tool-calling capabilities required for agent workflows. "

@@ -102,7 +102,7 @@ class CLIBillingMixin:
         if state.error:
             self._dim(f"{load_failed}: {state.error}", icon="💳 ", lead=True)
         else:
-            self._dim("Not logged into Nous Portal.", icon="💳 ", lead=True)
+            self._dim("Not logged into Shiina Portal.", icon="💳 ", lead=True)
             print(f"  Run `shiina portal` to log in, then {cmd}.")
 
     def _print_org_line(self, state) -> None:
@@ -761,7 +761,7 @@ class CLIBillingMixin:
             if card.provenance is None:  # older NAS without provenance → generic line
                 self._dim('Your card saved on the portal will be charged.')
         print(f"  {_RULE}")
-        self._dim('By confirming, you allow Nous Research to charge your card.')
+        self._dim('By confirming, you allow Shiina to charge your card.')
         confirm_choices = [
             ("pay", f"Pay {format_money(amount)} now", "submit the charge"),
             ("portal", "Manage on portal", "manage your card / billing in the browser"),
@@ -956,7 +956,7 @@ class CLIBillingMixin:
         if reload_amt is None or threshold_amt is None or reload_amt <= threshold_amt:
             print("  🔴 Reload-to amount must be greater than the threshold.")
             return
-        self._dim(f"By confirming, you authorize Nous Research to charge {card.masked} whenever your balance reaches {format_money(threshold_amt)}. Turn off any time here or on the portal.", lead=True)
+        self._dim(f"By confirming, you authorize Shiina to charge {card.masked} whenever your balance reaches {format_money(threshold_amt)}. Turn off any time here or on the portal.", lead=True)
         if self._modal_choice("Turn on auto-reload?", f"Below {format_money(threshold_amt)} → reload to {format_money(reload_amt)}", _AUTO_RELOAD_AGREE_CHOICES) != "agree":
             print("  🟡 Cancelled.")
             return

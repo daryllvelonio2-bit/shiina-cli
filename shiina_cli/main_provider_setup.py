@@ -219,7 +219,7 @@ def _aux_config_menu() -> None:
              "  Side tasks (vision, compression, web extraction, etc.) default",
              '  to your main chat model.  "auto" means "use my main model" —',
              "  Shiina only falls back to a lightweight backend (OpenRouter,",
-             "  Nous Portal) if the main model is unavailable.  Override a",
+                         "  Shiina Portal) if the main model is unavailable.  Override a",
              "  task below if you want it pinned to a specific provider/model.", "")
 
         menu_tasks = _all_aux_tasks() + [(_DELEGATION_TASK_KEY, _DELEGATION_TASK_NAME, _DELEGATION_TASK_DESC)]

@@ -174,10 +174,10 @@ def cmd_dashboard_register(args) -> None:
         access_token = resolve_nous_access_token()
     except Exception as exc:
         if isinstance(exc, AuthError) and getattr(exc, "relogin_required", False):
-            print("✗ You're not logged into Nous Portal.\n"
+            print("✗ You're not logged into Shiina Portal.\n"
                   "  Run `shiina setup` (or `shiina auth add nous`) first, then retry.")
         else:
-            print(f"✗ Could not resolve a Nous Portal access token: {exc}")
+            print(f"✗ Could not resolve a Shiina Portal access token: {exc}")
         sys.exit(1)
     # An explicitly supplied portal (flag or env) is persisted in place; an inferred one is
     # written only if absent so .env isn't cluttered for the common production case.

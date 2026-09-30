@@ -1,4 +1,4 @@
-"""``shiina portal`` — the human-readable entry point for Nous Portal."""
+"""`shiina portal` — the human-readable entry point for Shiina Portal."""
 from __future__ import annotations
 
 import sys
@@ -47,7 +47,7 @@ def _cmd_status(args) -> int:
         auth = {}
     logged_in = bool(auth.get("logged_in"))
     free_tier = bool(auth.get("free_tier"))
-    _heading("Nous Portal")
+    _heading("Shiina Portal")
     if free_tier:
         from shiina_cli.anon_auth import FREE_TIER_LABEL, GUEST_MODEL, UPGRADE_HINT
         print(f"  Auth:    {color(f'{FREE_TIER_LABEL} · {GUEST_MODEL}', Colors.GREEN)}")
@@ -78,7 +78,7 @@ def _cmd_status(args) -> int:
     except Exception:
         print("  (could not resolve subscription state)")
         return 0
-    rows = [(feat.label, _feature_state(feat, via_nous="via Nous Portal")) for feat in features.items()]
+    rows = [(feat.label, _feature_state(feat, via_nous="via Shiina Portal")) for feat in features.items()]
     width = max((len(r[0]) for r in rows), default=0)
     for label, state in rows:
         print(f"  {label:<{width}}   {state}")
@@ -115,13 +115,13 @@ def _cmd_tools(args) -> int:
 
     _heading("Tool Gateway catalog")
     if not features.nous_auth_present:
-        print(color("  Not logged into Nous Portal — sign in with `shiina portal`.", Colors.YELLOW))
+        print(color("  Not logged into Shiina Portal — sign in with `shiina portal`.", Colors.YELLOW))
         print()
 
     label_width = max(len(label) for _, label, _ in _CATALOG)
     for key, label, partner in _CATALOG:
         feat = features.features.get(key)
-        state = color("unknown", Colors.DIM) if feat is None else _feature_state(feat, via_nous="✓ via Nous Portal")
+        state = color("unknown", Colors.DIM) if feat is None else _feature_state(feat, via_nous="✓ via Shiina Portal")
         print(f"  {label:<{label_width}}  partner: {partner:<14} {state}")
 
     print()
@@ -175,24 +175,24 @@ def add_parser(subparsers) -> None:
     """Register `shiina portal` on the given argparse subparsers object."""
     portal_parser = subparsers.add_parser(
         "portal",
-        help="Set up Nous Portal (login, model pick, Tool Gateway); see also `portal info`",
-        description=(
-            "Run `shiina portal` with no subcommand to log in to Nous Portal "
-            "and set it up — pick a model, set Nous as your provider, and offer "
-            "the Tool Gateway (the human-readable alias for `shiina auth add "
-            "nous --type oauth`, identical to `shiina setup --portal`). "
-            "Subcommands: login (default), info, open, tools."
-        ),
+        help="Set up Shiina Portal (login, model pick, Tool Gateway); see also `portal info`",
+                description=(
+                    "Run `shiina portal` with no subcommand to log in to Shiina Portal "
+                    "and set it up — pick a model, set Shiina as your provider, and offer "
+                    "the Tool Gateway (the human-readable alias for `shiina auth add "
+                    "nous --type oauth`, identical to `shiina setup --portal`). "
+                    "Subcommands: login (default), info, open, tools.",
+                ),
     )
     portal_sub = portal_parser.add_subparsers(dest="portal_command")
 
     # `status` is a hidden (no help) back-compat alias; registration order = `shiina portal -h` order.
     for name, help_text in (
-        ("login", "Log in to Nous Portal + set it up (default; one-shot onboarding)"),
+        ("login", "Log in to Shiina Portal + set it up (default; one-shot onboarding)"),
         ("info", "Show Portal auth + Tool Gateway routing summary"),
         ("status", None),
         ("open", "Open the Portal subscription page in your default browser"),
-        ("tools", "List Tool Gateway tools and which are routed via Nous"),
+        ("tools", "List Tool Gateway tools and which are routed via Shiina"),
     ):
         portal_sub.add_parser(name, **({} if help_text is None else {"help": help_text}))
 
