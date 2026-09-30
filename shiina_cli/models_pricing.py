@@ -1,7 +1,7 @@
 """Live model pricing.
 
 OpenRouter-compatible ``/v1/models`` pricing fetch with a per-endpoint/per-credential cache,
-Nous Portal sale chrome and org-policy filtering, and the Vercel AI Gateway / Novita / Fireworks /
+Shiina Portal sale chrome and org-policy filtering, and the Vercel AI Gateway / Novita / Fireworks /
 DeepInfra pricing adapters. Split out of ``shiina_cli.models``; helpers still defined there are
 looked up on ``shiina_cli.models`` at call time so ``patch("shiina_cli.models.<name>")`` mocks keep
 intercepting.
@@ -138,7 +138,7 @@ def _sale_pct(current: Any, original: Any) -> int | None:
 
 
 def compute_sale_discount(prompt: str, completion: str, original: Any) -> tuple[int, str, str] | None:
-    """Sale chrome from gateway ``pricing.original`` (Nous Portal only; callers gate on the provider
+    """Sale chrome from gateway ``pricing.original`` (Shiina Portal only; callers gate on the provider
     and opted in via ``include_sale_original=True``): ``(discount_percent, was_prompt_raw,
     was_completion_raw)`` when ``original`` is a dict and the current prompt (fallback: completion)
     rate is strictly below the original. Free / $0 models get a flat 100% off, with "was" prices
@@ -209,7 +209,7 @@ def fetch_models_with_pricing(
 ) -> dict[str, dict[str, Any]]:
     """Fetch ``/v1/models`` (any OpenRouter-compatible endpoint) → ``{model_id: {prompt, completion,
     ...}}``, cached per *base_url* and per credential so one caller's catalog never answers
-    another's read. *include_sale_original* (Nous Portal only) copies the gateway's pre-discount
+    another's read. *include_sale_original* (Shiina Portal only) copies the gateway's pre-discount
     ``pricing.original`` rates through as a nested ``original`` dict for sale chrome."""
     from shiina_cli.models import _SHIINA_USER_AGENT
     url_root = (base_url or "").rstrip("/")
@@ -236,7 +236,7 @@ def fetch_models_with_pricing(
         mid, pricing = item.get("id"), item.get("pricing")
         if mid and isinstance(pricing, dict):
             entry = _pricing_entry(pricing)
-            # Sale chrome is Nous Portal-only; never copy pricing.original for other catalogs.
+            # Sale chrome is Shiina Portal-only; never copy pricing.original for other catalogs.
             original = pricing.get("original") if include_sale_original else None
             if isinstance(original, dict):
                 orig_entry = {key: str(original[key]) for key in ("prompt", "completion", "input_cache_read", "input_cache_write")
@@ -280,7 +280,7 @@ _DEFAULT_NOUS_INFERENCE_BASE = "https://inference-api.nousresearch.com"
 
 
 def _resolve_nous_pricing_credentials() -> tuple[str, str]:
-    """``(api_key, base_url)`` for Nous Portal pricing; base_url is the bare origin (no ``/v1``).
+    """``(api_key, base_url)`` for Shiina Portal pricing; base_url is the bare origin (no ``/v1``).
     Precedence mirrors runtime credential resolution: ``NOUS_INFERENCE_BASE_URL`` (staging /
     preview) → resolved credential ``base_url`` → production default. Without the override a
     staging profile's sale ``pricing.original`` would never reach the pickers."""
@@ -318,7 +318,7 @@ def _fetch_nous_pricing(api_key: str, base_url: str, *, force_refresh: bool) -> 
         api_key=api_key,
         base_url=base_url,
         force_refresh=force_refresh,
-        include_sale_original=True,  # Sale chrome (pricing.original) is Nous Portal-only.
+        include_sale_original=True,  # Sale chrome (pricing.original) is Shiina Portal-only.
         cache_ttl_seconds=_NOUS_CATALOG_TTL_SECONDS,
     )
 

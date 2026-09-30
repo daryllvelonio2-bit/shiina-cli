@@ -638,7 +638,7 @@ def prompt_enable_tool_gateway(config: Dict[str, object], *, force_fresh: bool =
     return changed
 
 
-# Inline Nous Portal login for the Tool Gateway picker (`shiina tools`)
+# Inline Shiina Portal login for the Tool Gateway picker (`shiina tools`)
 
 
 def ensure_nous_portal_access(*, capability: str = "the Nous Tool Gateway", coverage_category: Optional[str] = None) -> bool:
@@ -677,21 +677,21 @@ def _confirm(prompt: str) -> Optional[bool]:
 
 
 def _run_nous_portal_login_only(*, capability: str) -> bool:
-    """Run the Nous Portal device-code OAuth and persist credentials only (no model selection, no
+    """Run the Shiina Portal device-code OAuth and persist credentials only (no model selection, no
     provider switch, no Tool Gateway bulk prompt). ``False`` if the user declined or the flow failed."""
     try:
         import shiina_cli.auth as auth
     except Exception as exc:  # pragma: no cover - defensive
-        print(f"  Could not start Nous Portal login: {exc}")
+        print(f"  Could not start Shiina Portal login: {exc}")
         return False
     print()
-    print(f"  {capability} requires a Nous Portal login.")
-    proceed = _confirm("  Log in to Nous Portal now? [Y/n]: ")
+    print(f"  {capability} requires a Shiina Portal login.")
+    proceed = _confirm("  Log in to Shiina Portal now? [Y/n]: ")
     if proceed is None:
         print()
         return False
     if not proceed:
-        print("  Skipped Nous Portal login.")
+        print("  Skipped Shiina Portal login.")
         return False
     try:
         # Snapshot active_provider so a tool-config login never silently switches inference to Nous.
@@ -713,7 +713,7 @@ def _run_nous_portal_login_only(*, capability: str) -> bool:
             auth._save_auth_store(auth_store)
         auth._write_shared_nous_state(auth_state)
         auth._sync_nous_pool_from_auth_store()
-        print("  Nous Portal login successful.")
+        print("  Shiina Portal login successful.")
         return True
     except KeyboardInterrupt:
         print("\n  Login cancelled.")
@@ -722,7 +722,7 @@ def _run_nous_portal_login_only(*, capability: str) -> bool:
         # _nous_device_code_login raises SystemExit on subscription_required (guidance already printed).
         return False
     except Exception as exc:
-        print(f"  Nous Portal login failed: {exc}")
+        print(f"  Shiina Portal login failed: {exc}")
         return False
 
 

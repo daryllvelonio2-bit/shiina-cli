@@ -82,7 +82,7 @@ def _register_self_hosted_client(
         except Exception:
             detail = ""
         if exc.code == 401:
-            message = ("Nous Portal rejected the access token (401). "
+            message = ("Shiina Portal rejected the access token (401). "
                        "Try `shiina auth add nous` to re-authenticate.")
         elif exc.code == 403:
             message = detail or "Your account is not permitted to register a self-hosted dashboard."
@@ -90,7 +90,7 @@ def _register_self_hosted_client(
             message = f"Portal returned HTTP {exc.code}" + (f": {detail}" if detail else "")
         raise RuntimeError(message) from exc
     except urllib.error.URLError as exc:
-        raise RuntimeError(f"Could not reach Nous Portal at {portal_base_url}: {exc.reason}") from exc
+        raise RuntimeError(f"Could not reach Shiina Portal at {portal_base_url}: {exc.reason}") from exc
     if not isinstance(payload, dict) or not payload.get("client_id"):
         raise RuntimeError("Portal returned an unexpected response (no client_id).")
     return payload

@@ -45,7 +45,7 @@ _CANONICAL_NAMES: dict[str, str] = {
     "custom:openrouter": "OpenRouter",
     "openai-codex": "OpenAI Codex",
     "anthropic": "Anthropic",
-    "nous": "Nous Portal",
+    "nous": "Shiina Portal",
     "nvidia": "NVIDIA NIM",
     "custom:nvidia": "NVIDIA NIM",
 }

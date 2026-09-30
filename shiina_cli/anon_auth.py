@@ -54,7 +54,7 @@ ANON_SECRET_ENV = "SHIINA_ANON_API_SECRET"
 GUEST_ONBOARDING_ENV = "SHIINA_GUEST_ONBOARDING"
 GUEST_MINT_TIMEOUT_SECONDS = 5.0
 # Copy shared by every surface that names the free tier (R-USR-1): never guest / anonymous / account.
-FREE_TIER_LABEL = "Nous · free tier"
+FREE_TIER_LABEL = "Shiina · free tier"
 UPGRADE_HINT = "Run `shiina auth upgrade` to sign in with a Nous account, or /login inside a chat."
 FREE_TIER_NOT_SIGNED_IN = (
     "You're not signed in. Free inference and connectors are always on. "

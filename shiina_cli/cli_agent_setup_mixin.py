@@ -361,7 +361,7 @@ class CLIAgentSetupMixin:
         from cli import _cprint, logger
         _cprint("")
         _cprint("☤ No inference provider is configured yet — let's fix that.")
-        _cprint("  You'll pick a provider (Nous Portal OAuth is the fastest; "
+        _cprint("  You'll pick a provider (Shiina Portal OAuth is the fastest; "
                 "no API key needed) and a model.")
         try:
             answer = input("  Set up a provider now? [Y/n]: ").strip().lower()

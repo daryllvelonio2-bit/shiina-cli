@@ -661,7 +661,7 @@ async def update_learning_node(body: LearningNodeEdit):
         body.profile, lambda: edit_node(body.id, body.content), 400, "edit failed")
 
 
-# Portal — Nous Portal auth + Tool Gateway routing status (read-only).
+# Portal — Shiina Portal auth + Tool Gateway routing status (read-only).
 
 
 @router.get("/api/portal")
@@ -673,7 +673,7 @@ async def get_portal_status():
 
 def _feature_state(feat) -> str:
     if getattr(feat, "managed_by_nous", False):
-        return "via Nous Portal"
+        return "via Shiina Portal"
     if getattr(feat, "active", False):
         return getattr(feat, "current_provider", None) or "active"
     return "not configured"

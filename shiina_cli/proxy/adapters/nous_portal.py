@@ -42,7 +42,7 @@ class NousPortalAdapter(UpstreamAdapter):
 
     @property
     def display_name(self) -> str:
-        return "Nous Portal"
+        return "Shiina Portal"
 
     @property
     def allowed_paths(self) -> FrozenSet[str]:
@@ -70,7 +70,7 @@ class NousPortalAdapter(UpstreamAdapter):
         with self._lock:
             state = self._read_state()
             if state is None:
-                raise RuntimeError("Not logged into Nous Portal. Run `shiina auth add nous` first.")
+                raise RuntimeError("Not logged into Shiina Portal. Run `shiina auth add nous` first.")
             try:
                 refreshed = resolve_nous_runtime_credentials(
                     force_refresh=force_refresh, stale_access_token=stale_access_token or None
@@ -79,11 +79,11 @@ class NousPortalAdapter(UpstreamAdapter):
                 if isinstance(exc, AuthError) and _is_terminal_nous_refresh_error(exc):
                     _quarantine_nous_oauth_state(state, exc, reason="proxy_refresh_failure")
                     self._save_state(state, quarantine_error=exc, quarantine_reason="proxy_refresh_failure")
-                raise RuntimeError(f"Failed to refresh Nous Portal credentials: {exc}") from exc
+                raise RuntimeError(f"Failed to refresh Shiina Portal credentials: {exc}") from exc
             runtime_key = refreshed.get("api_key")
             if not runtime_key:
                 raise RuntimeError(
-                    "Nous Portal refresh did not return a usable inference JWT. "
+                    "Shiina Portal refresh did not return a usable inference JWT. "
                     "Try `shiina auth add nous` to re-authenticate."
                 )
             # The returned base_url already honors the NOUS_INFERENCE_BASE_URL override (documented

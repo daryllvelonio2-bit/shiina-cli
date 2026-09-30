@@ -444,7 +444,7 @@ def _validate_live_listing(req: _Request) -> Optional[dict[str, Any]]:
     # time, so mirror that source of truth for per-message /model validation.
     if req.normalized == "nous" and req.lookup.lower() in _nous_portal_recommended_names():
         return _accept_with_note(f"Note: `{req.requested}` was not found in the live /v1/models listing "
-                                 "but is a current Nous Portal recommendation — accepted.")
+                                 "but is a current Shiina Portal recommendation — accepted.")
     return _reject(f"Model `{req.requested}` was not found in this provider's model listing.{match.suggestion_text}")
 
 

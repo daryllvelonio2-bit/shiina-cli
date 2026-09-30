@@ -1899,7 +1899,7 @@ cmd_dump = _forward_command("cmd_dump", "shiina_cli.dump", "run_dump", doc='Dump
 cmd_debug = _forward_command("cmd_debug", "shiina_cli.debug", "run_debug", doc='Debug tools (share report, etc.).')
 cmd_skin = _forward_command("cmd_skin", "shiina_cli.skin_cmd", "skin_command", doc='Skin management (list / use / set).')
 cmd_import = _forward_command("cmd_import", "shiina_cli.backup", "run_import", doc='Restore a Shiina backup from a zip file.')
-cmd_dashboard_register = _forward_command("cmd_dashboard_register", "shiina_cli.dashboard_register", "cmd_dashboard_register", doc='Register a self-hosted dashboard OAuth client with Nous Portal.')
+cmd_dashboard_register = _forward_command("cmd_dashboard_register", "shiina_cli.dashboard_register", "cmd_dashboard_register", doc='Register a self-hosted dashboard OAuth client with Shiina Portal.')
 cmd_gateway_enroll = _forward_command("cmd_gateway_enroll", "shiina_cli.gateway_enroll", "cmd_gateway_enroll", doc='Enroll a self-hosted gateway with a relay connector.')
 cmd_prompt_size = _forward_command("cmd_prompt_size", "shiina_cli.prompt_size", "cmd_prompt_size", doc='Show a byte/char breakdown of the system prompt + tool schemas.')
 cmd_pairing = _forward_command("cmd_pairing", "shiina_cli.pairing", "pairing_command")
@@ -2011,7 +2011,7 @@ def _resolve_active_provider(config, model_cfg, effective_provider, custom_provi
             if exc.code == "no_provider_configured":
                 # The picker that is about to open IS the fix; a warning that says
                 # "run `shiina model`" from inside `shiina model` is circular.
-                print("No provider is set up yet — pick one below. (Nous Portal works without an API key.)")
+                print("No provider is set up yet — pick one below. (Shiina Portal works without an API key.)")
             elif effective_provider == "auto":
                 print(f"Warning: {format_auth_error(exc)} Falling back to auto provider detection.")
             active = None  # no provider yet; default to first in list

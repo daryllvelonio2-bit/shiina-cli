@@ -39,7 +39,7 @@ def _unusable_invoke_jwt_error(reason: str, *, no_refresh_token: bool = False) -
     """Shared ``relogin=True`` error for an access token that is not a usable inference JWT."""
     detail = " and no refresh token is available" if no_refresh_token else ""
     return _nous_err(
-        f"Nous Portal access token is not a usable inference JWT ({reason}){detail}. "
+        f"Shiina Portal access token is not a usable inference JWT ({reason}){detail}. "
         f"{_UNUSABLE_JWT_RELOGIN}",
         reason, relogin=True)
 

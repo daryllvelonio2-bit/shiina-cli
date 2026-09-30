@@ -292,7 +292,7 @@ def _configure_tool_category(ts_key: str, cat: dict, config: dict, *, force_fres
         # Subscribers get the "included" star; everyone else a hint that selecting triggers a Portal login.
         sub_marker = ""
         if not reconfigure and p.get("managed_nous_feature"):
-            sub_marker = "  ★ Included with your Nous subscription" if _nous_logged_in else "  ★ via Nous Portal (login on select)"
+            sub_marker = "  ★ Included with your Nous subscription" if _nous_logged_in else "  ★ via Shiina Portal (login on select)"
         provider_choices.append(f"{p['name']}{badge}{tag}{configured}{sub_marker}")
 
     if not reconfigure:
@@ -760,7 +760,7 @@ def apply_provider_selection(ts_key: str, provider_name: str, config: dict) -> N
 
 def _nous_provider_gate(provider: dict, config: dict, managed_feature, *, force_fresh: bool) -> bool:
     """Return False (after printing why) when a Nous-gated row cannot be selected.
-    Managed Tool Gateway rows are always listed but only *activate* with paid Nous Portal access —
+    Managed Tool Gateway rows are always listed but only *activate* with paid Shiina Portal access —
     selecting one runs an inline Portal login (auth + entitlement only, no inference-provider switch).
     Pure pre-auth UX rows (``requires_nous_auth`` without a managed feature) keep the older logged-in +
     entitled gate."""
@@ -772,7 +772,7 @@ def _nous_provider_gate(provider: dict, config: dict, managed_feature, *, force_
         if not ensure_nous_portal_access(
             capability=f"{provider.get('name', 'the Nous Tool Gateway')}",
             coverage_category=MANAGED_FEATURE_COVERAGE_CATEGORY.get(managed_feature)):
-            _print_warning("  Not enabled — Nous Portal access is required for this backend.")
+            _print_warning("  Not enabled — Shiina Portal access is required for this backend.")
             return False
         return True
 
@@ -782,7 +782,7 @@ def _nous_provider_gate(provider: dict, config: dict, managed_feature, *, force_
         if not features.nous_auth_present or not entitled:
             message = format_nous_portal_entitlement_message(
                 features.account_info, capability=f"{provider.get('name', 'Nous Subscription')}")
-            _print_warning(f"  {message or 'Nous Subscription is only available after logging into Nous Portal.'}")
+            _print_warning(f"  {message or 'Nous Subscription is only available after logging into Shiina Portal.'}")
             return False
     return True
 
@@ -920,7 +920,7 @@ def _configure_provider(provider: dict, config: dict, *, force_fresh: bool = Tru
         return
 
     if not reconfigure and _show_portal_hint(provider, config, managed_feature, force_fresh):
-        _print_info("  Available through Nous Portal subscription.")
+        _print_info("  Available through Shiina Portal subscription.")
 
     all_configured = _prompt_env_vars(env_vars, reconfigure=reconfigure)
     if provider.get("post_setup") and all_configured:

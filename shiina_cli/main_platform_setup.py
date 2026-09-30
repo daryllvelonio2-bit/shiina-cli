@@ -295,7 +295,7 @@ def _sync_status(ssc) -> int:
     elif status.get("logged_in"):
         _err("\nOrg skills: not applicable — this account isn't a member of a shared organisation.")
     if not status.get("logged_in"):
-        _err("\nNot logged into Nous Portal — sync is inert.")
+        _err("\nNot logged into Shiina Portal — sync is inert.")
     elif not status.get("nous_admin"):
         _err("\nSync is not enabled for your account yet.")
     elif not status.get("feature_enabled"):

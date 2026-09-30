@@ -288,7 +288,7 @@ def _status_card(
 # credential source), not the internal auth_mode string ("oauth_pkce").
 _PROVIDER_STATUS: Dict[str, tuple[str, Callable[[dict], dict]]] = {
     "nous": ("get_nous_auth_status_local", lambda r: {**_status_card(
-        r, "nous_portal", r.get("portal_base_url") or "Nous Portal",
+        r, "nous_portal", r.get("portal_base_url") or "Shiina Portal",
         _truncate_token(r.get("access_token")), r.get("access_expires_at"), bool(r.get("has_refresh_token")),
     ), "free_tier": bool(r.get("free_tier")), "account_tier": r.get("account_tier")}),
     "openai-codex": ("get_codex_auth_status", lambda r: _status_card(
