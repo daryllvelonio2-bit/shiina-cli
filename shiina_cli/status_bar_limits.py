@@ -147,7 +147,6 @@ def format_limits_compact(
     if width >= 80 and w_5h and w_wk:
         items = [("5h ", w_5h), ("w ", w_wk)]
     elif w_5h and w_wk:
-        p5 = round(100 - w_5h.used_percent) if w_5h.used_percent is not None else 100
         pw = round(100 - w_wk.used_percent) if w_wk.used_percent is not None else 100
         if pw == 0:
             items = [("w ", w_wk)]

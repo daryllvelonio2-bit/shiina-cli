@@ -27,6 +27,11 @@ logger = logging.getLogger(__name__)
 
 ROUTER_DEFAULT_BASE_URL = "https://api.router.com/v1"
 
+#: Age at which the disk mirror is considered stale: the cache is still served (never HTTP on the
+#: hot path) while a background warmer re-fetches. Matches the catalog TTL used by the OpenRouter
+#: image-gen plugin (``_CATALOG_TTL_SECONDS``).
+_DISK_TTL_SECONDS = 900.0
+
 #: model id -> accepted effort levels. ``[]`` = model accepts NO reasoning
 #: fields; absent = unknown (callers keep their defaults).
 _efforts_cache: Optional[dict[str, list[str]]] = None

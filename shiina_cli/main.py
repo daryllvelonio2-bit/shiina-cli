@@ -3464,13 +3464,18 @@ def _parse_cli_args(parser, subparsers, argv):
         return args
 
     subparsers.required = True
+    # Suppress argparse's usage dump for the first attempt only. The restore MUST be a
+    # finally: a non-SystemExit failure here (e.g. a malformed parser description) used to
+    # leave sys.stderr pointing at a dead StringIO, swallowing the traceback and every
+    # later stderr write for the rest of the process.
     _saved_stderr = sys.stderr
     try:
         sys.stderr = _io.StringIO()
-        args = parser.parse_args(_processed_argv)
-        sys.stderr = _saved_stderr
+        try:
+            args = parser.parse_args(_processed_argv)
+        finally:
+            sys.stderr = _saved_stderr
     except SystemExit as exc:
-        sys.stderr = _saved_stderr
         if exc.code == 0:  # help/version already printed; don't print twice
             raise
         # Subcommand consumed as a flag value (e.g. -c model): normal parse.

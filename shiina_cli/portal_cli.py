@@ -176,13 +176,13 @@ def add_parser(subparsers) -> None:
     portal_parser = subparsers.add_parser(
         "portal",
         help="Set up Shiina Portal (login, model pick, Tool Gateway); see also `portal info`",
-                description=(
-                    "Run `shiina portal` with no subcommand to log in to Shiina Portal "
-                    "and set it up — pick a model, set Shiina as your provider, and offer "
-                    "the Tool Gateway (the human-readable alias for `shiina auth add "
-                    "nous --type oauth`, identical to `shiina setup --portal`). "
-                    "Subcommands: login (default), info, open, tools.",
-                ),
+        description=(
+            "Run `shiina portal` with no subcommand to log in to Shiina Portal "
+            "and set it up — pick a model, set Shiina as your provider, and offer "
+            "the Tool Gateway (the human-readable alias for `shiina auth add "
+            "nous --type oauth`, identical to `shiina setup --portal`). "
+            "Subcommands: login (default), info, open, tools."
+        ),
     )
     portal_sub = portal_parser.add_subparsers(dest="portal_command")
 

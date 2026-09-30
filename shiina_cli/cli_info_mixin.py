@@ -10,7 +10,6 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 import os
-import shutil
 import threading
 import time
 
@@ -610,7 +609,7 @@ class CLIInfoMixin:
             print(f"  {line}")
         print()
 
-    def _show_usage(self, target_provider: Optional[str] = None):
+    def _show_usage(self, target_provider: str | None = None):
         """Rate limits + session token usage (when a live agent exists) + provider account quota / credits."""
         from cli import datetime, format_duration_compact
 

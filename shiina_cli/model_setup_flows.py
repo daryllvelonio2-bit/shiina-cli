@@ -623,13 +623,10 @@ def _model_flow_copilot_acp(config, current_model=""):
 def _model_flow_antigravity(config, current_model=""):
     """Google Antigravity model selection using native local agy OAuth."""
     from agent.antigravity_client import GoogleOAuthTokenManager
-    from shiina_cli.auth import PROVIDER_REGISTRY
     from shiina_cli.models import _PROVIDER_MODELS
 
     del config
     provider_id = "antigravity"
-    pconfig = PROVIDER_REGISTRY.get(provider_id)
-    name = pconfig.name if pconfig else "Google Antigravity"
 
     try:
         mgr = GoogleOAuthTokenManager()
@@ -671,13 +668,10 @@ def _model_flow_antigravity(config, current_model=""):
 def _model_flow_kiro(config, current_model=""):
     """Kiro CLI model selection using native local Kiro account."""
     from agent.kiro_client import check_kiro_credentials
-    from shiina_cli.auth import PROVIDER_REGISTRY
     from shiina_cli.models import _PROVIDER_MODELS
 
     del config
     provider_id = "kiro"
-    pconfig = PROVIDER_REGISTRY.get(provider_id)
-    name = pconfig.name if pconfig else "Kiro"
 
     authed, provider = check_kiro_credentials()
     if not authed:
@@ -712,13 +706,10 @@ def _model_flow_kiro(config, current_model=""):
 def _model_flow_freebuff(config, current_model=""):
     """Freebuff CLI model selection using native local Freebuff credentials."""
     from agent.freebuff_client import get_freebuff_token, find_freebuff_binary, fetch_freebuff_models
-    from shiina_cli.auth import PROVIDER_REGISTRY
     from shiina_cli.models import _PROVIDER_MODELS
 
     del config
     provider_id = "freebuff"
-    pconfig = PROVIDER_REGISTRY.get(provider_id)
-    name = pconfig.name if pconfig else "Freebuff"
 
     token = get_freebuff_token()
     bin_path = find_freebuff_binary()
@@ -762,12 +753,10 @@ def _model_flow_opencode(config, current_model=""):
         fetch_opencode_models,
         OPENCODE_FALLBACK_MODELS,
     )
-    from shiina_cli.auth import PROVIDER_REGISTRY
     from shiina_cli.models import _PROVIDER_MODELS
 
     del config
     provider_id = "opencode-cli"
-    pconfig = PROVIDER_REGISTRY.get(provider_id)
 
     creds = get_opencode_credentials()
     bin_path = find_opencode_binary()
@@ -794,13 +783,10 @@ def _model_flow_opencode(config, current_model=""):
 def _model_flow_qoder(config, current_model=""):
     """Qoder AI model selection using Personal Access Token (PAT)."""
     from agent.qoder_client import get_default_qoder_token_manager, fetch_qoder_models, QODER_FALLBACK_MODELS
-    from shiina_cli.auth import PROVIDER_REGISTRY
-    from shiina_cli.config import get_env_value, save_env_value
+    from shiina_cli.config import save_env_value
 
     del config
     provider_id = "qoder"
-    pconfig = PROVIDER_REGISTRY.get(provider_id)
-    name = pconfig.name if pconfig else "Qoder"
 
     mgr = get_default_qoder_token_manager()
     pat = ""
@@ -1225,8 +1211,10 @@ def _model_flow_anthropic(config, current_model=""):
     # Check ALL credential sources
     existing_key = get_anthropic_key()
     cc_available = False
+    # Imported OUTSIDE the suppress: a failed import here would otherwise leave
+    # ``_is_oauth_token`` unbound and raise NameError on the guard below, past the guard's reach.
+    from agent.anthropic_credentials import _is_oauth_token, is_claude_code_token_valid, read_claude_code_credentials
     with contextlib.suppress(Exception):
-        from agent.anthropic_credentials import read_claude_code_credentials, is_claude_code_token_valid, _is_oauth_token
         cc_creds = read_claude_code_credentials()
         if cc_creds and is_claude_code_token_valid(cc_creds):
             cc_available = True

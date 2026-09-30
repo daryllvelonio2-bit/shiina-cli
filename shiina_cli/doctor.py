@@ -71,7 +71,7 @@ def _check_auth_providers(should_fix: bool, f: Finding) -> None:
     """Refresh-free OAuth status snapshot (doctor must never trigger a token refresh)."""
     with warn_on_error("Auth provider status", "(could not check: {e})"):
         from shiina_cli.auth import get_nous_auth_status_local, get_codex_auth_status, get_minimax_oauth_auth_status
-        _log_row("Shiina Portal auth", get_nous_auth_status_local())
+        _login_row("Shiina Portal auth", get_nous_auth_status_local())
         # Native OAuth is Shiina' own device-code flow; the Codex CLI only imports existing ~/.codex/auth.json
         # tokens, so the hint sits under the Codex row (not as another provider's remedy).
         if not _login_row("OpenAI Codex auth", get_codex_auth_status(), show_error=True) and not _safe_which("codex"):

@@ -1800,3 +1800,19 @@ def test_docker_daemon_probe_uses_version_not_info(monkeypatch):
     doctor_tools._check_docker_backend("docker", False, [])
 
     assert calls and calls[0][:2] == ["docker", "version"]
+
+
+def test_auth_provider_check_uses_a_defined_row_helper(capsys):
+    """Invariant: `shiina doctor`'s auth row prints, instead of NameError'ing into
+    "(could not check: name '_log_row' is not defined)".
+
+    Regression: the Shiina Portal row called ``_log_row``, which never existed in the module, so
+    the row (and everything after it in the same ``warn_on_error`` block) silently degraded to a
+    warning instead of reporting Portal / Codex / MiniMax auth state.
+    """
+    finding = doctor_mod._check_auth_providers(False)  # doctor_check wraps (should_fix) -> Finding
+    out = capsys.readouterr().out
+
+    assert "could not check" not in out
+    assert "Shiina Portal auth" in out
+    assert isinstance(finding, doctor_mod.Finding)
