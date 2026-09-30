@@ -646,7 +646,9 @@ def _model_flow_antigravity(config, current_model=""):
     _say("  Google Antigravity uses your active Antigravity subscription natively.",
          "  Authenticated via Google OAuth (Linux SecretService / agy session).", "")
 
-    catalog_ids = _PROVIDER_MODELS.get(provider_id, [
+    from agent.antigravity_client import fetch_antigravity_models
+
+    catalog_ids = fetch_antigravity_models() or _PROVIDER_MODELS.get(provider_id, [
         "claude-sonnet-4-6",
         "claude-opus-4-6-thinking",
         "gemini-3.8-flash-tiered",
@@ -705,6 +707,88 @@ def _model_flow_kiro(config, current_model=""):
     if selected:
         _finish_model(selected, provider_id, f"Default model set to: {selected} (via Kiro)",
                       base_url="kiro://local", api_mode="chat_completions")
+
+
+def _model_flow_freebuff(config, current_model=""):
+    """Freebuff CLI model selection using native local Freebuff credentials."""
+    from agent.freebuff_client import get_freebuff_token, find_freebuff_binary, fetch_freebuff_models
+    from shiina_cli.auth import PROVIDER_REGISTRY
+    from shiina_cli.models import _PROVIDER_MODELS
+
+    del config
+    provider_id = "freebuff"
+    pconfig = PROVIDER_REGISTRY.get(provider_id)
+    name = pconfig.name if pconfig else "Freebuff"
+
+    token = get_freebuff_token()
+    bin_path = find_freebuff_binary()
+
+    if not token and not bin_path:
+        _say("  ⚠ Could not find Freebuff CLI installation or login credentials.",
+             "  Please install Freebuff (`npm install -g freebuff`) and sign in using `freebuff`.")
+        return
+
+    _say("  Freebuff uses your active Freebuff CLI models natively.",
+         "  Authenticated via local Freebuff session credentials.", "")
+
+    catalog_ids = fetch_freebuff_models() or _PROVIDER_MODELS.get(provider_id, [
+        "glm-5.3-flash",
+        "deepseek-v4-flash",
+        "gpt-5.6-luna",
+        "gpt-6-luna",
+        "mimo-v2.5",
+        "mimo-v2.6-pro",
+        "solar-pro4",
+        "solar-mini4",
+        "kimi-k3-eco",
+        "gemini-3.8-flash",
+        "muse-spark-1.2",
+    ])
+
+    selected = _pick_model_or_prompt(
+        catalog_ids, "Model name: ", current_model=current_model or "glm-5.3-flash",
+        confirm_provider=provider_id, confirm_base_url="freebuff://local")
+
+    if selected:
+        _finish_model(selected, provider_id, f"Default model set to: {selected} (via Freebuff)",
+                      base_url="freebuff://local", api_mode="chat_completions")
+
+
+def _model_flow_opencode(config, current_model=""):
+    """OpenCode CLI model selection using local OpenCode CLI and models."""
+    from agent.opencode_client import (
+        find_opencode_binary,
+        get_opencode_credentials,
+        fetch_opencode_models,
+        OPENCODE_FALLBACK_MODELS,
+    )
+    from shiina_cli.auth import PROVIDER_REGISTRY
+    from shiina_cli.models import _PROVIDER_MODELS
+
+    del config
+    provider_id = "opencode-cli"
+    pconfig = PROVIDER_REGISTRY.get(provider_id)
+
+    creds = get_opencode_credentials()
+    bin_path = find_opencode_binary()
+
+    if not creds and not bin_path:
+        _say("  ⚠ Could not find OpenCode CLI installation or credentials.",
+             "  Please install OpenCode (`npm install -g opencode-ai` or `brew install anomalyco/tap/opencode`).")
+        return
+
+    _say("  OpenCode CLI provides autonomous coding models and local provider integrations.",
+         "  Authenticated via local OpenCode configuration.", "")
+
+    catalog_ids = fetch_opencode_models() or _PROVIDER_MODELS.get(provider_id, list(OPENCODE_FALLBACK_MODELS))
+
+    selected = _pick_model_or_prompt(
+        catalog_ids, "Model name: ", current_model=current_model or "opencode/big-pickle",
+        confirm_provider=provider_id, confirm_base_url="opencode://local")
+
+    if selected:
+        _finish_model(selected, provider_id, f"Default model set to: {selected} (via OpenCode CLI)",
+                      base_url="opencode://local", api_mode="chat_completions")
 
 
 def _model_flow_qoder(config, current_model=""):

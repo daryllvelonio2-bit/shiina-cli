@@ -115,6 +115,18 @@ SHIINA_OVERLAYS: Dict[str, ShiinaOverlay] = {
         base_url_override="https://api.cline.bot/api/v1",
         base_url_env_var="CLINE_BASE_URL",
     ),
+    "freebuff": ShiinaOverlay(
+        transport="chat_completions",
+        auth_type="external_process",
+        base_url_override="freebuff://local",
+        base_url_env_var="FREEBUFF_BASE_URL",
+    ),
+    "opencode-cli": ShiinaOverlay(
+        transport="chat_completions",
+        auth_type="external_process",
+        base_url_override="opencode://local",
+        base_url_env_var="OPENCODE_BASE_URL",
+    ),
 }
 
 
@@ -162,6 +174,8 @@ _ALIAS_GROUPS: Dict[str, Tuple[str, ...]] = {
     "kiro": ("kiro-cli", "kiro-ai", "kiro-dev", "xkiro"),
     "qoder": ("qoder-ai", "qoder.com", "qoder-sh"),
     "cline": ("cline-ai", "cline-bot", "cline-cli"),
+    "freebuff": ("codebuff", "freebuff-cli"),
+    "opencode-cli": ("opencode-local", "opencode-agent", "opencode-bin", "opencode-dev"),
 }
 ALIASES: Dict[str, str] = {alias: canon for canon, aliases in _ALIAS_GROUPS.items() for alias in aliases}
 
@@ -175,6 +189,7 @@ _LABEL_OVERRIDES: Dict[str, str] = {
     "nebius-token-factory": "Nebius Token Factory", "tencent-tokenplan": "Tencent TokenPlan", "lmstudio": "LM Studio",
     "local": "Local endpoint", "bedrock": "AWS Bedrock", "vertex": "Google Vertex AI", "ollama-cloud": "Ollama Cloud",
     "xai-oauth": "xAI Grok OAuth (SuperGrok / Premium+)", "qoder": "Qoder AI", "cline": "Cline",
+    "freebuff": "Freebuff CLI", "opencode-cli": "OpenCode CLI",
 }
 
 

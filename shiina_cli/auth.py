@@ -1891,9 +1891,25 @@ def _external_process_auth_evidence(provider_id: str) -> tuple[bool, Optional[st
             mgr = GoogleOAuthTokenManager()
             token = mgr.get_access_token()
             if token:
-                return True, "Linux SecretService (agy login)"
+                return True, "Google Antigravity OAuth (agy)"
         except Exception as exc:
             logger.debug("antigravity auth evidence check failed: %s", exc)
+        for bin_name in ("agy", "antigravity"):
+            if shutil.which(bin_name) or (Path.home() / ".local/bin" / bin_name).is_file():
+                return True, f"Google Antigravity CLI ({bin_name})"
+        return False, None
+
+    if provider_id in ("freebuff", "codebuff", "freebuff-cli"):
+        try:
+            from agent.freebuff_client import get_freebuff_token, find_freebuff_binary
+            tok = get_freebuff_token()
+            if tok:
+                return True, "Freebuff credentials (~/.config/manicode/credentials.json)"
+            binary = find_freebuff_binary()
+            if binary:
+                return True, f"Freebuff CLI ({os.path.basename(binary)})"
+        except Exception as exc:
+            logger.debug("freebuff auth evidence check failed: %s", exc)
         return False, None
 
     if provider_id in ("kiro", "kiro-cli", "kiro-ai", "xkiro"):
@@ -1904,6 +1920,9 @@ def _external_process_auth_evidence(provider_id: str) -> tuple[bool, Optional[st
                 return True, f"Kiro SQLite store ({provider})"
         except Exception as exc:
             logger.debug("kiro auth evidence check failed: %s", exc)
+        for bin_name in ("kiro-cli", "kiro"):
+            if shutil.which(bin_name) or (Path.home() / ".local/bin" / bin_name).is_file():
+                return True, f"Kiro CLI ({bin_name})"
         return False, None
 
     if provider_id in ("cline", "cline-ai", "cline-bot", "cline-cli"):
@@ -1918,6 +1937,21 @@ def _external_process_auth_evidence(provider_id: str) -> tuple[bool, Optional[st
                     return True, "Cline CLI local session"
         except Exception as exc:
             logger.debug("cline auth evidence check failed: %s", exc)
+        if shutil.which("cline"):
+            return True, "Cline CLI on PATH"
+        return False, None
+
+    if provider_id in ("opencode", "opencode-cli", "opencode-local", "opencode-agent", "opencode-bin"):
+        try:
+            from agent.opencode_client import check_opencode_credentials, find_opencode_binary
+            authed, note = check_opencode_credentials()
+            if authed:
+                return True, note
+            binary = find_opencode_binary()
+            if binary:
+                return True, f"OpenCode CLI ({os.path.basename(binary)})"
+        except Exception as exc:
+            logger.debug("opencode auth evidence check failed: %s", exc)
         return False, None
 
     if provider_id != "copilot-acp":

@@ -916,7 +916,7 @@ DEFAULT_CONFIG = {
         # stash, battery, title, total_tokens (session Σ, opt-in only). Narrow terminals still drop
         # context_detail/prompt_elapsed/idle_since.
         "status_bar": {
-            "fields": ["model", "context_detail"],
+            "fields": ["model", "context_detail", "context_pct"],
         },
         "copy_shortcut": "auto",  # "auto" (platform default) | ctrl_c | ctrl_shift_c | disabled
         # Petdex animated mascot (github.com/crafter-station/petdex): cosmetic sprite across

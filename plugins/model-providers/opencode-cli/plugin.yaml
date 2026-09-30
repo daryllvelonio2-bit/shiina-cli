@@ -1,0 +1,4 @@
+name: opencode-cli
+version: "1.0.0"
+description: "OpenCode CLI provider for Shiina"
+author: "Shiina"

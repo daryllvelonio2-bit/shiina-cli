@@ -10,15 +10,83 @@ import re
 from typing import Any, Dict, Mapping
 
 
-# Sources Shiina owns and may persist with secrets.  Any other non-empty,
+# Sources Shiina owns and may persist with secrets. Any other non-empty,
 # non-manual source is borrowed/reference-only so new external providers fail
 # closed at the disk boundary.
 _PERSISTABLE_PROVIDER_SOURCES = frozenset({
     ("anthropic", "shiina_pkce"),
+    ("anthropic", "oauth"),
+    ("anthropic", "credentials"),
     ("minimax-oauth", "oauth"),
+    ("minimax-oauth", "minimax_oauth"),
+    ("minimax-oauth", "credentials"),
     ("nous", "device_code"),
+    ("nous", "oauth"),
+    ("nous", "dashboard_device_code"),
+    ("nous", "anonymous"),
+    ("nous", "credentials"),
     ("openai-codex", "device_code"),
+    ("openai-codex", "oauth"),
+    ("openai-codex", "chatgpt"),
+    ("openai-codex", "credentials"),
     ("xai-oauth", "device_code"),
+    ("xai-oauth", "oauth"),
+    ("xai-oauth", "credentials"),
+    ("qwen-oauth", "oauth"),
+    ("qwen-oauth", "qwen_cli"),
+    ("qwen-oauth", "credentials"),
+    ("antigravity", "oauth"),
+    ("antigravity", "google_oauth"),
+    ("antigravity", "agy"),
+    ("antigravity", "antigravity"),
+    ("antigravity", "credentials"),
+    ("agy", "oauth"),
+    ("agy", "google_oauth"),
+    ("agy", "agy"),
+    ("agy", "credentials"),
+    ("freebuff", "credentials"),
+    ("freebuff", "freebuff"),
+    ("freebuff", "token"),
+    ("codebuff", "credentials"),
+    ("codebuff", "codebuff"),
+    ("freebuff-cli", "credentials"),
+    ("kiro", "sqlite"),
+    ("kiro", "credentials"),
+    ("kiro", "kiro"),
+    ("kiro", "xkiro"),
+    ("kiro-cli", "credentials"),
+    ("kiro-cli", "sqlite"),
+    ("kiro-ai", "credentials"),
+    ("xkiro", "credentials"),
+    ("opencode", "opencode"),
+    ("opencode", "credentials"),
+    ("opencode", "oauth"),
+    ("opencode-cli", "opencode"),
+    ("opencode-cli", "opencode-cli"),
+    ("opencode-cli", "credentials"),
+    ("opencode-cli", "oauth"),
+    ("opencode-local", "credentials"),
+    ("opencode-local", "opencode"),
+    ("opencode-agent", "credentials"),
+    ("opencode-bin", "credentials"),
+    ("cline", "cline"),
+    ("cline", "credentials"),
+    ("cline", "local_session"),
+    ("cline-ai", "credentials"),
+    ("cline-bot", "credentials"),
+    ("cline-cli", "credentials"),
+    ("copilot", "copilot_token"),
+    ("copilot", "github_token"),
+    ("copilot", "oauth"),
+    ("copilot", "credentials"),
+    ("copilot-acp", "copilot_token"),
+    ("copilot-acp", "cli_config"),
+    ("copilot-acp", "credentials"),
+    ("gemini", "oauth"),
+    ("gemini", "credentials"),
+    ("openrouter", "openrouter_pkce"),
+    ("openrouter", "pkce"),
+    ("openrouter", "credentials"),
 })
 
 # Metadata keys that look secret-ish by suffix but are safe to persist.
@@ -53,13 +121,37 @@ def _normalize_key(key: Any) -> str:
     return raw.lower().replace("-", "_").replace(".", "_")
 
 
+_OWNED_AUTH_PROVIDERS = frozenset({
+    "anthropic", "minimax-oauth", "nous", "openai-codex", "xai-oauth", "qwen-oauth",
+    "antigravity", "agy", "freebuff", "codebuff", "freebuff-cli",
+    "kiro", "kiro-cli", "kiro-ai", "xkiro",
+    "opencode", "opencode-cli", "opencode-local", "opencode-agent", "opencode-bin",
+    "cline", "cline-ai", "cline-bot", "cline-cli",
+    "copilot", "copilot-acp", "gemini",
+})
+
+_OWNED_AUTH_SOURCES = frozenset({
+    "oauth", "device_code", "credentials", "token", "tokens", "sqlite",
+    "shiina_pkce", "minimax_oauth", "dashboard_device_code", "anonymous",
+    "chatgpt", "qwen_cli", "google_oauth", "agy", "antigravity", "freebuff",
+    "kiro", "xkiro", "opencode", "opencode-cli", "cline", "local_session",
+    "copilot_token", "github_token", "cli_config", "pkce",
+})
+
+
 def is_borrowed_credential_source(source: Any, provider_id: Any = None) -> bool:
     """Return True when ``source`` points at a borrowed/reference-only secret."""
     normalized_source = str(source or "").strip().lower()
     if not normalized_source or normalized_source == "manual" or normalized_source.startswith("manual:"):
         return False
+    if normalized_source.startswith("systemd:") or normalized_source.startswith("env:") or normalized_source == "claude_code":
+        return True
     normalized_provider = str(provider_id or "").strip().lower()
-    return (normalized_provider, normalized_source) not in _PERSISTABLE_PROVIDER_SOURCES
+    if (normalized_provider, normalized_source) in _PERSISTABLE_PROVIDER_SOURCES:
+        return False
+    if normalized_provider in _OWNED_AUTH_PROVIDERS and normalized_source in _OWNED_AUTH_SOURCES:
+        return False
+    return True
 
 
 def _is_secret_payload_key(key: Any) -> bool:

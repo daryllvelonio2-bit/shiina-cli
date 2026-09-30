@@ -337,6 +337,30 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "nvidia/nemotron-3.5-lightning:free",
         "cohere/north-mini-code:free",
     ],
+    "freebuff": [
+        "glm-5.3-flash",
+        "deepseek-v4-flash",
+        "gpt-5.6-luna",
+        "gpt-6-luna",
+        "mimo-v2.5",
+        "mimo-v2.6-pro",
+        "solar-pro4",
+        "solar-mini4",
+        "kimi-k3-eco",
+        "gemini-3.8-flash",
+        "muse-spark-1.2",
+        "space-bunny-alpha",
+    ],
+    "opencode-cli": [
+        "opencode/big-pickle",
+        "opencode/ling-3.0-flash-fin-free",
+        "opencode/longcat-2.5-preview-free",
+        "opencode/mimo-v2.6-flash-free",
+        "opencode/muse-spark-1.3-contributor-free",
+        "opencode/nemotron-3-ultra-free",
+        "opencode/nemotron-3.5-lightning-free",
+        "opencode/space-bunny-free",
+    ],
 }
 
 
@@ -396,6 +420,8 @@ CANONICAL_PROVIDERS: list[ProviderEntry] = [ProviderEntry(*row) for row in (
     ("kiro", "Kiro", "Kiro CLI (Claude Sonnet, DeepSeek, Qwen via local Kiro account)"),
     ("qoder", "Qoder", "Qoder AI (Qwen3.8, Sonus, Cantus, DeepSeek, Kimi, GLM, MiniMax via PAT)"),
     ("cline", "Cline", "Cline AI (Pixel Canary, Space Bunny, Free Tier models via local Cline account)"),
+    ("freebuff", "Freebuff", "Freebuff CLI (Free coding models: GLM 5.3 Flash, DeepSeek, Luna, MiMo via Freebuff CLI)"),
+    ("opencode-cli", "OpenCode CLI", "OpenCode CLI (Local agent & models: Big Pickle, Nemotron, Space Bunny, Mimo, Groq via OpenCode CLI)"),
 )]
 
 

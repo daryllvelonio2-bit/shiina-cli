@@ -1,79 +1,8 @@
 """Direct native Kiro client for Shiina CLI.
 
-Drives the local [2J[H[?1000h[?1003h[?1006h[?1006l[?1003l[?1000l[?2004h[?u[>4;1m[?25l[6n[?2004h[?2026h[J● [97mI[0m[37mn[0m[37mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m
-────────────────────────────────────────────────────────────[0m
-                                                 [95m~/.shiina/shiina-agent[39m · (main)[0m
-[0m
-[7m [0mInitializing · type to queue a message[0m
-                                                             /copy to clipboard[0m
-[0m
-[0m[?2026l[3A[1G[?25l[?2026h[4A
-[2K                                      [95mKIRO[39m[0m
-[2K[0m
-[2K   An early release of [95mKiro CLI V3[39m is now available! Try it out: [95mkiro-cli --v3[39m[0m
-[2K                                         [0m
-[2K         [1mWhat's new:[22m Specs, expanded hooks, and an improved trust model.[0m
-[2K                          [95mhttps://kiro.dev/docs/cli/v3/[39m[0m
-[2K                                         [0m
-[2K    [1mTip: [22mStart your message with ! to run a shell command without leaving the[0m
-[2K    chat; [95mCtrl+C[39m cancels it.[0m
-[2K[0m
-[2K● [97mI[0m[37mn[0m[37mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m
-[2K────────────────────────────────────────────────────────────[0m
-[2K                                                 [95m~/.shiina/shiina-agent[39m · (main)[0m
-[2K[0m
-[2K[7m [0mInitializing · type to queue a message[0m
-[2K                                                             /copy to clipboard[0m
-[2K[0m
-[2K[0m[?2026l[3A[1G[?25l[?2026h[4A
-[2K● [37mI[0m[97mn[0m[37mi[0m[37mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [37mI[0m[37mn[0m[97mi[0m[37mt[0m[37mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[37mn[0m[37mi[0m[97mt[0m[37mi[0m[37ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[37mi[0m[37mt[0m[97mi[0m[37ma[0m[37ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[37mt[0m[37mi[0m[97ma[0m[37ml[0m[37mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[37mi[0m[37ma[0m[97ml[0m[37mi[0m[37mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[37ma[0m[37ml[0m[97mi[0m[37mz[0m[37mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[37ml[0m[37mi[0m[97mz[0m[37mi[0m[37mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[37mi[0m[37mz[0m[97mi[0m[37mn[0m[37mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[37mz[0m[37mi[0m[97mn[0m[37mg[0m[37m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[37mi[0m[37mn[0m[97mg[0m[37m.[0m[37m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[37mn[0m[37mg[0m[97m.[0m[37m.[0m[37m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[37mg[0m[37m.[0m[97m.[0m[37m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[37m.[0m[37m.[0m[97m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[37m.[0m[37m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[37m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[1G[?25l[1G[?25l[?2026h[4A
-[2K● [97mI[0m[37mn[0m[37mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [37mI[0m[97mn[0m[37mi[0m[37mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [37mI[0m[37mn[0m[97mi[0m[37mt[0m[37mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[37mn[0m[37mi[0m[97mt[0m[37mi[0m[37ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[37mi[0m[37mt[0m[97mi[0m[37ma[0m[37ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[37mt[0m[37mi[0m[97ma[0m[37ml[0m[37mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[37mi[0m[37ma[0m[97ml[0m[37mi[0m[37mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[37ma[0m[37ml[0m[97mi[0m[37mz[0m[37mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[37ml[0m[37mi[0m[97mz[0m[37mi[0m[37mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[37mi[0m[37mz[0m[97mi[0m[37mn[0m[37mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[37mz[0m[37mi[0m[97mn[0m[37mg[0m[37m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[37mi[0m[37mn[0m[97mg[0m[37m.[0m[37m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[37mn[0m[37mg[0m[97m.[0m[37m.[0m[37m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[37mg[0m[37m.[0m[97m.[0m[37m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[37m.[0m[37m.[0m[97m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[37m.[0m[37m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[37m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[1G[?25l[1G[?25l[?2026h[4A
-[2K● [97mI[0m[37mn[0m[37mi[0m[mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [37mI[0m[97mn[0m[37mi[0m[37mt[0m[mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [37mI[0m[37mn[0m[97mi[0m[37mt[0m[37mi[0m[ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[37mn[0m[37mi[0m[97mt[0m[37mi[0m[37ma[0m[ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K● [mI[0m[mn[0m[37mi[0m[37mt[0m[97mi[0m[37ma[0m[37ml[0m[mi[0m[mz[0m[mi[0m[mn[0m[mg[0m[m.[0m[m.[0m[m.[0m[0m[?2026l[4B[1G[?25l[?2026h[4A
-[2K[0m
-[2K────────────────────────────────────────────────────────────[0m
-[2K[95mkiro_default[39m · auto                              [95m~/.shiina/shiina-agent[39m · (main)[0m[?2026l[2B[1G[?25l[?2026h
-[2K[7m [0mask a question or describe a task ↵[0m[?2026l[1G[?25l[?2026h[2A
-[2K[95mkiro_default[39m · auto · [32m◔[39m [32m10%[39m                      [95m~/.shiina/shiina-agent[39m · (main)[0m[?2026l[2B[1G[?25l[?2004l[>4;0m[4B
-[?25h[?2004l tool directly in-process without requiring
+Drives the local kiro-cli tool directly in-process without requiring
 a separate bridge daemon or proxy server. Reads user's active session & credentials
-directly from .
+directly from local storage.
 """
 
 from __future__ import annotations
@@ -91,6 +20,10 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, Iterator, List, Optional
+
+
+def ensure_shiina_agent_config() -> None:
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +44,7 @@ KIRO_MODELS = (
 
 KIRO_MODEL_ALIASES = {
     "kiro-sonnet": "claude-sonnet-4.5",
+    "sonnet": "claude-sonnet-4.5",
     "claude-sonnet": "claude-sonnet-4.5",
     "sonnet-4.5": "claude-sonnet-4.5",
     "kiro-deepseek": "deepseek-3.2",
@@ -128,19 +62,38 @@ KIRO_MODEL_ALIASES = {
 def resolve_kiro_model(raw_model: str) -> str:
     """Normalize model string to standard Kiro model ID."""
     m = (raw_model or "").strip()
+    if not m:
+        return "claude-sonnet-4.5"
+    if m in KIRO_MODEL_ALIASES:
+        return KIRO_MODEL_ALIASES[m]
     for prefix in ("kiro/", "kiro-"):
         if m.startswith(prefix):
             m = m[len(prefix):]
             break
-    return KIRO_MODEL_ALIASES.get(m, m) if m else "claude-sonnet-4.5"
+    return KIRO_MODEL_ALIASES.get(m, m)
+
+
+def _get_kiro_db_path() -> Optional[Path]:
+    """Find Kiro SQLite database across Linux, macOS, and Windows."""
+    candidates = [
+        Path.home() / ".local/share/kiro-cli/data.sqlite3",
+        Path.home() / "Library/Application Support/kiro-cli/data.sqlite3",
+    ]
+    if "LOCALAPPDATA" in os.environ:
+        candidates.append(Path(os.environ["LOCALAPPDATA"]) / "kiro-cli/data.sqlite3")
+    for p in candidates:
+        if p.is_file():
+            return p
+    return None
 
 
 def check_kiro_credentials() -> tuple[bool, Optional[str]]:
     """Check if the user is authenticated with Kiro CLI in data.sqlite3."""
-    if not KIRO_DB_PATH.exists():
+    db_path = _get_kiro_db_path()
+    if not db_path:
         return False, None
     try:
-        conn = sqlite3.connect(f"file:{KIRO_DB_PATH}?mode=ro", uri=True)
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
         cursor = conn.cursor()
         cursor.execute("SELECT value FROM auth_kv WHERE key='kirocli:social:token'")
         row = cursor.fetchone()
@@ -196,22 +149,59 @@ def clean_kiro_output(raw_text: str) -> str:
     return "\n".join(content_lines).strip()
 
 
-def format_messages_for_kiro(messages: list[dict[str, Any]]) -> str:
+def extract_thinking_from_text(raw: str) -> tuple[Optional[str], str]:
+    """Extract reasoning from <thinking> or <thought> tags."""
+    if not raw:
+        return None, ""
+    pattern = re.compile(r"<(?:thinking|thought)>(.*?)</(?:thinking|thought)>", re.DOTALL | re.IGNORECASE)
+    match = pattern.search(raw)
+    if match:
+        thinking = match.group(1).strip()
+        text = pattern.sub("", raw).strip()
+        return thinking, text
+    return None, raw.strip()
+
+
+def kiro_completion_to_stream_chunks(completion: Any) -> list[Any]:
+    """Convert a Kiro completion object into stream chunks for streaming responses."""
+    msg = completion.choices[0].message if completion.choices else None
+    reasoning = getattr(msg, "reasoning_content", None) if msg else None
+    content = getattr(msg, "content", "") if msg else ""
+    finish_reason = completion.choices[0].finish_reason if completion.choices else "stop"
+
+    chunks = []
+    if reasoning:
+        chunks.append(SimpleNamespace(
+            choices=[SimpleNamespace(delta=SimpleNamespace(reasoning_content=reasoning), finish_reason=None)]
+        ))
+    if content:
+        chunks.append(SimpleNamespace(
+            choices=[SimpleNamespace(delta=SimpleNamespace(content=content), finish_reason=None)]
+        ))
+    chunks.append(SimpleNamespace(
+        choices=[SimpleNamespace(delta=SimpleNamespace(), finish_reason=finish_reason)]
+    ))
+    return chunks
+
+
+def format_messages_for_kiro(
+    messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None
+) -> str:
     """Format an OpenAI-style messages list into a plain text prompt for kiro-cli."""
-    if not messages:
+    if not messages and not tools:
         return ""
 
-    if len(messages) == 1 and messages[0].get("role") == "user":
-        content = messages[0].get("content", "")
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):
-            return "\n".join(
-                p.get("text", "") if isinstance(p, dict) else str(p)
-                for p in content
-            )
-
     sections = []
+    if tools:
+        tool_desc = ["Available tools:"]
+        for t in tools:
+            fn = t.get("function", {})
+            name = fn.get("name", "")
+            desc = fn.get("description", "")
+            params = fn.get("parameters", {})
+            tool_desc.append(f"- {name}: {desc} (parameters: {json.dumps(params)})")
+        sections.append("\n".join(tool_desc))
+
     for msg in messages:
         role = (msg.get("role") or "user").upper()
         content = msg.get("content", "")
@@ -223,25 +213,32 @@ def format_messages_for_kiro(messages: list[dict[str, Any]]) -> str:
         elif not isinstance(content, str):
             content = str(content or "")
 
+        reasoning = msg.get("reasoning_content") or msg.get("reasoning")
+        body_parts = []
+        if reasoning:
+            body_parts.append(f"<thinking>\n{reasoning}\n</thinking>")
+        if content:
+            body_parts.append(content)
+
         tool_calls = msg.get("tool_calls")
         if tool_calls and isinstance(tool_calls, list):
-            tc_strs = []
             for tc in tool_calls:
-                fn = tc.get("function", {})
-                tc_strs.append(f"Tool Call: {fn.get('name')}({fn.get('arguments')})")
-            content = (content + "\n" if content else "") + "\n".join(tc_strs)
+                body_parts.append(f"<tool_call>{json.dumps(tc)}</tool_call>")
 
-        if role in ("SYSTEM", "DEVELOPER"):
-            sections.append(f"[System Instructions]\n{content}")
-        elif role == "USER":
-            sections.append(f"[User]\n{content}")
-        elif role == "ASSISTANT":
-            sections.append(f"[Assistant]\n{content}")
-        elif role == "TOOL":
+        body = "\n".join(body_parts)
+        if role == "TOOL":
             name = msg.get("name") or "tool"
-            sections.append(f"[Tool Result ({name})]\n{content}")
+            cid = msg.get("tool_call_id")
+            header = f"[Tool Result ({name} id={cid})]" if cid else f"[Tool Result ({name})]"
+            sections.append(f"{header}\n{body}")
+        elif role in ("SYSTEM", "DEVELOPER"):
+            sections.append(f"[System Instructions]\n{body}")
+        elif role == "USER":
+            sections.append(f"[User]\n{body}")
+        elif role == "ASSISTANT":
+            sections.append(f"[Assistant]\n{body}")
         else:
-            sections.append(f"[{role}]\n{content}")
+            sections.append(f"[{role}]\n{body}")
 
     return "\n\n".join(sections)
 
@@ -262,7 +259,13 @@ class KiroClient:
     ) -> None:
         self.api_key = api_key or "kiro-local"
         self.base_url = base_url or "kiro://local"
-        self.command = command or os.environ.get("KIRO_BIN") or shutil.which("kiro-cli") or "/home/janelle/.local/bin/kiro-cli"
+        self.command = (
+            command
+            or os.environ.get("KIRO_BIN")
+            or shutil.which("kiro-cli")
+            or shutil.which("kiro")
+            or str(Path.home() / ".local/bin/kiro-cli")
+        )
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create_chat_completion))
         self.is_closed = False
 
@@ -281,7 +284,7 @@ class KiroClient:
         **_: Any,
     ) -> Any:
         resolved_model = resolve_kiro_model(model or "")
-        prompt = format_messages_for_kiro(messages or [])
+        prompt = format_messages_for_kiro(messages or [], tools=tools)
         if not prompt.strip():
             prompt = "Hello"
 
@@ -324,18 +327,19 @@ class KiroClient:
             err = proc.stderr.strip() if proc.stderr else f"Process exited with code {proc.returncode}"
             raise RuntimeError(f"Kiro execution failed: {err}")
 
+        thinking, text_without_thinking = extract_thinking_from_text(cleaned)
+
         from agent.acp_openai_bridge import (
-            completion_to_stream_chunks as _completion_to_stream_chunks,
             extract_tool_calls_from_text as _extract_tool_calls_from_text,
         )
 
-        tool_calls, cleaned_text = _extract_tool_calls_from_text(cleaned)
+        tool_calls, cleaned_text = _extract_tool_calls_from_text(text_without_thinking)
 
         message = SimpleNamespace(
             content=cleaned_text,
             tool_calls=tool_calls,
-            reasoning=None,
-            reasoning_content=None,
+            reasoning=thinking,
+            reasoning_content=thinking,
             reasoning_details=None,
         )
 
@@ -351,5 +355,5 @@ class KiroClient:
         )
 
         if stream:
-            return _completion_to_stream_chunks(completion)
+            return kiro_completion_to_stream_chunks(completion)
         return completion

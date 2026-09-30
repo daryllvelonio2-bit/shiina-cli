@@ -1067,7 +1067,7 @@ class CLIStatusBarMixin:
             except Exception:
                 brand_sym = "★"
             if styled:
-                segs.append([(_SB, f" {brand_sym} "), (_STRONG, f"{model_short}{cred_suffix}")])
+                segs.append([(_SB, f" {brand_sym} "), (_STRONG, f"{model_short}{cred_suffix} ")])
             else:
                 segs.append([("", f"{brand_sym} {model_short}{cred_suffix}")])
 
@@ -1175,23 +1175,23 @@ class CLIStatusBarMixin:
             segs = self._status_bar_segments(
                 snapshot, width, field_set, self._is_session_yolo_active(), styled=False)
             parts = ["".join(t for _, t in seg) for seg in segs] or [f"{brand_sym} {model_short}"]
-            if (
-                field_set is not None
-                and set(field_set) <= {"model", "context_detail", "context_pct", "limits", "quota"}
-                and len(parts) >= 2
-            ):
-                # Shiina minimal bar (2026-09-18): model left, ctx and limits right.
-                left, right = parts[0], " · ".join(parts[1:])
-                gap = max(1, width - len(left) - len(right))
+            left = parts[0]
+            right = " · ".join(parts[1:]) if len(parts) > 1 else ""
+            left_w = len(left)
+            right_w = len(right)
+            if session_title:
+                title_text = f" {session_title} "
+                title_w = len(title_text)
+                remaining = width - left_w - right_w - title_w
+                if remaining >= 2:
+                    left_pad = remaining // 2
+                    right_pad = remaining - left_pad
+                    return f"{left}{' ' * left_pad}{title_text}{' ' * right_pad}{right}"
+            used = left_w + right_w
+            if right and width >= used + 1:
+                gap = max(1, width - used)
                 return f"{left}{' ' * gap}{right}"
-            # Narrow bars always join the battery with │; wider tiers use the tier separator.
-            if battery_label:
-                parts.insert(0, battery_label)
-            if width < 52:
-                text = f"{parts[0]} │ " + " · ".join(parts[1:]) if battery_label else " · ".join(parts)
-            else:
-                text = (" · " if width < 76 else " │ ").join(parts)
-            return self._right_align_status_title(text, session_title, width)
+            return left
         except Exception:
             return f"{brand_sym} {self.model if getattr(self, 'model', None) else 'Shiina'}"
 
@@ -1219,66 +1219,69 @@ class CLIStatusBarMixin:
             session_title = (snapshot.get("session_title") or getattr(self, "_pending_title", "") or "").strip()
             segs = self._status_bar_segments(
                 snapshot, width, field_set, self._is_session_yolo_active(), styled=True)
-            if (
-                field_set is not None
-                and set(field_set) <= {"model", "context_detail", "context_pct", "limits", "quota", "title"}
-                and len(segs) >= 2
-            ):
-                # Shiina minimal bar: first segment left, ctx and limits right,
-                # with session title centered in the middle.
+
+            # Left pill: model (and credentials)
+            if segs:
                 left_frags: list = list(segs[0])
-                right_frags: list = []
-                for seg in segs[1:]:
-                    if right_frags:
+            else:
+                left_frags = [(_SB, f" {brand_sym} "), (_STRONG, f"{snapshot['model_short']} ")]
+            if left_frags and not left_frags[-1][1].endswith(" "):
+                _s, _t = left_frags[-1]
+                left_frags[-1] = (_s, _t + " ")
+
+            left_w = sum(self._status_bar_display_width(t) for _, t in left_frags)
+
+            # Right pill: context, limits, and extra indicators
+            right_frags: list = []
+            if len(segs) > 1:
+                right_frags.append((_SB, " "))
+                for i, seg in enumerate(segs[1:]):
+                    if i > 0:
                         right_frags.append((_DIM, " · "))
                     right_frags.extend(seg)
-                left_w = sum(self._status_bar_display_width(t) for _, t in left_frags)
-                right_w = sum(self._status_bar_display_width(t) for _, t in right_frags)
-                if session_title:
-                    title_text = f" {session_title} "
-                    title_w = self._status_bar_display_width(title_text)
-                    available = width - left_w - right_w
-                    if available >= title_w + 2:
-                        target_start = (width - title_w) // 2
-                        left_pad = max(1, target_start - left_w)
-                        right_pad = max(1, width - (left_w + left_pad + title_w + right_w))
-                        return (
-                            left_frags
-                            + [("", " " * left_pad), (_STRONG, title_text), ("", " " * right_pad)]
-                            + right_frags
-                        )
-                used = left_w + right_w
-                return left_frags + [("", " " * max(1, width - used))] + right_frags
-            sep = " · " if width < 76 else " │ "
-            frags: list = []
-            for seg in segs or [[(_SB, f" {brand_sym} "), (_STRONG, snapshot["model_short"])]]:
-                if frags:
-                    frags.append((_DIM, sep))
-                frags.extend(seg)
-            # Stash indicator (📌 N) after every width tier so a parked draft is never
-            # invisible; before the battery prepend, and the first thing the trim drops.
+                right_frags.append((_SB, " "))
+
             try:
                 stash_indicator = self._prompt_stash.indicator()
             except Exception:
                 stash_indicator = ""
             if stash_indicator and _ok("stash"):
-                frags.extend([(_DIM, " · "), (_STRONG, stash_indicator)])
-            frags.append((_SB, " "))  # one-cell right margin
-            # Battery is the first element when enabled: prepend ahead of the brand marker.
-            battery_label = snapshot.get("battery_label") or ""
-            if battery_label and _ok("battery"):
-                battery_style = self._battery_status_style(snapshot.get("battery_category", "dim"))
-                frags[0:0] = [(_SB, " "), (battery_style, battery_label), (_DIM, " │")]
+                if not right_frags:
+                    right_frags = [(_SB, " ")]
+                elif right_frags[-1] == (_SB, " "):
+                    right_frags.pop()
+                    right_frags.append((_DIM, " · "))
+                right_frags.extend([(_STRONG, stash_indicator), (_SB, " ")])
 
-            frags = self._right_align_status_title_fragments(frags, session_title, width)
             vim_label = self._vim_mode_label()
             if vim_label:
-                frags.extend([(_DIM, " │ "), (_STRONG, vim_label), (_SB, " ")])
-            total_width = sum(self._status_bar_display_width(text) for _, text in frags)
-            if total_width > width:
-                plain_text = "".join(text for _, text in frags)
-                return [(_SB, self._trim_status_bar_text(plain_text, width))]
-            return frags
+                if not right_frags:
+                    right_frags = [(_SB, " ")]
+                elif right_frags[-1] == (_SB, " "):
+                    right_frags.pop()
+                    right_frags.append((_DIM, " · "))
+                right_frags.extend([(_STRONG, vim_label), (_SB, " ")])
+
+            right_w = sum(self._status_bar_display_width(t) for _, t in right_frags)
+
+            # Center pill: session title
+            if session_title and (field_set is None or "title" in field_set or set(field_set) <= {"model", "context_detail", "context_pct", "limits", "quota", "title"}):
+                title_text = f" {session_title} "
+                title_w = self._status_bar_display_width(title_text)
+                remaining = width - left_w - right_w - title_w
+                if remaining >= 2:
+                    left_pad = remaining // 2
+                    right_pad = remaining - left_pad
+                    return (
+                        left_frags
+                        + [("", " " * left_pad), (_STRONG, title_text), ("", " " * right_pad)]
+                        + right_frags
+                    )
+
+            used = left_w + right_w
+            if right_frags and width >= used + 1:
+                return left_frags + [("", " " * max(1, width - used))] + right_frags
+            return left_frags
         except Exception:
             return [(_SB, f" {self._build_status_bar_text()} ")]
 

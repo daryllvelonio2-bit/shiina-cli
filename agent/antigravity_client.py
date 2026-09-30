@@ -11,6 +11,9 @@ import contextlib
 import json
 import logging
 import os
+import re
+import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -110,10 +113,20 @@ class GoogleOAuthTokenManager:
 
     def _load_initial_tokens(self) -> None:
         # 1. Environment variables
-        env_token = os.getenv("ANTIGRAVITY_ACCESS_TOKEN") or os.getenv("AGY_ACCESS_TOKEN")
+        env_token = (
+            os.getenv("ANTIGRAVITY_ACCESS_TOKEN")
+            or os.getenv("AGY_ACCESS_TOKEN")
+            or os.getenv("GEMINI_ACCESS_TOKEN")
+            or os.getenv("GOOGLE_ACCESS_TOKEN")
+        )
         if env_token:
             self._access_token = env_token
-            self._refresh_token = os.getenv("ANTIGRAVITY_REFRESH_TOKEN") or os.getenv("AGY_REFRESH_TOKEN")
+            self._refresh_token = (
+                os.getenv("ANTIGRAVITY_REFRESH_TOKEN")
+                or os.getenv("AGY_REFRESH_TOKEN")
+                or os.getenv("GEMINI_REFRESH_TOKEN")
+                or os.getenv("GOOGLE_REFRESH_TOKEN")
+            )
             self._expiry = time.time() + 3600
             return
 
@@ -143,7 +156,43 @@ class GoogleOAuthTokenManager:
         except Exception as exc:
             logger.debug("Failed to read from SecretService: %s", exc)
 
-        # 3. ~/.shiina/auth.json
+        # 3. macOS Keychain (service: gemini)
+        if sys.platform == "darwin":
+            try:
+                proc = subprocess.run(
+                    ["security", "find-generic-password", "-s", "gemini", "-w"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if proc.returncode == 0 and proc.stdout.strip():
+                    raw = json.loads(proc.stdout.strip())
+                    token_info = raw.get("token", raw) if isinstance(raw, dict) else {}
+                    if token_info.get("access_token"):
+                        self._access_token = token_info["access_token"]
+                        self._refresh_token = token_info.get("refresh_token")
+                        logger.debug("Loaded Antigravity OAuth tokens from macOS Keychain.")
+                        return
+            except Exception as exc:
+                logger.debug("Failed to read from macOS Keychain: %s", exc)
+
+        # 4. Generic keyring library fallback (cross-platform)
+        try:
+            import keyring
+            for username in ("antigravity", "gemini", ""):
+                sec = keyring.get_password("gemini", username)
+                if sec:
+                    raw = json.loads(sec)
+                    token_info = raw.get("token", raw) if isinstance(raw, dict) else {}
+                    if token_info.get("access_token"):
+                        self._access_token = token_info["access_token"]
+                        self._refresh_token = token_info.get("refresh_token")
+                        logger.debug("Loaded Antigravity OAuth tokens from keyring.")
+                        return
+        except Exception as exc:
+            logger.debug("Failed to read from keyring: %s", exc)
+
+        # 5. ~/.shiina/auth.json
         try:
             auth_file = Path.home() / ".shiina" / "auth.json"
             if auth_file.exists():
@@ -239,6 +288,95 @@ def get_default_token_manager() -> GoogleOAuthTokenManager:
     if _DEFAULT_TOKEN_MANAGER is None:
         _DEFAULT_TOKEN_MANAGER = GoogleOAuthTokenManager()
     return _DEFAULT_TOKEN_MANAGER
+
+
+def fetch_antigravity_models(timeout: float = 15.0, token_manager: Optional[GoogleOAuthTokenManager] = None) -> list[str]:
+    """Fetch live available models for Google Antigravity / Code Assist.
+
+    Prioritizes querying the Code Assist MODELS_ENDPOINT directly via bearer token;
+    falls back to executing `agy models` via subprocess; and finally falls back
+    to curated default models.
+    """
+    # 1. Direct API query with token
+    try:
+        mgr = token_manager or get_default_token_manager()
+        token = mgr.get_access_token()
+        if token:
+            req = urllib.request.Request(
+                MODELS_ENDPOINT,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "User-Agent": DEFAULT_USER_AGENT,
+                    "Content-Type": "application/json",
+                },
+                data=json.dumps({}).encode("utf-8"),
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            models_dict = data.get("models", {})
+            if models_dict and isinstance(models_dict, dict):
+                ordered: list[str] = []
+                # First prioritize recommended models from agentModelSorts
+                for sort_group in data.get("agentModelSorts", []):
+                    for grp in sort_group.get("groups", []):
+                        for mid in grp.get("modelIds", []):
+                            if mid in models_dict and mid not in ordered:
+                                ordered.append(mid)
+                # Then append the rest of the available models, filtering out internal test endpoints
+                for mid in models_dict:
+                    if mid not in ordered and not mid.startswith(("chat_", "models/proactive", "MODEL_")):
+                        ordered.append(mid)
+                if ordered:
+                    return ordered
+    except Exception as exc:
+        logger.debug("Failed fetching Antigravity models via Code Assist API: %s", exc)
+
+    # 2. CLI subprocess fallback: `agy models` or `antigravity models`
+    for bin_name in (
+        os.getenv("AGY_BIN"),
+        os.getenv("ANTIGRAVITY_BIN"),
+        shutil.which("agy"),
+        shutil.which("antigravity"),
+        str(Path.home() / ".local/bin/agy"),
+    ):
+        if not bin_name or not os.path.exists(bin_name):
+            continue
+        try:
+            proc = subprocess.run(
+                [bin_name, "models"],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            if proc.returncode == 0 and proc.stdout:
+                clean = re.sub(r"\x1b\[[0-9;?]*[a-zA-Z]", "", proc.stdout)
+                lines = [line.strip() for line in clean.splitlines()]
+                cli_models = []
+                for line in lines:
+                    if not line or "Fetching available models" in line or line.startswith(("-", "*", "=")):
+                        continue
+                    parts = line.split()
+                    if parts:
+                        model_id = parts[0]
+                        if model_id and not model_id.startswith(("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")):
+                            cli_models.append(model_id)
+                if cli_models:
+                    return cli_models
+        except Exception as exc:
+            logger.debug("Failed fetching models via %s CLI: %s", bin_name, exc)
+
+    # 3. Static fallback
+    return [
+        "claude-sonnet-4-6",
+        "claude-opus-4-6-thinking",
+        "gemini-3.8-flash-tiered",
+        "gemini-3.8-flash-high",
+        "gemini-pro-agent",
+        "gemini-3.1-pro-high",
+        "gpt-oss-120b-medium",
+        "gemini-3.5-flash-lite",
+    ]
 
 
 class AntigravityClient:

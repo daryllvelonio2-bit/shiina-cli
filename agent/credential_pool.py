@@ -2054,10 +2054,105 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
 # --- Seeding --------------------------------------------------------------
 
 
+def _find_matching_entry_index(
+    entries: List[PooledCredential],
+    source: str,
+    payload: Dict[str, Any],
+) -> Optional[int]:
+    """Find index of an existing entry that represents the exact same account as payload."""
+    target_id = payload.get("id")
+    if target_id:
+        for idx, entry in enumerate(entries):
+            if entry.id == target_id:
+                return idx
+
+    incoming_access = payload.get("access_token")
+    incoming_refresh = payload.get("refresh_token")
+    incoming_agent_key = payload.get("agent_key")
+    incoming_fp = payload.get("secret_fingerprint")
+    if incoming_access and not incoming_fp:
+        incoming_fp = fingerprint_secret_value(incoming_access)
+
+    # 1. Match by secret equality / fingerprint
+    for idx, entry in enumerate(entries):
+        if entry.source != source:
+            continue
+        if incoming_access and entry.access_token and incoming_access == entry.access_token:
+            return idx
+        if incoming_refresh and entry.refresh_token and incoming_refresh == entry.refresh_token:
+            return idx
+        if incoming_agent_key and entry.agent_key and incoming_agent_key == entry.agent_key:
+            return idx
+        if incoming_fp:
+            entry_fp = entry.extra.get("secret_fingerprint") or fingerprint_secret_value(entry.access_token)
+            if entry_fp and entry_fp == incoming_fp:
+                return idx
+
+    # 2. Match by user / organization identity
+    incoming_user_id = payload.get("user_id") or payload.get("extra", {}).get("user_id")
+    if incoming_user_id:
+        for idx, entry in enumerate(entries):
+            if entry.source == source and entry.extra.get("user_id") == incoming_user_id:
+                return idx
+
+    # 3. Match by explicit label
+    incoming_label = payload.get("label")
+    if incoming_label and incoming_label != source:
+        for idx, entry in enumerate(entries):
+            if entry.source == source and entry.label == incoming_label:
+                return idx
+
+    # 4. Strict singleton sources (env:VAR, config:NAME, model_config)
+    if source.startswith("env:") or source.startswith("config:") or source == "model_config":
+        for idx, entry in enumerate(entries):
+            if entry.source == source:
+                return idx
+
+    # 5. Shell entries for the same source with no credentials
+    for idx, entry in enumerate(entries):
+        if entry.source == source:
+            has_creds = bool(
+                entry.access_token or entry.refresh_token or entry.agent_key or entry.extra.get("secret_fingerprint")
+            )
+            if not has_creds:
+                return idx
+
+    return None
+
+
+def _find_duplicate_indices(
+    entries: List[PooledCredential],
+    existing_idx: Optional[int],
+    source: str,
+) -> Set[int]:
+    """Find duplicate indices only for exact matching account instances or singleton sources."""
+    if existing_idx is None:
+        return set()
+    target_entry = entries[existing_idx]
+    duplicates = set()
+    is_singleton_source = (
+        source.startswith("env:") or source.startswith("config:") or source == "model_config"
+    )
+    for idx, entry in enumerate(entries):
+        if idx == existing_idx:
+            continue
+        if is_singleton_source and entry.source == source:
+            duplicates.add(idx)
+        elif target_entry.id and entry.id == target_entry.id:
+            duplicates.add(idx)
+        elif (
+            target_entry.access_token
+            and entry.access_token
+            and target_entry.access_token == entry.access_token
+            and target_entry.source == entry.source
+        ):
+            duplicates.add(idx)
+    return duplicates
+
+
 def _upsert_entry(entries: List[PooledCredential], provider: str, source: str, payload: Dict[str, Any]) -> bool:
-    matching_indices = [idx for idx, entry in enumerate(entries) if entry.source == source]
-    existing_idx = matching_indices[0] if matching_indices else None
-    duplicate_indices = set(matching_indices[1:])
+    existing_idx = _find_matching_entry_index(entries, source, payload)
+    duplicate_indices = _find_duplicate_indices(entries, existing_idx, source)
     if duplicate_indices:
         entries[:] = [entry for idx, entry in enumerate(entries) if idx not in duplicate_indices]
 
@@ -2377,6 +2472,87 @@ def _seed_tokens_singleton(seed: _Seeder, auth_store: Dict[str, Any]) -> None:
     })
 
 
+def _seed_antigravity_singleton(seed: _Seeder) -> None:
+    try:
+        from agent.antigravity_client import GoogleOAuthTokenManager
+        mgr = GoogleOAuthTokenManager()
+        token = mgr.get_access_token()
+        if token:
+            seed.upsert("oauth", {
+                "auth_type": AUTH_TYPE_OAUTH,
+                "access_token": token,
+                "label": "Google Antigravity OAuth (agy)",
+            })
+    except Exception as exc:
+        logger.debug("Antigravity seed failed: %s", exc)
+
+
+def _seed_freebuff_singleton(seed: _Seeder) -> None:
+    try:
+        from agent.freebuff_client import get_freebuff_token
+        tok = get_freebuff_token()
+        if tok:
+            seed.upsert("credentials", {
+                "auth_type": AUTH_TYPE_API_KEY,
+                "access_token": tok,
+                "label": "Freebuff credentials",
+            })
+    except Exception as exc:
+        logger.debug("Freebuff seed failed: %s", exc)
+
+
+def _seed_kiro_singleton(seed: _Seeder) -> None:
+    try:
+        from agent.kiro_client import _get_kiro_db_path
+        import sqlite3
+        import json
+
+        db_path = _get_kiro_db_path()
+        if db_path and db_path.is_file():
+            conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM auth_kv WHERE key='kirocli:social:token'")
+            row = cursor.fetchone()
+            conn.close()
+            if row and row[0]:
+                data = json.loads(row[0])
+                token = data.get("access_token")
+                if token:
+                    provider_lbl = data.get("provider", "social")
+                    seed.upsert("sqlite", {
+                        "auth_type": AUTH_TYPE_API_KEY,
+                        "access_token": token,
+                        "refresh_token": data.get("refresh_token"),
+                        "label": f"Kiro ({provider_lbl})",
+                    })
+    except Exception as exc:
+        logger.debug("Kiro seed failed: %s", exc)
+
+
+def _seed_opencode_singleton(seed: _Seeder) -> None:
+    try:
+        from agent.opencode_client import get_opencode_credentials
+        creds = get_opencode_credentials()
+        if creds and isinstance(creds, dict):
+            for provider_name, provider_data in creds.items():
+                if not isinstance(provider_data, dict):
+                    continue
+                token = (
+                    provider_data.get("token")
+                    or provider_data.get("access_token")
+                    or provider_data.get("apiKey")
+                )
+                if token:
+                    seed.upsert("opencode", {
+                        "auth_type": AUTH_TYPE_API_KEY,
+                        "access_token": token,
+                        "refresh_token": provider_data.get("refresh_token"),
+                        "label": f"OpenCode ({provider_name})",
+                    })
+    except Exception as exc:
+        logger.debug("OpenCode seed failed: %s", exc)
+
+
 def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tuple[bool, Set[str]]:
     seed = _Seeder(provider, entries)
     auth_store = _load_auth_store()
@@ -2396,6 +2572,14 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
         if provider == "openai-codex" and seed.is_suppressed(provider, "device_code"):
             return seed.result
         _seed_tokens_singleton(seed, auth_store)
+    elif provider in ("antigravity", "agy"):
+        _seed_antigravity_singleton(seed)
+    elif provider in ("freebuff", "codebuff", "freebuff-cli"):
+        _seed_freebuff_singleton(seed)
+    elif provider in ("kiro", "kiro-cli", "kiro-ai", "xkiro"):
+        _seed_kiro_singleton(seed)
+    elif provider in ("opencode", "opencode-cli", "opencode-local", "opencode-agent", "opencode-bin"):
+        _seed_opencode_singleton(seed)
     return seed.result
 
 
@@ -2553,6 +2737,13 @@ def _prune_stale_seeded_entries(
         # requested (an `shiina auth` command that confirmed the source is gone).
         if entry.source.startswith("env:"):
             return prune_env_sources
+        # Accounts with valid credentials must never be automatically pruned;
+        # they should only be removed when explicitly removed by the user in providers.
+        has_credentials = bool(
+            entry.access_token or entry.refresh_token or entry.agent_key or entry.extra.get("api_key")
+        )
+        if has_credentials:
+            return False
         # File-backed singletons and Shiina PKCE disappear when their backing file is gone.
         return is_borrowed_credential_source(entry.source, entry.provider) or entry.source == "shiina_pkce"
 

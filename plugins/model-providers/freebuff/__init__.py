@@ -40,7 +40,15 @@ class FreebuffProfile(ProviderProfile):
     def fetch_models(
         self, *, api_key: str | None = None, base_url: str | None = None, timeout: float = 15.0
     ) -> list[str] | None:
-        del api_key, base_url, timeout
+        del api_key, base_url
+        try:
+            from agent.freebuff_client import fetch_freebuff_models
+
+            models = fetch_freebuff_models(timeout=timeout)
+            if models:
+                return models
+        except Exception as exc:
+            logger.debug("Failed dynamic Freebuff model fetch: %s", exc)
         return list(FREEBUFF_MODELS)
 
 

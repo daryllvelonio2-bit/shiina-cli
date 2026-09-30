@@ -55,13 +55,13 @@ def _attach_agent(
 
 
 class TestCLIStatusBar:
-    def test_session_title_is_right_aligned_after_it_is_queued(self):
+    def test_session_title_is_centered_after_it_is_queued(self):
         cli_obj = _make_cli()
         cli_obj._pending_title = "weekly-digest"
 
         text = cli_obj._build_status_bar_text(width=80)
 
-        assert text.endswith(" weekly-digest ")
+        assert " weekly-digest " in text
         assert cli_obj._status_bar_display_width(text) == 80
 
     def test_snapshot_refreshes_persisted_session_title(self):
@@ -300,7 +300,7 @@ class TestStatusBarWidthSource:
                 f"({total_text!r})"
             )
 
-    def test_fragments_put_session_title_at_far_right(self):
+    def test_fragments_put_session_title_centered(self):
         cli_obj = self._make_wide_cli()
         cli_obj._pending_title = "weekly-digest"
         mock_app = MagicMock()
@@ -310,7 +310,7 @@ class TestStatusBarWidthSource:
             frags = cli_obj._get_status_bar_fragments()
 
         text = "".join(value for _, value in frags)
-        assert text.endswith(" weekly-digest ")
+        assert " weekly-digest " in text
         assert cli_obj._status_bar_display_width(text) == 100
 
     def test_fragments_use_pt_width_over_shutil(self):

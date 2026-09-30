@@ -39,27 +39,15 @@ class AntigravityProfile(ProviderProfile):
     def fetch_models(
         self, *, api_key: str | None = None, base_url: str | None = None, timeout: float = 15.0
     ) -> list[str] | None:
-        from shiina_cli.auth import resolve_external_process_provider_credentials
-
+        del api_key, base_url
         try:
-            creds = resolve_external_process_provider_credentials(self.name)
-            cmd = creds.get("command") or "agy"
-            proc = subprocess.run(
-                [cmd, "models"],
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-            if proc.returncode == 0 and proc.stdout:
-                models = []
-                for line in proc.stdout.splitlines():
-                    parts = line.strip().split()
-                    if parts and not parts[0].startswith("⠋") and not parts[0].startswith("Fetching"):
-                        models.append(parts[0])
-                if models:
-                    return models
-        except Exception:
-            pass
+            from agent.antigravity_client import fetch_antigravity_models
+
+            models = fetch_antigravity_models(timeout=timeout)
+            if models:
+                return models
+        except Exception as exc:
+            logger.debug("Failed dynamic Antigravity model fetch: %s", exc)
         return list(ANTIGRAVITY_MODELS)
 
 
