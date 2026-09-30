@@ -260,6 +260,25 @@ _REGISTRY: List[RemovalStep] = [
     ),
 ]
 
+# External agent CLIs Shiina drives locally (kiro, opencode, freebuff): the credential store
+# belongs to the CLI, so removal only suppresses the seed — it never deletes the CLI's own file.
+for _provs, _src, _backing in (
+    (("freebuff", "codebuff", "freebuff-cli"), "credentials", "~/.config/manicode/credentials.json"),
+    (("kiro", "kiro-cli", "kiro-ai", "xkiro"), "sqlite", "~/.local/share/kiro-cli/data.sqlite3"),
+    (("opencode", "opencode-cli", "opencode-local", "opencode-agent", "opencode-bin"), "opencode:", "opencode's own credential store"),
+):
+    _match = (lambda src: src.startswith("opencode:")) if _src.endswith(":") else None
+    for _p in _provs:
+        _REGISTRY.append(RemovalStep(
+            provider=_p, source_id=_src, match_fn=_match,
+            remove_fn=_suppress_only(
+                "Suppressed {source} — it will not be re-seeded.",
+                f"Note: credentials still live in {_backing}",
+                f"Run `shiina auth add {_p}` to re-enable if needed.",
+            ),
+            description=f"{_p}: {_backing}",
+        ))
+
 
 # ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
 # Names external plugins imported from this module before the Sep 2026 decomposition.

@@ -1247,3 +1247,46 @@ def test_openrouter_loopback_callback_binds_nonce_path_and_rejects_forged_redire
     assert seen["forged_status"] == 404
     assert seen["genuine_status"] == 200
     assert code == "good-code"
+
+
+def test_auth_remove_external_process_cli_suppresses_reseed(tmp_path, monkeypatch):
+    """Invariant: removing a locally-driven CLI credential stays removed.
+
+    freebuff/kiro/opencode are re-seeded from the CLI's own store on every load_pool(); with no
+    registered removal step the entry resurrects immediately after `shiina auth remove`.
+    """
+    monkeypatch.setenv("SHIINA_HOME", str(tmp_path / "shiina"))
+    monkeypatch.setattr(
+        "agent.credential_pool._seed_from_singletons",
+        lambda provider, entries: (False, set()),
+    )
+    _write_auth_store(
+        tmp_path,
+        {
+            "version": 1,
+            "credential_pool": {
+                "freebuff": [
+                    {
+                        "id": "fb-1",
+                        "label": "Freebuff credentials",
+                        "auth_type": "api_key",
+                        "priority": 0,
+                        "source": "credentials",
+                        "access_token": "freebuff-token",
+                    }
+                ]
+            },
+        },
+    )
+
+    from shiina_cli.auth_commands import auth_remove_command
+
+    class _Args:
+        provider = "freebuff"
+        target = "1"
+
+    auth_remove_command(_Args())
+
+    from shiina_cli.auth import is_source_suppressed
+
+    assert is_source_suppressed("freebuff", "credentials") is True

@@ -23,6 +23,7 @@ Two invariants shape almost every design decision and are the lens for reviewing
 ## Development Principles & Quality Gates
 
 - **Fix real bugs, well:** Reproduce on current `main`, point to exact line, fix the whole bug class including sibling call paths. Verify claim and design intent against codebase before patching.
+- **Always commit after a meaningful change:** Ensure every significant update is cleanly committed.
 - **Expand reach at the edges:** Adapters, channels, providers, models, UI features integrate via existing setup/config UX (`shiina tools`, `shiina setup`).
 - **Refactor god-files into clean modules:** Extract into facade + siblings (`<stem>_<topic>.py`).
 - **Extend, don't duplicate:** Check existing infra first. For 3+ variants in a category, design an ABC + orchestrator.

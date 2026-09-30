@@ -601,33 +601,70 @@ def _fetch_openrouter_account_usage(base_url: Optional[str], api_key: Optional[s
     return _snapshot("openrouter", "credits_api", windows, details)
 
 
+def _antigravity_token_manager(access_token: str):
+    """Bind a token manager to the account behind *access_token*.
+
+    The default manager always resolves the ACTIVE agy login, so a multi-account pool would
+    otherwise report the active account's quota for every account.
+    """
+    from agent.antigravity_client import GoogleOAuthTokenManager
+
+    if not access_token:
+        return GoogleOAuthTokenManager()
+    refresh_token = None
+    try:
+        from agent.credential_pool import load_pool
+
+        refresh_token = next(
+            (e.refresh_token for e in load_pool("antigravity").entries() if e.access_token == access_token),
+            None,
+        )
+    except Exception:
+        logger.debug("antigravity: no refresh token for the pooled account", exc_info=True)
+    return GoogleOAuthTokenManager(access_token=access_token, refresh_token=refresh_token, persist=False)
+
+
 def _fetch_antigravity_account_usage(
     base_url: Optional[str] = None, api_key: Optional[str] = None, model: Optional[str] = None,
 ) -> Optional[AccountUsageSnapshot]:
-    from agent.antigravity_client import GoogleOAuthTokenManager, resolve_agy_model
+    from agent.antigravity_client import resolve_agy_model
+    manager = _antigravity_token_manager(str(api_key or "").strip())
     try:
-        token = GoogleOAuthTokenManager().get_access_token()
+        token = manager.get_access_token()
     except Exception:
         return None
     if not token:
         return None
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "User-Agent": "antigravity/1.2.7",
-    }
+
     url = "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary"
     fallback_url = "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary"
-    data = None
-    with httpx.Client(timeout=10.0) as client:
-        for ep in (url, fallback_url):
-            try:
-                resp = client.post(ep, headers=headers, json={})
-                if resp.status_code == 200:
-                    data = resp.json() or {}
-                    break
-            except Exception:
-                continue
+
+    def _fetch_quota(bearer: str) -> tuple[Optional[int], Optional[dict]]:
+        """``(http_status, payload)``; status is None when every endpoint failed at the transport."""
+        headers = {
+            "Authorization": f"Bearer {bearer}",
+            "Content-Type": "application/json",
+            "User-Agent": "antigravity/1.2.7",
+        }
+        with httpx.Client(timeout=10.0) as client:
+            for ep in (url, fallback_url):
+                try:
+                    resp = client.post(ep, headers=headers, json={})
+                    if resp.status_code == 200:
+                        return 200, (resp.json() or {})
+                    if resp.status_code in (401, 403):
+                        return resp.status_code, None
+                except Exception:
+                    continue
+        return None, None
+
+    status, data = _fetch_quota(token)
+    if status in (401, 403):
+        # The pooled copy was superseded by a token re-issued elsewhere: refresh once, then retry.
+        try:
+            _, data = _fetch_quota(manager.get_access_token(force_refresh=True))
+        except Exception:
+            return None
     if not data or not isinstance(data, dict):
         return None
 
@@ -885,6 +922,29 @@ def _fetch_nvidia_account_usage(
     return _snapshot("nvidia", "models_api", windows, details, title="NVIDIA NIM Account")
 
 
+def _external_process_connected_snapshot(provider: str) -> Optional[AccountUsageSnapshot]:
+    """Fallback for an agent CLI Shiina drives locally (kiro, opencode-cli, freebuff, cline).
+
+    These have no quota API, so report the connection instead of dropping the provider into the
+    compact "Other connected providers" summary line.
+    """
+    from shiina_cli.auth import PROVIDER_REGISTRY, _external_process_auth_evidence
+    from shiina_cli.providers import get_label
+    from shiina_cli.runtime_provider_backends import _is_external_process_provider
+
+    if provider not in PROVIDER_REGISTRY or not _is_external_process_provider(provider):
+        return None
+    try:
+        authed, note = _external_process_auth_evidence(provider)
+    except Exception:
+        return None
+    if not authed:
+        return None
+    details = [f"Connected — {note}"] if note else ["Connected"]
+    details.append("Runs on your local CLI subscription — no usage API")
+    return _snapshot(provider, "external_process", [], details, title=get_label(provider))
+
+
 _USAGE_FETCHERS: dict[str, Callable[..., Optional[AccountUsageSnapshot]]] = {
     "openai-codex": _fetch_codex_account_usage,
     "anthropic": _fetch_anthropic_account_usage,
@@ -907,10 +967,13 @@ _USAGE_FETCHERS: dict[str, Callable[..., Optional[AccountUsageSnapshot]]] = {
 def fetch_account_usage(
     provider: Optional[str], *, base_url: Optional[str] = None, api_key: Optional[str] = None, model: Optional[str] = None,
 ) -> Optional[AccountUsageSnapshot]:
-    fetcher = _USAGE_FETCHERS.get(str(provider or "").strip().lower())
+    key = str(provider or "").strip().lower()
+    fetcher = _USAGE_FETCHERS.get(key)
     try:
         if not fetcher:
-            return None
+            # No quota API: an agent CLI we drive locally still reports its connection so the
+            # dashboard can list it.
+            return _external_process_connected_snapshot(key)
         import inspect
         sig = inspect.signature(fetcher)
         if "model" in sig.parameters:

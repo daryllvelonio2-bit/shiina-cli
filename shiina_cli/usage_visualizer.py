@@ -18,6 +18,7 @@ from rich.markup import escape as _escape_markup
 
 from agent.account_usage import AccountUsageSnapshot, AccountUsageWindow, fetch_account_usage, _USAGE_FETCHERS
 from agent.credential_pool import load_pool
+from shiina_cli.skin_engine import get_active_skin
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +152,9 @@ def discover_quota_providers(
     import shiina_cli.auth as auth_mod
     from shiina_cli.auth import PROVIDER_REGISTRY
     from shiina_cli.auth_commands import list_custom_pool_providers, _get_custom_provider_entries
+    from shiina_cli.providers import ALIASES
+    from shiina_cli.runtime_provider_backends import _is_external_process_provider
+    from agent.account_usage import _USAGE_FETCHERS
 
     try:
         credential_pool = auth_mod._load_auth_store().get("credential_pool")
@@ -186,6 +190,13 @@ def discover_quota_providers(
         if norm in seen:
             continue
 
+        # Alias variants (kiro-cli, kiro-ai, opencode-local, qoder-ai, …) are the same credential
+        # under another name; fold them onto their canonical provider so the dashboard lists the
+        # provider once. A variant with its own usage fetcher (xkiro, cline) keeps its identity.
+        canon = norm if norm in _USAGE_FETCHERS else str(ALIASES.get(norm) or norm)
+        if canon in seen:
+            continue
+
         # Check if provider has pooled credentials
         try:
             pool = load_pool(p)
@@ -195,18 +206,29 @@ def discover_quota_providers(
 
         # Check if provider matches supported quota providers
         is_supported = (
-            norm in SUPPORTED_QUOTA_PROVIDERS
-            or (norm.startswith("custom:") and any(x in norm for x in ("xkiro", "openrouter", "cline", "kilo")))
+            canon in SUPPORTED_QUOTA_PROVIDERS
+            or canon in _USAGE_FETCHERS
+            or (canon.startswith("custom:") and any(x in canon for x in ("xkiro", "openrouter", "cline", "kilo")))
         )
 
         if is_supported:
-            if n_entries > 0 or norm in ("openai-codex", "anthropic", "nous"):
-                quota_candidates.append(p)
-                seen.add(norm)
+            if n_entries > 0 or canon in ("openai-codex", "anthropic", "nous"):
+                quota_candidates.append(canon)
+                seen.add(canon)
+        elif n_entries > 0 and _is_external_process_provider(canon):
+            # Local/subscription CLI with no quota API (kiro, opencode-cli, qoder): render it with
+            # its connection detail instead of burying it in the summary line.
+            quota_candidates.append(canon)
+            seen.add(canon)
         elif n_entries > 0:
-            other_providers.append((p, n_entries))
+            other_providers.append((canon, n_entries))
 
-    return quota_candidates, other_providers
+    # Fold alias variants onto their canonical provider so the summary counts read
+    # "qoder (4 keys)" rather than four separate one-key rows.
+    totals: dict[str, int] = {}
+    for name, cnt in other_providers:
+        totals[name] = totals.get(name, 0) + cnt
+    return quota_candidates, list(totals.items())
 
 
 def fetch_all_provider_usage(
@@ -284,6 +306,10 @@ def build_usage_dashboard(
     console_width: int = 80,
 ) -> Panel:
     """Build a styled Rich Panel presenting provider quotas, visual gauges, and multi-account breakdown."""
+    skin = get_active_skin()
+    name_color = skin.get_color("ui_accent", "#38bdf8")
+    title_color = skin.get_color("banner_title", "#60a5fa")
+    border_color = skin.get_color("banner_border", "#3b82f6")
     norm_active = (active_provider or "").lower().strip()
     if norm_active in ("agy", "google-antigravity", "jetski"):
         norm_active = "antigravity"
@@ -337,13 +363,13 @@ def build_usage_dashboard(
             snap = acc.snapshot
 
             if is_active:
-                header = f"[bold #FFD700]★ {display_name}[/] [dim cyan](active model)[/]{pool_suffix}"
+                header = f"[bold {name_color}]★ {display_name}[/] [dim cyan](active model)[/]{pool_suffix}"
             elif "xkiro" in norm_p or (snap.plan and "free" in snap.plan.lower()):
-                header = f"[bold #FFD700]✦ {display_name}[/] [dim green](Daily Free Tier)[/]{pool_suffix}"
+                header = f"[bold {name_color}]✦ {display_name}[/] [dim green](Daily Free Tier)[/]{pool_suffix}"
             elif "nvidia" in norm_p:
-                header = f"[bold #FFD700]✦ {display_name}[/] [dim green](Free Trial)[/]{pool_suffix}"
+                header = f"[bold {name_color}]✦ {display_name}[/] [dim green](Free Trial)[/]{pool_suffix}"
             else:
-                header = f"[bold #FFD700]✦ {display_name}[/]{pool_suffix}"
+                header = f"[bold {name_color}]✦ {display_name}[/]{pool_suffix}"
 
             lines.append(header)
 
@@ -385,11 +411,11 @@ def build_usage_dashboard(
             tier_hdr = "Daily Free Tier • " if "xkiro" in norm_p else ("Free Trial • " if "nvidia" in norm_p else "")
 
             if is_active:
-                header = f"[bold #FFD700]★ {display_name}[/] [dim cyan](active model • {len(accs)} accounts{cred_hdr})[/]{pool_suffix}"
+                header = f"[bold {name_color}]★ {display_name}[/] [dim cyan](active model • {len(accs)} accounts{cred_hdr})[/]{pool_suffix}"
             elif "xkiro" in norm_p or "nvidia" in norm_p:
-                header = f"[bold #FFD700]✦ {display_name}[/] [dim green]({tier_hdr}{len(accs)} accounts)[/]{pool_suffix}"
+                header = f"[bold {name_color}]✦ {display_name}[/] [dim green]({tier_hdr}{len(accs)} accounts)[/]{pool_suffix}"
             else:
-                header = f"[bold #FFD700]✦ {display_name}[/] [dim cyan]({len(accs)} accounts{cred_hdr})[/]{pool_suffix}"
+                header = f"[bold {name_color}]✦ {display_name}[/] [dim cyan]({len(accs)} accounts{cred_hdr})[/]{pool_suffix}"
 
             lines.append(header)
 
@@ -444,10 +470,10 @@ def build_usage_dashboard(
         lines.append("")
         lines.append(f"[dim]Other connected providers: {', '.join(other_labels)}[/]")
 
-    title_text = "[bold #FFD700]✨ Provider Quotas & Usage Limits[/]"
+    title_text = f"[bold {title_color}]✨ Provider Quotas & Usage Limits[/]"
     return Panel(
         "\n".join(lines).rstrip(),
         title=title_text,
-        border_style="bright_blue",
+        border_style=border_color,
         padding=(1, 2),
     )

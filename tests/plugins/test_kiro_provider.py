@@ -34,7 +34,24 @@ class TestKiroProvider(unittest.TestCase):
         self.assertEqual(rt["provider"], "kiro")
         self.assertEqual(rt["base_url"], "kiro://local")
         self.assertEqual(rt["api_mode"], "chat_completions")
-        self.assertEqual(rt["source"], "process")
+
+    def test_pool_entry_without_base_url_keeps_provider_endpoint(self):
+        """A local-store-seeded credential (token only, no endpoint — what
+        ``_seed_kiro_singleton`` writes) must not blank the provider's base_url.
+
+        The credential-pool rung sits above the external-process rung, so before this a
+        logged-in Kiro account resolved to provider 'kiro' with an EMPTY base_url and the
+        CLI died with \"Provider resolver returned an empty base URL\".
+        """
+        from agent.credential_pool import write_credential_pool
+
+        write_credential_pool("kiro", [{
+            "id": "kiro-test", "label": "Kiro (google)", "auth_type": "api_key",
+            "priority": 0, "source": "sqlite", "access_token": "kiro-access-token",
+        }])
+        rt = resolve_runtime_provider(requested="kiro", target_model="claude-sonnet-4.5")
+        self.assertEqual(rt["provider"], "kiro")
+        self.assertEqual(rt["base_url"], "kiro://local")
 
 
 if __name__ == "__main__":

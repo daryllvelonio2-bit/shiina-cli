@@ -25,7 +25,10 @@ class TestQoderProvider(unittest.TestCase):
         self.assertEqual(resolve_provider("qoder.com"), "qoder")
 
     def test_resolve_runtime_provider(self):
-        rt = resolve_runtime_provider(requested="qoder", target_model="Qwen3.8-Max")
+        # Explicit key: the test must not depend on an ambient QODER_PAT (fails on CI/other machines).
+        rt = resolve_runtime_provider(
+            requested="qoder", target_model="Qwen3.8-Max", explicit_api_key="qoder-test-key"
+        )
         self.assertEqual(rt["provider"], "qoder")
         self.assertEqual(rt["base_url"], "https://api2.qoder.sh")
         self.assertEqual(rt["api_mode"], "chat_completions")

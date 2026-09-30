@@ -354,3 +354,25 @@ def test_build_usage_dashboard_nvidia_rendering():
     assert "#main" in rendered
 
 
+
+
+def test_discover_quota_providers_folds_alias_variants(monkeypatch):
+    """Invariant: alias variants of one provider yield ONE dashboard row, not one per alias.
+
+    kiro/kiro-cli/kiro-ai share a single credential; before folding they each produced a row
+    (and the summary line read "kiro (3 keys)").
+    """
+    monkeypatch.setattr(
+        "shiina_cli.auth._load_auth_store",
+        lambda: {"credential_pool": {"kiro": {}, "kiro-cli": {}, "kiro-ai": {}}},
+    )
+    monkeypatch.setattr(
+        "shiina_cli.usage_visualizer.load_pool",
+        lambda p: MagicMock(entries=lambda: [MagicMock()]),
+    )
+
+    quota_cands, _ = discover_quota_providers()
+
+    assert quota_cands.count("kiro") == 1
+    assert "kiro-cli" not in quota_cands
+    assert "kiro-ai" not in quota_cands

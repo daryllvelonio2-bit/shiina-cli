@@ -396,3 +396,66 @@ def test_fetch_account_usage_nvidia(monkeypatch):
 
 
 
+
+
+def test_fetch_account_usage_reports_local_cli_connection(monkeypatch):
+    """Invariant: a connected agent CLI with no usage API still yields a snapshot.
+
+    Kiro/OpenCode are driven through a local CLI with no quota endpoint; before this they
+    returned None and vanished from the /usage dashboard entirely.
+    """
+    monkeypatch.setattr(
+        "shiina_cli.auth._external_process_auth_evidence",
+        lambda provider: (True, "Kiro SQLite store (google)"),
+    )
+
+    snap = fetch_account_usage("kiro")
+
+    assert snap is not None
+    assert snap.provider == "kiro"
+    assert snap.windows == ()
+    assert any("Kiro SQLite store (google)" in d for d in snap.details)
+
+
+def test_fetch_account_usage_antigravity_queries_each_account_with_its_own_token(monkeypatch):
+    """Invariant: a multi-account pool queries each account with ITS OWN credential.
+
+    Regression: the fetcher ignored the pooled api_key and always used the default token manager,
+    which resolves the ACTIVE agy login — so every account displayed the active account's quota
+    (both rows showed the same remaining percentage).
+    """
+    bearers: list[str] = []
+
+    class _PostClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def post(self, url, headers=None, json=None):
+            bearers.append(headers["Authorization"])
+            return _Response({"groups": [], "description": "ok"})
+
+    class _Entry:
+        def __init__(self, access_token, refresh_token):
+            self.access_token = access_token
+            self.refresh_token = refresh_token
+
+    class _Pool:
+        def entries(self):
+            return [_Entry("tok-a", "ref-a"), _Entry("tok-b", "ref-b")]
+
+    monkeypatch.setattr("agent.account_usage.httpx.Client", lambda timeout=10.0: _PostClient())
+    monkeypatch.setattr("agent.credential_pool.load_pool", lambda provider: _Pool())
+    # The default manager (no api_key) resolves the ACTIVE agy login — give it one so the base
+    # behaviour (every account reporting the active account's quota) is what the test catches.
+    monkeypatch.setattr(
+        "agent.antigravity_client.GoogleOAuthTokenManager._load_initial_tokens",
+        lambda self: setattr(self, "_access_token", "active-account-token"),
+    )
+
+    assert fetch_account_usage("antigravity", api_key="tok-a") is not None
+    assert fetch_account_usage("antigravity", api_key="tok-b") is not None
+
+    assert bearers == ["Bearer tok-a", "Bearer tok-b"]

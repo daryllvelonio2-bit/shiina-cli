@@ -104,13 +104,28 @@ def resolve_agy_model(raw_model: str) -> str:
 class GoogleOAuthTokenManager:
     """Manages Google OAuth tokens for Antigravity / Google One AI subscriptions."""
 
-    def __init__(self) -> None:
-        self._access_token: Optional[str] = None
-        self._refresh_token: Optional[str] = None
-        self._expiry: float = 0.0
+    def __init__(
+        self,
+        access_token: Optional[str] = None,
+        refresh_token: Optional[str] = None,
+        *,
+        persist: bool = True,
+    ) -> None:
+        """``persist=False`` binds the manager to a CALLER-SUPPLIED credential.
+
+        Needed for multi-account pools: ``_save_to_auth_json`` writes the single active
+        ``providers.antigravity`` slot, so a refresh of a non-active account must not be
+        persisted over it. ``expiry=inf`` means "trust the supplied token until a 401 forces
+        a refresh" — the caller has no expiry to hand over.
+        """
+        self._access_token = access_token or None
+        self._refresh_token = refresh_token or None
+        self._expiry: float = float("inf") if access_token else 0.0
         self._email: Optional[str] = None
         self._lock = threading.Lock()
-        self._load_initial_tokens()
+        self._persist = persist
+        if not (access_token or refresh_token):
+            self._load_initial_tokens()
 
     def _extract_account_metadata(self, raw: Any) -> None:
         """Extract authenticated user email from raw secret payload or id_token."""
@@ -268,9 +283,11 @@ class GoogleOAuthTokenManager:
         except Exception as exc:
             logger.debug("Failed to read from keyring: %s", exc)
 
-        # 5. ~/.shiina/auth.json
+        # 5. <shiina_home>/auth.json
         try:
-            auth_file = Path.home() / ".shiina" / "auth.json"
+            from shiina_constants import get_shiina_home
+
+            auth_file = get_shiina_home() / "auth.json"
             if auth_file.exists():
                 with open(auth_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
@@ -329,14 +346,17 @@ class GoogleOAuthTokenManager:
                 expires_in = int(result.get("expires_in", 3600))
                 self._expiry = time.time() + expires_in
                 logger.info("Successfully refreshed Google Antigravity OAuth access token.")
-                self._save_to_auth_json()
+                if self._persist:
+                    self._save_to_auth_json()
         except urllib.error.HTTPError as e:
             err_msg = e.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"Failed to refresh Google Antigravity token: HTTP {e.code} - {err_msg}") from e
 
     def _save_to_auth_json(self) -> None:
         try:
-            auth_file = Path.home() / ".shiina" / "auth.json"
+            from shiina_constants import get_shiina_home
+
+            auth_file = get_shiina_home() / "auth.json"
             if auth_file.exists():
                 with open(auth_file, "r", encoding="utf-8") as f:
                     store = json.load(f)

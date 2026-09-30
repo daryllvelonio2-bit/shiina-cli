@@ -189,7 +189,7 @@ _LABEL_OVERRIDES: Dict[str, str] = {
     "nebius-token-factory": "Nebius Token Factory", "tencent-tokenplan": "Tencent TokenPlan", "lmstudio": "LM Studio",
     "local": "Local endpoint", "bedrock": "AWS Bedrock", "vertex": "Google Vertex AI", "ollama-cloud": "Ollama Cloud",
     "xai-oauth": "xAI Grok OAuth (SuperGrok / Premium+)", "qoder": "Qoder AI", "cline": "Cline",
-    "freebuff": "Freebuff CLI", "opencode-cli": "OpenCode CLI",
+    "freebuff": "Freebuff CLI", "opencode-cli": "OpenCode CLI", "kiro": "Kiro",
 }
 
 

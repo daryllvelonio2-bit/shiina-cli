@@ -479,8 +479,15 @@ def _pool_entry_mode_and_url(provider, entry, model_cfg, effective_model, base_u
     # Honour model.base_url only when the pool entry carries no explicit base_url (i.e. it fell
     # back to the registry default). Env var overrides win.
     pconfig = PROVIDER_REGISTRY.get(provider)
-    if pconfig and base_url.rstrip("/") == pconfig.inference_base_url.rstrip("/"):
-        base_url = _config_base_url_for_provider(model_cfg, provider) or base_url
+    if pconfig:
+        # A pool entry whose credential carries no endpoint (external-process providers seeded
+        # from a local store — kiro, antigravity, freebuff, opencode-cli — have only a token)
+        # must fall back to the provider's own base_url, or the runtime is rejected downstream as
+        # an empty base URL even though the subprocess endpoint is well known.
+        if not base_url.strip():
+            base_url = pconfig.inference_base_url
+        if base_url.rstrip("/") == pconfig.inference_base_url.rstrip("/"):
+            base_url = _config_base_url_for_provider(model_cfg, provider) or base_url
     return _configured_or_fallback_api_mode(provider, model_cfg, base_url, effective_model, opencode_by_model=True), base_url
 
 
