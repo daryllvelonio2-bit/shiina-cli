@@ -108,8 +108,55 @@ class GoogleOAuthTokenManager:
         self._access_token: Optional[str] = None
         self._refresh_token: Optional[str] = None
         self._expiry: float = 0.0
+        self._email: Optional[str] = None
         self._lock = threading.Lock()
         self._load_initial_tokens()
+
+    def _extract_account_metadata(self, raw: Any) -> None:
+        """Extract authenticated user email from raw secret payload or id_token."""
+        if not isinstance(raw, dict):
+            return
+        # 1. Direct email field
+        if raw.get("email"):
+            self._email = str(raw["email"]).strip()
+            return
+        # 2. Check inside token dict
+        tok_dict = raw.get("token")
+        if isinstance(tok_dict, dict) and tok_dict.get("email"):
+            self._email = str(tok_dict["email"]).strip()
+            return
+        # 3. Decode JWT id_token (no network call needed)
+        id_tok = raw.get("id_token") or (tok_dict.get("id_token") if isinstance(tok_dict, dict) else None)
+        if id_tok and isinstance(id_tok, str) and "." in id_tok:
+            try:
+                import base64
+                parts = id_tok.split(".")
+                if len(parts) >= 2:
+                    padded = parts[1] + "=" * ((4 - len(parts[1]) % 4) % 4)
+                    claims = json.loads(base64.urlsafe_b64decode(padded).decode("utf-8"))
+                    if claims.get("email"):
+                        self._email = str(claims["email"]).strip()
+                        return
+            except Exception as e:
+                logger.debug("Failed decoding id_token: %s", e)
+
+    def get_authenticated_email(self) -> Optional[str]:
+        """Return the authenticated user email if known, or query Google tokeninfo."""
+        if self._email:
+            return self._email
+        # Fast query to Google tokeninfo if access token is available
+        token = self._access_token
+        if token:
+            try:
+                req = urllib.request.Request(f"https://oauth2.googleapis.com/tokeninfo?access_token={token}")
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    if data.get("email"):
+                        self._email = str(data["email"]).strip()
+                        return self._email
+            except Exception as e:
+                logger.debug("Failed querying tokeninfo for email: %s", e)
+        return None
 
     def _load_initial_tokens(self) -> None:
         # 1. Environment variables
@@ -144,6 +191,7 @@ class GoogleOAuthTokenManager:
                 token_info = raw.get("token", {})
                 self._access_token = token_info.get("access_token")
                 self._refresh_token = token_info.get("refresh_token")
+                self._extract_account_metadata(raw)
                 expiry_str = token_info.get("expiry")
                 if expiry_str:
                     try:
@@ -154,7 +202,35 @@ class GoogleOAuthTokenManager:
                 logger.debug("Loaded Antigravity OAuth tokens from SecretService.")
                 return
         except Exception as exc:
-            logger.debug("Failed to read from SecretService: %s", exc)
+            logger.debug("Failed to read from SecretService via library: %s", exc)
+
+        # 2b. Linux secret-tool fallback (when secretstorage/dbus python package is missing in venv)
+        if sys.platform.startswith("linux") and shutil.which("secret-tool"):
+            try:
+                proc = subprocess.run(
+                    ["secret-tool", "lookup", "service", "gemini", "username", "antigravity"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if proc.returncode == 0 and proc.stdout.strip():
+                    raw = json.loads(proc.stdout.strip())
+                    token_info = raw.get("token", raw) if isinstance(raw, dict) else {}
+                    if token_info.get("access_token"):
+                        self._access_token = token_info["access_token"]
+                        self._refresh_token = token_info.get("refresh_token")
+                        self._extract_account_metadata(raw)
+                        expiry_str = token_info.get("expiry")
+                        if expiry_str:
+                            try:
+                                dt = datetime.fromisoformat(expiry_str)
+                                self._expiry = dt.timestamp()
+                            except Exception:
+                                self._expiry = time.time() + 1800
+                        logger.debug("Loaded Antigravity OAuth tokens via secret-tool.")
+                        return
+            except Exception as exc:
+                logger.debug("Failed to read from secret-tool: %s", exc)
 
         # 3. macOS Keychain (service: gemini)
         if sys.platform == "darwin":

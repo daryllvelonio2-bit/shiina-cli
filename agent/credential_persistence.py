@@ -146,6 +146,8 @@ def is_borrowed_credential_source(source: Any, provider_id: Any = None) -> bool:
         return False
     if normalized_source.startswith("systemd:") or normalized_source.startswith("env:") or normalized_source == "claude_code":
         return True
+    if normalized_source.startswith("opencode:") or normalized_source.startswith("kiro:"):
+        return False
     normalized_provider = str(provider_id or "").strip().lower()
     if (normalized_provider, normalized_source) in _PERSISTABLE_PROVIDER_SOURCES:
         return False

@@ -2092,7 +2092,8 @@ def _find_matching_entry_index(
     incoming_user_id = payload.get("user_id") or payload.get("extra", {}).get("user_id")
     if incoming_user_id:
         for idx, entry in enumerate(entries):
-            if entry.source == source and entry.extra.get("user_id") == incoming_user_id:
+            entry_user = entry.extra.get("user_id") if entry.extra else None
+            if entry.source == source and entry_user and entry_user == incoming_user_id:
                 return idx
 
     # 3. Match by explicit label
@@ -2112,7 +2113,7 @@ def _find_matching_entry_index(
     for idx, entry in enumerate(entries):
         if entry.source == source:
             has_creds = bool(
-                entry.access_token or entry.refresh_token or entry.agent_key or entry.extra.get("secret_fingerprint")
+                entry.access_token or entry.refresh_token or entry.agent_key or (entry.extra and entry.extra.get("secret_fingerprint"))
             )
             if not has_creds:
                 return idx
@@ -2178,8 +2179,27 @@ def _upsert_entry(entries: List[PooledCredential], provider: str, source: str, p
         known_fingerprint = existing.extra.get("secret_fingerprint")
         if isinstance(known_fingerprint, str) and known_fingerprint:
             token_changed = fingerprint_secret_value(incoming_token) != known_fingerprint
+
+    # Update label if token changed or existing label was a generic fallback
+    incoming_label = payload.get("label")
+    should_update_label = False
+    if incoming_label and incoming_label != existing.label:
+        generic_labels = {
+            source,
+            provider,
+            "Google Antigravity OAuth (agy)",
+            "Freebuff credentials",
+            f"OpenCode ({provider})",
+        }
+        if existing.label in generic_labels or token_changed:
+            should_update_label = True
+
     for key, value in payload.items():
-        if key in {"id", "priority"} or value is None or (key == "label" and existing.label):
+        if key in {"id", "priority"} or value is None:
+            continue
+        if key == "label":
+            if should_update_label:
+                field_updates["label"] = incoming_label
             continue
         if key in _field_names:
             if getattr(existing, key) != value:
@@ -2194,9 +2214,6 @@ def _upsert_entry(entries: List[PooledCredential], provider: str, source: str, p
             field_updates["extra"] = {**existing.extra, **extra_updates}
         updated = replace(existing, **field_updates)
         entries[existing_idx] = updated
-        # Runtime-only borrowed secret updates refresh the in-memory entry
-        # without forcing auth.json churn when the disk-safe payload is
-        # unchanged (e.g. env keys with the same fingerprint).
         return bool(duplicate_indices) or existing.to_dict() != updated.to_dict()
     return bool(duplicate_indices)
 
@@ -2478,11 +2495,17 @@ def _seed_antigravity_singleton(seed: _Seeder) -> None:
         mgr = GoogleOAuthTokenManager()
         token = mgr.get_access_token()
         if token:
-            seed.upsert("oauth", {
+            email = mgr.get_authenticated_email()
+            payload: Dict[str, Any] = {
                 "auth_type": AUTH_TYPE_OAUTH,
                 "access_token": token,
-                "label": "Google Antigravity OAuth (agy)",
-            })
+                "label": email or "Google Antigravity OAuth (agy)",
+            }
+            if email:
+                payload["user_id"] = email
+            if mgr._refresh_token:
+                payload["refresh_token"] = mgr._refresh_token
+            seed.upsert("oauth", payload)
     except Exception as exc:
         logger.debug("Antigravity seed failed: %s", exc)
 
@@ -2541,9 +2564,10 @@ def _seed_opencode_singleton(seed: _Seeder) -> None:
                     provider_data.get("token")
                     or provider_data.get("access_token")
                     or provider_data.get("apiKey")
+                    or provider_data.get("key")
                 )
                 if token:
-                    seed.upsert("opencode", {
+                    seed.upsert(f"opencode:{provider_name}", {
                         "auth_type": AUTH_TYPE_API_KEY,
                         "access_token": token,
                         "refresh_token": provider_data.get("refresh_token"),
@@ -2847,3 +2871,186 @@ def load_pool(provider: str) -> CredentialPool:
             removed_ids=disk_ids - new_ids,
         )
     return CredentialPool(provider, entries)
+
+
+def scan_all_clis() -> List[Dict[str, Any]]:
+    """Scan all supported external CLIs, inspect accounts, and sync into pool."""
+    results: List[Dict[str, Any]] = []
+
+    # 1. Antigravity / agy
+    try:
+        from agent.antigravity_client import GoogleOAuthTokenManager
+        mgr = GoogleOAuthTokenManager()
+        token = mgr.get_access_token()
+        email = mgr.get_authenticated_email()
+        if token:
+            p_antigravity = load_pool("antigravity")
+            results.append({
+                "cli": "antigravity (agy)",
+                "provider": "antigravity",
+                "status": "connected",
+                "account": email or "Google Account",
+                "auth_type": "oauth",
+                "pool_count": len(p_antigravity.entries()),
+            })
+        else:
+            results.append({
+                "cli": "antigravity (agy)",
+                "provider": "antigravity",
+                "status": "not_logged_in",
+                "account": None,
+                "auth_type": "oauth",
+                "pool_count": 0,
+            })
+    except Exception as e:
+        results.append({
+            "cli": "antigravity (agy)",
+            "provider": "antigravity",
+            "status": "not_detected",
+            "account": None,
+            "error": str(e),
+        })
+
+    # 2. OpenCode
+    try:
+        from agent.opencode_client import get_opencode_credentials, find_opencode_binary
+        bin_path = find_opencode_binary()
+        creds = get_opencode_credentials()
+        if creds:
+            p_open = load_pool("opencode-cli")
+            providers = list(creds.keys())
+            results.append({
+                "cli": "opencode",
+                "provider": "opencode-cli",
+                "status": "connected",
+                "account": ", ".join(providers),
+                "auth_type": "api_key",
+                "pool_count": len(p_open.entries()),
+            })
+        elif bin_path:
+            results.append({
+                "cli": "opencode",
+                "provider": "opencode-cli",
+                "status": "installed",
+                "account": f"CLI at {bin_path}",
+                "auth_type": "cli",
+                "pool_count": 0,
+            })
+        else:
+            results.append({
+                "cli": "opencode",
+                "provider": "opencode-cli",
+                "status": "not_detected",
+                "account": None,
+            })
+    except Exception as e:
+        results.append({
+            "cli": "opencode",
+            "provider": "opencode-cli",
+            "status": "error",
+            "account": None,
+            "error": str(e),
+        })
+
+    # 3. Kiro CLI
+    try:
+        from agent.kiro_client import check_kiro_credentials
+        ok, provider_name = check_kiro_credentials()
+        if ok:
+            p_kiro = load_pool("kiro")
+            results.append({
+                "cli": "kiro",
+                "provider": "kiro",
+                "status": "connected",
+                "account": f"Session ({provider_name})",
+                "auth_type": "social_session",
+                "pool_count": len(p_kiro.entries()),
+            })
+        else:
+            results.append({
+                "cli": "kiro",
+                "provider": "kiro",
+                "status": "not_detected",
+                "account": None,
+            })
+    except Exception as e:
+        results.append({
+            "cli": "kiro",
+            "provider": "kiro",
+            "status": "error",
+            "account": None,
+            "error": str(e),
+        })
+
+    # 4. Freebuff / Codebuff
+    try:
+        from agent.freebuff_client import get_freebuff_token, find_freebuff_binary
+        fb_tok = get_freebuff_token()
+        fb_bin = find_freebuff_binary()
+        if fb_tok:
+            p_fb = load_pool("freebuff")
+            results.append({
+                "cli": "freebuff",
+                "provider": "freebuff",
+                "status": "connected",
+                "account": "Active Token",
+                "auth_type": "token",
+                "pool_count": len(p_fb.entries()),
+            })
+        elif fb_bin:
+            results.append({
+                "cli": "freebuff",
+                "provider": "freebuff",
+                "status": "installed",
+                "account": f"CLI at {fb_bin}",
+                "auth_type": "cli",
+                "pool_count": 0,
+            })
+        else:
+            results.append({
+                "cli": "freebuff",
+                "provider": "freebuff",
+                "status": "not_detected",
+                "account": None,
+            })
+    except Exception as e:
+        results.append({
+            "cli": "freebuff",
+            "provider": "freebuff",
+            "status": "error",
+            "account": None,
+            "error": str(e),
+        })
+
+    # 5. Cline
+    try:
+        from shiina_cli.auth import get_provider_auth_state
+        cline_state = get_provider_auth_state("cline")
+        p_cline = load_pool("cline")
+        entries = p_cline.entries()
+        if entries or (cline_state and cline_state.get("access_token")):
+            results.append({
+                "cli": "cline",
+                "provider": "cline",
+                "status": "connected",
+                "account": f"{len(entries)} key(s) configured",
+                "auth_type": "api_key",
+                "pool_count": len(entries),
+            })
+        else:
+            results.append({
+                "cli": "cline",
+                "provider": "cline",
+                "status": "not_configured",
+                "account": None,
+            })
+    except Exception as e:
+        results.append({
+            "cli": "cline",
+            "provider": "cline",
+            "status": "error",
+            "account": None,
+            "error": str(e),
+        })
+
+    return results

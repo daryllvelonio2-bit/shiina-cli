@@ -806,11 +806,37 @@ def auth_upgrade_command(args) -> None:
         raise SystemExit(code)
 
 
+def auth_scan_command(args=None) -> None:
+    """``shiina auth scan`` / ``shiina scan``: scan all external CLIs and sync accounts."""
+    from agent.credential_pool import scan_all_clis
+
+    print("Scanning available external CLI tools and accounts...\n")
+    results = scan_all_clis()
+
+    print(f"{'CLI Tool':<20} {'Status':<16} {'Account / Details':<34} {'Pool Count'}")
+    print("-" * 80)
+    for r in results:
+        cli = r.get("cli", "")
+        status = r.get("status", "")
+        account = r.get("account") or r.get("error") or "None"
+        count = str(r.get("pool_count", "-"))
+        status_disp = {
+            "connected": "Connected",
+            "installed": "Detected (CLI)",
+            "not_logged_in": "Not Logged In",
+            "not_detected": "Not Detected",
+            "not_configured": "Not Configured",
+            "error": "Error",
+        }.get(status, status)
+        print(f"{cli:<20} {status_disp:<16} {account:<34} {count}")
+    print("\nSynced detected accounts into credential pool.")
+
+
 _AUTH_ACTIONS = {
     "add": auth_add_command, "list": auth_list_command, "remove": auth_remove_command,
     "reset": auth_reset_command, "priority": auth_priority_command, "refresh": auth_refresh_command, "status": auth_status_command,
     "logout": auth_logout_command, "upgrade": auth_upgrade_command,
-    "spotify": auth_spotify_command}
+    "spotify": auth_spotify_command, "scan": auth_scan_command}
 
 
 def auth_command(args) -> None:

@@ -78,4 +78,5 @@ def build_auth_parser(subparsers, *, cmd_auth: Callable) -> None:
         help="Do not attempt to open the browser automatically")
     auth_spotify.add_argument(
         "--timeout", type=float, help="Callback/token exchange timeout in seconds")
+    auth_subparsers.add_parser("scan", help="Scan external CLI tools and sync detected accounts")
     auth_parser.set_defaults(func=cmd_auth)
