@@ -24,6 +24,8 @@ Two invariants shape almost every design decision and are the lens for reviewing
 
 - **Fix real bugs, well:** Reproduce on current `main`, point to exact line, fix the whole bug class including sibling call paths. Verify claim and design intent against codebase before patching.
 - **Always commit after a meaningful change:** Ensure every significant update is cleanly committed.
+- **No bloat:** Write the smallest thing that is correct. If it can be done in 2 lines, do not write 5. No defensive wrappers around code that cannot fail, no flags nobody sets, no "just in case" helpers, no re-stating the WHAT in comments or docstrings (keep the WHY). Deleting lines is a valid fix.
+- **Provider onboarding notes:** Whenever you connect a new CLI/tool to Shiina — certificates, keys, tokens, OAuth, a local subprocess, a credential store on disk — you MUST update `EXTERNAL_PROCESS_PROVIDERS_NOTES.md` in the same change with steps, location, how, and data needed.
 - **Expand reach at the edges:** Adapters, channels, providers, models, UI features integrate via existing setup/config UX (`shiina tools`, `shiina setup`).
 - **Refactor god-files into clean modules:** Extract into facade + siblings (`<stem>_<topic>.py`).
 - **Extend, don't duplicate:** Check existing infra first. For 3+ variants in a category, design an ABC + orchestrator.
