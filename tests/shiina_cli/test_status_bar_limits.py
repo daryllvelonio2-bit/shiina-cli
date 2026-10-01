@@ -200,3 +200,25 @@ def test_minimal_status_bar_renders_limits_beside_ctx(monkeypatch):
     assert "agy-flash" in full_str
     assert "ctx -- · 5h 70%" in full_str
     assert "w 48%" in full_str
+
+
+def test_status_bar_limits_respects_account_id(monkeypatch):
+    """Multiple accounts under the same provider and model cache separately by account_id."""
+    clear_limits_cache()
+    snap_acc1 = _snapshot("antigravity", "quota", [AccountUsageWindow(label="Gemini Models (weekly)", used_percent=5.0)], [])
+    snap_acc2 = _snapshot("antigravity", "quota", [AccountUsageWindow(label="Gemini Models (weekly)", used_percent=95.0)], [])
+
+    _limits_cache["antigravity:agy-flash:acc-1"] = (float("inf"), snap_acc1)
+    _limits_cache["antigravity:agy-flash:acc-2"] = (float("inf"), snap_acc2)
+
+    hit1 = get_cached_account_limits("antigravity", "agy-flash", account_id="acc-1")
+    hit2 = get_cached_account_limits("antigravity", "agy-flash", account_id="acc-2")
+
+    assert hit1 is snap_acc1
+    assert hit2 is snap_acc2
+
+    _, text1 = format_limits_compact(hit1, model="agy-flash")
+    _, text2 = format_limits_compact(hit2, model="agy-flash")
+
+    assert "95%" in text1
+    assert "5%" in text2

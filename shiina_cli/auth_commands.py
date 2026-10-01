@@ -443,6 +443,11 @@ def auth_priority_command(args) -> None:
     moved = pool.move_entry(matched.id, requested)
     if moved is None:
         raise SystemExit(f'No credential matching "{getattr(args, "target", None)}" for provider {provider}.')
+    try:
+        from shiina_cli.status_bar_limits import clear_limits_cache
+        clear_limits_cache()
+    except Exception:
+        pass
     _report_priority(provider, pool, moved, requested, "Set", "to")
 
 

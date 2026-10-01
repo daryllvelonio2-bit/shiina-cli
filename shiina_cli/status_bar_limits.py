@@ -20,10 +20,11 @@ _active_fetches: set[str] = set()
 _fetch_lock = threading.Lock()
 
 
-def _cache_key(provider: Optional[str], model: Optional[str] = None) -> str:
+def _cache_key(provider: Optional[str], model: Optional[str] = None, account_id: Optional[str] = None) -> str:
     p = str(provider or "").strip().lower()
     m = str(model or "").strip().lower()
-    return f"{p}:{m}"
+    acc = str(account_id or "").strip()
+    return f"{p}:{m}:{acc}" if acc else f"{p}:{m}"
 
 
 def clear_limits_cache() -> None:
@@ -194,6 +195,7 @@ def get_cached_account_limits(
     model: Optional[str] = None,
     base_url: Optional[str] = None,
     api_key: Optional[str] = None,
+    account_id: Optional[str] = None,
     on_update: Optional[Callable[[], None]] = None,
 ) -> Any:
     """Non-blocking query for cached account usage limits.
@@ -204,7 +206,7 @@ def get_cached_account_limits(
     """
     if not provider:
         return None
-    key = _cache_key(provider, model)
+    key = _cache_key(provider, model, account_id=account_id)
     now = time.monotonic()
 
     with _fetch_lock:
@@ -258,12 +260,15 @@ def refresh_account_limits_async(
     model: Optional[str] = None,
     base_url: Optional[str] = None,
     api_key: Optional[str] = None,
+    account_id: Optional[str] = None,
     on_update: Optional[Callable[[], None]] = None,
 ) -> None:
     """Trigger an asynchronous refresh of account limits (e.g. after a chat turn)."""
     if not provider:
         return
-    key = _cache_key(provider, model)
+    key = _cache_key(provider, model, account_id=account_id)
     with _fetch_lock:
         _limits_cache.pop(key, None)
-    get_cached_account_limits(provider, model=model, base_url=base_url, api_key=api_key, on_update=on_update)
+    get_cached_account_limits(
+        provider, model=model, base_url=base_url, api_key=api_key, account_id=account_id, on_update=on_update
+    )

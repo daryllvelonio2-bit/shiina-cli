@@ -609,18 +609,38 @@ def _antigravity_token_manager(access_token: str):
     """
     from agent.antigravity_client import GoogleOAuthTokenManager
 
-    if not access_token:
-        return GoogleOAuthTokenManager()
     refresh_token = None
     try:
         from agent.credential_pool import load_pool
 
-        refresh_token = next(
-            (e.refresh_token for e in load_pool("antigravity").entries() if e.access_token == access_token),
-            None,
-        )
+        pool = load_pool("antigravity")
+        entries = pool.entries() if pool else []
+        if not access_token:
+            # When no token is specified, query the active pooled credential (priority 0)
+            current = pool.peek() if pool and pool.has_credentials() else None
+            if current and (current.access_token or current.refresh_token):
+                access_token = current.access_token or ""
+                refresh_token = current.refresh_token
+        else:
+            match = next(
+                (
+                    e
+                    for e in entries
+                    if e.access_token == access_token
+                    or e.id == access_token
+                    or e.label == access_token
+                    or e.refresh_token == access_token
+                ),
+                None,
+            )
+            if match:
+                access_token = match.access_token or access_token
+                refresh_token = match.refresh_token
     except Exception:
         logger.debug("antigravity: no refresh token for the pooled account", exc_info=True)
+
+    if not access_token and not refresh_token:
+        return GoogleOAuthTokenManager()
     return GoogleOAuthTokenManager(access_token=access_token, refresh_token=refresh_token, persist=False)
 
 

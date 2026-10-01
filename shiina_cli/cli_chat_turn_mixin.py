@@ -496,11 +496,13 @@ class CLIChatTurnMixin:
             if resolved_prov:
                 base_url = (getattr(self.agent, "base_url", None) if self.agent else None) or getattr(self, "base_url", None)
                 api_key = (getattr(self.agent, "api_key", None) if self.agent else None) or getattr(self, "api_key", None)
+                account_id = getattr(self.agent, "_credential_pool_entry_id", None)
                 refresh_account_limits_async(
                     resolved_prov,
                     model=model_name,
                     base_url=base_url,
                     api_key=api_key,
+                    account_id=account_id,
                     on_update=getattr(self, "_invalidate", None),
                 )
         except Exception:
