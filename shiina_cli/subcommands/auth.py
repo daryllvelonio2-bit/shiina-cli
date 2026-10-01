@@ -48,6 +48,11 @@ def build_auth_parser(subparsers, *, cmd_auth: Callable) -> None:
     auth_priority.add_argument("provider", help="Provider id")
     auth_priority.add_argument("target", help="Credential index, entry id, or exact label")
     auth_priority.add_argument("priority", type=int, help="New priority; others are renumbered")
+    auth_use = auth_subparsers.add_parser(
+        "use", aliases=["switch"],
+        help="Select a pooled credential as active (sets its priority to 0)")
+    auth_use.add_argument("provider", help="Provider id")
+    auth_use.add_argument("target", help="Credential index, entry id, or exact label")
     auth_refresh = auth_subparsers.add_parser(
         "refresh", help="Refresh a pooled OAuth credential's tokens and clear its cooldown")
     auth_refresh.add_argument("provider", help="Provider id")

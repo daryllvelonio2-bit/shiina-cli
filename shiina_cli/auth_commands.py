@@ -446,6 +446,12 @@ def auth_priority_command(args) -> None:
     _report_priority(provider, pool, moved, requested, "Set", "to")
 
 
+def auth_use_command(args) -> None:
+    """`shiina auth use <provider> <target>`: switch active credential (shortcut for priority 0)."""
+    setattr(args, "priority", 0)
+    auth_priority_command(args)
+
+
 def _free_tier_lines() -> tuple[str, str]:
     """The two-line free-tier rendering shared by every auth display surface (R-USR-1)."""
     from shiina_cli.anon_auth import FREE_TIER_LABEL, GUEST_MODEL, UPGRADE_HINT
@@ -834,7 +840,9 @@ def auth_scan_command(args=None) -> None:
 
 _AUTH_ACTIONS = {
     "add": auth_add_command, "list": auth_list_command, "remove": auth_remove_command,
-    "reset": auth_reset_command, "priority": auth_priority_command, "refresh": auth_refresh_command, "status": auth_status_command,
+    "reset": auth_reset_command, "priority": auth_priority_command,
+    "use": auth_use_command, "switch": auth_use_command,
+    "refresh": auth_refresh_command, "status": auth_status_command,
     "logout": auth_logout_command, "upgrade": auth_upgrade_command,
     "spotify": auth_spotify_command, "scan": auth_scan_command}
 

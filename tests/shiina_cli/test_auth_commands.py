@@ -830,6 +830,53 @@ def test_auth_remove_reindexes_priorities(tmp_path, monkeypatch):
     assert entries[0]["priority"] == 0
 
 
+def test_auth_use_promotes_target_credential_to_priority_zero(tmp_path, monkeypatch):
+    """`shiina auth use <provider> <target>` switches active credential by setting priority to 0."""
+    monkeypatch.setenv("SHIINA_HOME", str(tmp_path / "shiina"))
+    _write_auth_store(
+        tmp_path,
+        {
+            "version": 1,
+            "providers": {},
+            "credential_pool": {
+                "antigravity": [
+                    {
+                        "id": "agy-1",
+                        "label": "first@gmail.com",
+                        "auth_type": "oauth",
+                        "priority": 0,
+                        "source": "manual",
+                        "access_token": "tok1",
+                    },
+                    {
+                        "id": "agy-2",
+                        "label": "second@gmail.com",
+                        "auth_type": "oauth",
+                        "priority": 1,
+                        "source": "manual",
+                        "access_token": "tok2",
+                    },
+                ]
+            }
+        },
+    )
+
+    from shiina_cli.auth_commands import auth_use_command
+
+    class _Args:
+        provider = "antigravity"
+        target = "second@gmail.com"
+
+    auth_use_command(_Args())
+
+    payload = json.loads((tmp_path / "shiina" / "auth.json").read_text())
+    entries = payload["credential_pool"]["antigravity"]
+    assert entries[0]["id"] == "agy-2"
+    assert entries[0]["priority"] == 0
+    assert entries[1]["id"] == "agy-1"
+    assert entries[1]["priority"] == 1
+
+
 def test_auth_remove_codex_migrates_legacy_dict_suppression(tmp_path, monkeypatch):
     """Removing a Codex credential must tolerate legacy dict suppression data."""
     monkeypatch.setenv("SHIINA_HOME", str(tmp_path / "shiina"))
