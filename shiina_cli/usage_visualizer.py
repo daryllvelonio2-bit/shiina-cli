@@ -421,12 +421,35 @@ def build_usage_dashboard(
 
             for acc in accs:
                 snap = acc.snapshot
-                marker = "[bold cyan]←[/]" if acc.is_current else " "
+                marker = "[bold cyan]← (active)[/]" if acc.is_current else ""
                 raw_lbl = str(acc.label) if acc.label else str(acc.priority + 1)
                 lbl = f"#{raw_lbl}"
                 user = extract_user_info(snap.details, max_len=32)
-                user_str = f"[dim]• {user}[/]" if user else ""
+                user_str = f"[dim]• {user}[/]" if user and user != raw_lbl else ""
 
+                if len(snap.windows) > 1:
+                    lines.append(f"   [bold white]{lbl}[/] {marker} {user_str}".rstrip())
+                    for w in snap.windows:
+                        w_name = shorten_label(w.label)
+                        if w.used_percent is not None:
+                            avail = max(0.0, min(100.0, 100.0 - w.used_percent))
+                            gauge = render_line_gauge(avail, width=max(8, gauge_width - 4))
+                            pct_str = (
+                                f"[bold green]{avail:>3.0f}%[/]"
+                                if avail >= 25.0
+                                else (f"[bold yellow]{avail:>3.0f}%[/]" if avail > 0 else "[bold red]  0%[/]")
+                            )
+                            reset_str = f"[dim]• resets {format_countdown(w.reset_at)}[/]" if w.reset_at else ""
+                            lines.append(f"      [white]{w_name:<19}[/] {gauge}  {pct_str}  {reset_str}".rstrip())
+                        else:
+                            detail_val = w.detail or "available"
+                            if "free trial" in detail_val.lower() or "rate limit" in detail_val.lower():
+                                lines.append(f"      [white]{w_name:<19}[/] [bold green]Active[/] [dim]• Free Trial (Rate Limits)[/]")
+                            else:
+                                lines.append(f"      [white]{w_name:<19}[/] [bold green]{detail_val}[/]")
+                    continue
+
+                single_marker = "[bold cyan]←[/]" if acc.is_current else " "
                 w = snap.windows[0] if snap.windows else None
                 if w and w.used_percent is not None:
                     avail = max(0.0, min(100.0, 100.0 - w.used_percent))
@@ -447,15 +470,15 @@ def build_usage_dashboard(
                         if m:
                             tok_str = f" [dim]({m.group(1)})[/]"
 
-                    lines.append(f"   [white]{lbl:<6}[/] {marker} {gauge}  {pct_str} {tok_str} {res_str} {user_str}".rstrip())
+                    lines.append(f"   [white]{lbl:<6}[/] {single_marker} {gauge}  {pct_str} {tok_str} {res_str} {user_str}".rstrip())
                 elif w and "credits" in (w.detail or "").lower():
                     c_num = extract_credits(w.detail)
-                    lines.append(f"   [white]{lbl:<6}[/] {marker} [bold green]{c_num:>7,} cred[/]  {user_str}".rstrip())
+                    lines.append(f"   [white]{lbl:<6}[/] {single_marker} [bold green]{c_num:>7,} cred[/]  {user_str}".rstrip())
                 elif w and ("free trial" in (w.detail or "").lower() or "rate limit" in (w.detail or "").lower()):
-                    lines.append(f"   [white]{lbl:<6}[/] {marker} [bold green]Active[/] [dim]• Free Trial (Rate Limits)[/]  {user_str}".rstrip())
+                    lines.append(f"   [white]{lbl:<6}[/] {single_marker} [bold green]Active[/] [dim]• Free Trial (Rate Limits)[/]  {user_str}".rstrip())
                 else:
                     det = w.detail if w else "Ready"
-                    lines.append(f"   [white]{lbl:<6}[/] {marker} [dim]{det}[/]  {user_str}".rstrip())
+                    lines.append(f"   [white]{lbl:<6}[/] {single_marker} [dim]{det}[/]  {user_str}".rstrip())
 
         if idx < len(ordered_keys) - 1:
             lines.append("")

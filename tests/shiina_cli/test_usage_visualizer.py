@@ -312,6 +312,68 @@ def test_cli_show_usage_renders_session_usage_outside_dashboard_panel(capsys):
     assert ("╰" in between or "╯" in between or "─" * 20 in between), "Panel box must close before Session Token Usage"
 
 
+def test_build_usage_dashboard_multi_account_multi_window():
+    """Providers with multiple accounts and multiple quota windows (like Antigravity)
+    must render both accounts with each account's respective windows."""
+    from rich.console import Console
+
+    now = datetime.now(timezone.utc)
+    acc1 = ProviderAccountUsage(
+        snapshot=AccountUsageSnapshot(
+            provider="antigravity",
+            source="quota_api",
+            fetched_at=now,
+            title="Google Antigravity",
+            plan=None,
+            windows=(
+                AccountUsageWindow(label="Gemini Models (weekly)", used_percent=91.0, reset_at=now + timedelta(days=2)),
+                AccountUsageWindow(label="Gemini Models (5h)", used_percent=0.0, reset_at=now + timedelta(hours=5)),
+            ),
+            details=(),
+            unavailable_reason=None,
+        ),
+        label="daryllvelonio@gmail.com",
+        credential_id="agy-1",
+        priority=0,
+        is_current=True,
+    )
+    acc2 = ProviderAccountUsage(
+        snapshot=AccountUsageSnapshot(
+            provider="antigravity",
+            source="quota_api",
+            fetched_at=now,
+            title="Google Antigravity",
+            plan=None,
+            windows=(
+                AccountUsageWindow(label="Gemini Models (weekly)", used_percent=11.0, reset_at=now + timedelta(days=7)),
+                AccountUsageWindow(label="Gemini Models (5h)", used_percent=60.0, reset_at=now + timedelta(hours=3)),
+            ),
+            details=(),
+            unavailable_reason=None,
+        ),
+        label="daryllvelonio9@gmail.com",
+        credential_id="agy-2",
+        priority=1,
+        is_current=False,
+    )
+
+    panel = build_usage_dashboard({"antigravity": [acc1, acc2]}, active_provider="antigravity")
+    console = Console(force_terminal=True, color_system="truecolor", width=80)
+    with console.capture() as capture:
+        console.print(panel)
+    rendered = capture.get()
+
+    assert "daryllvelonio@gmail.com" in rendered
+    assert "daryllvelonio9@gmail.com" in rendered
+    assert "← (active)" in rendered
+    assert "Gemini (weekly)" in rendered
+    assert "Gemini (5h)" in rendered
+    assert "9%" in rendered
+    assert "100%" in rendered
+    assert "89%" in rendered
+    assert "40%" in rendered
+
+
 def test_build_usage_dashboard_multi_account_cline():
     from shiina_cli.usage_visualizer import ProviderAccountUsage
 
