@@ -555,6 +555,7 @@ def _record_send_consent_change(*, enabled: bool) -> None:
 from shiina_cli.setup_tts import setup_tts  # noqa: E402
 from shiina_cli.setup_terminal import setup_terminal_backend  # noqa: E402
 from shiina_cli.setup_platforms import setup_gateway  # noqa: E402
+from shiina_cli.setup_vision import setup_vision  # noqa: E402
 from shiina_cli.setup_summary import _print_setup_summary  # noqa: E402,F401
 from shiina_cli.setup_migration import _offer_openclaw_migration, _skip_configured_section  # noqa: E402
 from shiina_cli.setup_quick import _run_portal_one_shot, _run_quick_setup  # noqa: E402
@@ -568,6 +569,7 @@ SETUP_SECTIONS = [
     ("terminal", "Terminal Backend", setup_terminal_backend),
     ("gateway", "Messaging Platforms (Gateway)", setup_gateway),
     ("tools", "Tools", setup_tools),
+    ("vision", "Vision / Image Analysis", setup_vision),
     ("telemetry", "Shared Metrics", setup_telemetry),
     ("agent", "Agent Settings", setup_agent_settings),
 ]
@@ -632,7 +634,8 @@ def _run_full_setup(config: dict, shiina_home, *, is_existing: bool, migration_r
         _step("model", "Model & Provider", lambda: setup_model_provider(config)),
         _step("terminal", "Terminal Backend", lambda: setup_terminal_backend(config)),
         ("Messaging Platforms", _gateway_step),
-        _step("tools", "Tools", lambda: setup_tools(config, first_install=not is_existing))])
+        _step("tools", "Tools", lambda: setup_tools(config, first_install=not is_existing)),
+        _step("vision", "Vision / Image Analysis", lambda: setup_vision(config))])
 
 
 # First-time mode picker: (menu label, setup_quick runner name) — None falls through to Full Setup.
@@ -699,7 +702,7 @@ def _run_setup_wizard_impl(args):
         _info("Running the full wizard — each prompt shows your current value.",
               "Press Enter to keep it, or type a new value to change it.", "",
               "Tip: jump straight to a section with 'shiina setup model|terminal|",
-              "     gateway|tools|agent', or fill only missing items with --quick.")
+              "     gateway|tools|vision|agent', or fill only missing items with --quick.")
     else:
         # First-time setup (--reconfigure / --quick are meaningless here; fall through)
         print()

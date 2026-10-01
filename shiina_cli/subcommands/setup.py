@@ -11,10 +11,10 @@ def build_setup_parser(subparsers, *, cmd_setup: Callable) -> None:
         "setup", help="Interactive setup wizard",
         description="Configure Shiina Agent with an interactive wizard. "
         "Run a specific section: "
-        "shiina setup model|tts|terminal|gateway|tools|telemetry|agent")
+        "shiina setup model|tts|terminal|gateway|tools|vision|telemetry|agent")
     setup_parser.add_argument(
         "section", nargs="?",
-        choices=["model", "tts", "terminal", "gateway", "tools", "telemetry", "agent"],
+        choices=["model", "tts", "terminal", "gateway", "tools", "vision", "telemetry", "agent"],
         default=None, help="Run a specific setup section instead of the full wizard")
     setup_parser.add_argument(
         "--non-interactive", action="store_true",
