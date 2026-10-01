@@ -2269,8 +2269,10 @@ class ChatConsole:
         self._buffer.truncate()
         self._inner.width = shutil.get_terminal_size((80, 24)).columns
         self._inner.print(*args, **kwargs)
-        for line in _OSC_ESCAPE_RE.sub("", self._buffer.getvalue()).rstrip("\n").split("\n"):
-            _cprint(line)
+        clean = _OSC_ESCAPE_RE.sub("", self._buffer.getvalue())
+        if clean.endswith("\n"):
+            clean = clean[:-1]
+        _cprint(clean)
 
     @contextmanager
     def status(self, *_args, **_kwargs):

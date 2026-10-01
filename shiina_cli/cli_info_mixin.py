@@ -644,7 +644,7 @@ class CLIInfoMixin:
                 other_providers=other_providers if not target_provider else None,
                 console_width=console_width,
             )
-            print()
+            self._console_print()
             self._console_print(panel)
             has_rendered_dashboard = True
         elif active_provider:
@@ -660,9 +660,9 @@ class CLIInfoMixin:
                     account_snapshot = None
             account_lines = [f"  {line}" for line in render_account_usage_lines(account_snapshot)]
             if account_lines:
-                print()
+                self._console_print()
                 for line in account_lines:
-                    print(line)
+                    self._console_print(line)
                 has_rendered_dashboard = True
 
         # 2. Nous Credits block (only for Nous provider or when no other provider limits were rendered)
@@ -674,21 +674,21 @@ class CLIInfoMixin:
         agent = getattr(self, "agent", None)
         if not agent:
             if not has_rendered_dashboard:
-                print("  (._.) No active agent -- send a message first.")
+                self._console_print("  (._.) No active agent -- send a message first.")
             return
 
         calls = getattr(agent, "session_api_calls", 0) or 0
         if calls == 0:
             if not has_rendered_dashboard:
-                print("  (._.) No API calls made yet in this session.")
+                self._console_print("  (._.) No API calls made yet in this session.")
             return
 
         rl_state = agent.get_rate_limit_state()
         if rl_state and rl_state.has_data:
             from agent.rate_limit_tracker import format_rate_limit_display
-            print()
-            print(format_rate_limit_display(rl_state))
-            print()
+            self._console_print()
+            self._console_print(format_rate_limit_display(rl_state))
+            self._console_print()
 
         input_tokens = getattr(agent, "session_input_tokens", 0) or 0
         output_tokens = getattr(agent, "session_output_tokens", 0) or 0
@@ -699,25 +699,31 @@ class CLIInfoMixin:
         pct = min(100, (last_prompt / ctx_len * 100)) if ctx_len else 0
         elapsed = format_duration_compact((datetime.now() - self.session_start).total_seconds())
 
-        print()
-        print("  📊 Session Token Usage")
-        print(f"  {'─' * 40}")
-        print(f"  Model:                     {agent.model}")
-        print(f"  Input tokens:              {input_tokens:>10,}")
-        print(f"  Output tokens:             {output_tokens:>10,}")
-        if reasoning_tokens:
-            print(f"  ↳ Reasoning (subset):      {reasoning_tokens:>10,}")
-        print(f"  Prompt tokens (total):     {agent.session_prompt_tokens:>10,}")
-        print(f"  Completion tokens:         {agent.session_completion_tokens:>10,}")
-        print(f"  Total tokens:              {agent.session_total_tokens:>10,}")
-        print(f"  API calls:                 {calls:>10,}")
-        print(f"  Session duration:          {elapsed:>10}")
-        print(f"  {'─' * 40}")
         from agent.context_breakdown import context_display_source
         mark = "~" if context_display_source(compressor) != "provider_usage" else ""
-        print(f"  Current context:  {mark}{last_prompt:,} / {ctx_len:,} ({mark}{pct:.0f}%)")
-        print(f"  Messages:         {len(self.conversation_history)}")
-        print(f"  Compressions:     {compressor.compression_count}")
+
+        session_lines = [
+            "",
+            "  📊 Session Token Usage",
+            f"  {'─' * 40}",
+            f"  Model:                     {agent.model}",
+            f"  Input tokens:              {input_tokens:>10,}",
+            f"  Output tokens:             {output_tokens:>10,}",
+        ]
+        if reasoning_tokens:
+            session_lines.append(f"  ↳ Reasoning (subset):      {reasoning_tokens:>10,}")
+        session_lines.extend([
+            f"  Prompt tokens (total):     {agent.session_prompt_tokens:>10,}",
+            f"  Completion tokens:         {agent.session_completion_tokens:>10,}",
+            f"  Total tokens:              {agent.session_total_tokens:>10,}",
+            f"  API calls:                 {calls:>10,}",
+            f"  Session duration:          {elapsed:>10}",
+            f"  {'─' * 40}",
+            f"  Current context:  {mark}{last_prompt:,} / {ctx_len:,} ({mark}{pct:.0f}%)",
+            f"  Messages:         {len(self.conversation_history)}",
+            f"  Compressions:     {compressor.compression_count}",
+        ])
+        self._console_print("\n".join(session_lines))
 
         if self.verbose:
             logging.getLogger().setLevel(logging.DEBUG)

@@ -227,6 +227,91 @@ def test_cli_show_usage_calls_visual_dashboard(capsys):
     assert "50%" in captured
 
 
+def test_cli_show_usage_renders_session_usage_outside_dashboard_panel(capsys):
+    """Session token usage must be rendered outside and after the Provider Quotas box,
+    routed through _console_print so async/TUI prints don't interleave inside panel borders."""
+    from shiina_cli.cli_info_mixin import CLIInfoMixin
+    from rich.console import Console
+
+    class TestCLI(CLIInfoMixin):
+        def __init__(self):
+            self.provider = "antigravity"
+            self.model = "deepseek-ai/deepseek-v4.1-flash"
+            self.base_url = None
+            self.api_key = None
+            self.verbose = False
+            self.console = Console(force_terminal=True, color_system="truecolor", width=80)
+            self.session_start = datetime.now()
+            self.conversation_history = []
+            self.printed_items = []
+
+            agent = MagicMock()
+            agent.model = "deepseek-ai/deepseek-v4.1-flash"
+            agent.session_api_calls = 5
+            agent.session_input_tokens = 2500
+            agent.session_output_tokens = 500
+            agent.session_reasoning_tokens = 0
+            agent.session_prompt_tokens = 2500
+            agent.session_completion_tokens = 500
+            agent.session_total_tokens = 3000
+            agent.get_rate_limit_state.return_value = None
+            agent.context_compressor.last_prompt_tokens = 2500
+            agent.context_compressor.context_length = 128000
+            agent.context_compressor.compression_count = 0
+            self.agent = agent
+
+        def _agent_or_self(self, attr):
+            return getattr(self.agent, attr, None) or getattr(self, attr, None)
+
+        def _print_nous_credits_block(self):
+            return False
+
+        def _print_usage_cta(self):
+            pass
+
+        def _console_print(self, *args, **kwargs):
+            self.printed_items.append(args[0] if args else "")
+            self.console.print(*args, **kwargs)
+
+    cli = TestCLI()
+    now = datetime.now(timezone.utc)
+    mock_snap = AccountUsageSnapshot(
+        provider="antigravity",
+        source="quota_api",
+        fetched_at=now,
+        title="Google Antigravity",
+        plan=None,
+        windows=(
+            AccountUsageWindow(label="Gemini Models (5h)", used_percent=20.0, reset_at=now + timedelta(hours=3)),
+        ),
+        details=(),
+        unavailable_reason=None,
+    )
+
+    with patch("shiina_cli.usage_visualizer.fetch_all_provider_usage", return_value={"antigravity": mock_snap}):
+        cli._show_usage()
+
+    captured = capsys.readouterr().out
+    assert "Provider Quotas & Usage Limits" in captured
+    assert "Session Token Usage" in captured
+
+    # Both items must be delivered via _console_print
+    from rich.panel import Panel
+    assert any(isinstance(item, Panel) for item in cli.printed_items), "Dashboard panel must use _console_print"
+    assert any("Session Token Usage" in str(item) for item in cli.printed_items), "Session usage must use _console_print"
+
+    # Panel box bottom border must appear BEFORE Session Token Usage in terminal output
+    dashboard_idx = captured.find("Provider Quotas & Usage Limits")
+    session_idx = captured.find("Session Token Usage")
+    assert dashboard_idx != -1
+    assert session_idx != -1
+    assert dashboard_idx < session_idx, "Session Token Usage must appear after the dashboard panel"
+
+    # Ensure box border closing character ╰ or ╯ appears between dashboard and session usage
+    between = captured[dashboard_idx:session_idx]
+    assert ("╰" in between or "╯" in between or "─" * 20 in between), "Panel box must close before Session Token Usage"
+
+
 def test_build_usage_dashboard_multi_account_cline():
     from shiina_cli.usage_visualizer import ProviderAccountUsage
 
