@@ -355,6 +355,7 @@ class GoogleOAuthTokenManager:
     def _save_to_auth_json(self) -> None:
         try:
             from shiina_constants import get_shiina_home
+            from utils import atomic_json_write
 
             auth_file = get_shiina_home() / "auth.json"
             if auth_file.exists():
@@ -370,8 +371,7 @@ class GoogleOAuthTokenManager:
                 "token_type": "Bearer",
                 "auth_type": "oauth_external",
             }
-            with open(auth_file, "w", encoding="utf-8") as f:
-                json.dump(store, f, indent=2)
+            atomic_json_write(auth_file, store, mode=0o600)
         except Exception as e:
             logger.debug("Could not persist refreshed token to auth.json: %s", e)
 
