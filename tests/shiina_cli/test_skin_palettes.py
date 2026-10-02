@@ -12,6 +12,7 @@ app's paired colors/darkColors contract.
 import pytest
 
 from shiina_cli.skin_engine import _BUILTIN_SKINS
+from shiina_cli.skin_dynamic import DYNAMIC_SKIN_NAMES
 
 # Union of the color keys consumed by the TUI (fromSkin) and the classic CLI
 # (banner.py / display.py / prompt_toolkit overrides). completion_menu_meta_*
@@ -133,8 +134,14 @@ LIGHT_AUTHORED = frozenset({"daylight", "warm-lightmode"})
 # completeness + full foreground-contrast contract; overlays are audited for
 # valid keys and fill polarity only.
 def _base_palettes():
-    """Yield (skin, palette, is_light) for every built-in's base `colors`."""
+    """Yield (skin, palette, is_light) for every built-in's base `colors`.
+
+    Dynamic skins are audited in ``test_dynamic_skin.py``: their block is intentionally empty
+    until a live desktop scheme is loaded, so there is nothing here to check.
+    """
     for name, skin in _BUILTIN_SKINS.items():
+        if name in DYNAMIC_SKIN_NAMES:
+            continue
         yield name, skin.get("colors", {}), name in LIGHT_AUTHORED
 
 

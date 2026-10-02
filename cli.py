@@ -1352,6 +1352,10 @@ def _install_skin_light_mode_hook() -> None:
 
     def _wrapped_get_color(self, key, fallback=""):
         value = _orig_get_color(self, key, fallback)
+        # A dynamic skin's palette already follows the desktop scheme's polarity, and the
+        # terminal-background probe is unreliable under a transparent wallpaper — never re-map it.
+        if getattr(self, "dynamic", False):
+            return value
         try:
             return _maybe_remap_for_light_mode(value)
         except Exception:

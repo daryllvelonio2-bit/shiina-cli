@@ -53,14 +53,17 @@ def _newest_mtime_ns(paths) -> int | None:
     return max((m for m in map(_watcher_mtime_ns, paths) if m is not None), default=None)
 
 
-def _skin_sig() -> tuple[str, float | None]:
-    """(active skin name, its user-file mtime). Built-ins have no file, so only
-    their name moves; a user skin's mtime lets an in-place color edit repaint too."""
+def _skin_sig() -> tuple:
+    """(active skin name, its user-file mtime, its desktop-scheme generation). Built-ins have no
+    file, so only their name moves; a user skin's mtime lets an in-place color edit repaint too,
+    and a dynamic skin's scheme mtime repaints when the wallpaper changes the palette."""
     name = str((_load_cfg().get("display") or {}).get("skin") or "default")
-    try:
-        return name, (_watcher_home() / "skins" / f"{name}.yaml").stat().st_mtime
-    except OSError:
-        return name, None
+    dynamic = ()
+    with contextlib.suppress(Exception):
+        from shiina_cli.skin_dynamic import DYNAMIC_SKIN_NAMES, scheme_generation
+        if name in DYNAMIC_SKIN_NAMES:
+            dynamic = scheme_generation()
+    return name, _watcher_mtime_ns(_watcher_home() / "skins" / f"{name}.yaml"), dynamic
 
 
 def _note_skin_broadcast() -> None:

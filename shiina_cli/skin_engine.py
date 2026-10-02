@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from shiina_cli import skin_dynamic
 from shiina_constants import get_shiina_home
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,9 @@ class SkinConfig:
     dark_colors: Dict[str, str] = field(default_factory=dict)
     spinner: Dict[str, Any] = field(default_factory=dict)
     branding: Dict[str, str] = field(default_factory=dict)
+    # Palette derived live from the desktop scheme: consumers must not re-adapt it (its polarity
+    # already follows the wallpaper) — see cli.py's light-mode remap.
+    dynamic: bool = False
     tool_prefix: str = "┊"
     tool_emojis: Dict[str, str] = field(default_factory=dict)  # per-tool emoji overrides
     banner_logo: str = ""    # Rich-markup ASCII art logo (replaces SHIINA_AGENT_LOGO)
@@ -362,7 +366,16 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
 [#F29C38]⠀⠀⠀⠀⠀⠀⠀⠀⣰⡿⢿⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
 [#F29C38]⠀⠀⠀⠀⠀⠀⠀⣼⡟⠀⠀⢻⣧⠀⠀⠀⠀⠀⠀⠀⠀[/]
 [dim #7A3511]⠀⠀⠀⠀⠀⠀⠀tail flame lit⠀⠀⠀⠀⠀⠀⠀⠀[/]""",
-    }}
+    },
+    "caelestia": {
+        "name": "caelestia",
+        "description": "Caelestia dynamic — colour follows your wallpaper; contrast enforced",
+        # Colours are computed at load time from the live desktop scheme (shiina_cli.skin_dynamic);
+        # until one is found this block is empty and every key falls back to the default skin.
+        "colors": {},
+        "spinner": {},
+        "branding": _SHIINA_BRANDING,
+        "tool_prefix": "┊"}}
 
 _active_skin: Optional[SkinConfig] = None
 _active_skin_name: str = "shiina"
@@ -402,7 +415,7 @@ def _load_skin_from_yaml(path: Path) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _build_skin_config(data: Dict[str, Any]) -> SkinConfig:
+def _build_skin_config(data: Dict[str, Any], *, dynamic: bool = False) -> SkinConfig:
     """Build a SkinConfig from a raw dict (built-in or loaded from YAML)."""
     default = _BUILTIN_SKINS["default"]
     skin_name = str(data.get("name", "unknown"))
@@ -424,7 +437,7 @@ def _build_skin_config(data: Dict[str, Any]) -> SkinConfig:
     return SkinConfig(
         name=skin_name, description=data.get("description", ""), colors=merged("colors"),
         light_colors=section("light_colors"), dark_colors=section("dark_colors"),
-        spinner=merged("spinner"), branding=merged("branding"),
+        spinner=merged("spinner"), branding=merged("branding"), dynamic=dynamic,
         tool_prefix=data.get("tool_prefix", default.get("tool_prefix", "┊")),
         tool_emojis=section("tool_emojis"), banner_logo=data.get("banner_logo", ""),
         banner_hero=data.get("banner_hero", ""))
@@ -444,12 +457,29 @@ def list_skins() -> List[Dict[str, str]]:
 
 
 def load_skin(name: str) -> SkinConfig:
-    """Load a skin by name: user skins first, then built-in, then default."""
-    user_file = _skins_dir() / f"{name}.yaml"
+    """Load a skin by name: user skins first, then built-in, then default.
+
+    Dynamic skins (``caelestia``) get their colours from the live desktop scheme at load time;
+    a user YAML of the same name still wins, so individual keys stay overridable.
+    """
+    canonical = _canonical_dynamic_name(name)
+    loader_name = canonical or name
+    user_file = _skins_dir() / f"{loader_name}.yaml"
     data = _load_skin_from_yaml(user_file) if user_file.is_file() else None
-    if not data and name not in _BUILTIN_SKINS:
+    if not data and loader_name not in _BUILTIN_SKINS:
         logger.warning("Skin '%s' not found, using default", name)
-    return _build_skin_config(data or _BUILTIN_SKINS.get(name) or _BUILTIN_SKINS["default"])
+    data = data or _BUILTIN_SKINS.get(loader_name) or _BUILTIN_SKINS["default"]
+    live = skin_dynamic.live_colors() if canonical else {}
+    if live:
+        data = {**data, "colors": {**(data.get("colors") or {}), **live}}
+    # Only a skin that actually received a live palette counts as dynamic; a fallback to the
+    # default colours must keep normal consumer adaptation (cli.py's light-mode remap).
+    return _build_skin_config(data, dynamic=bool(live))
+
+
+def _canonical_dynamic_name(name: str) -> str:
+    """``caelestia`` for any dynamic alias, else "" (only the canonical name is listed)."""
+    return skin_dynamic.DYNAMIC_SKIN_NAMES[0] if name in skin_dynamic.DYNAMIC_SKIN_NAMES else ""
 
 
 def get_active_skin() -> SkinConfig:
@@ -462,8 +492,13 @@ def get_active_skin() -> SkinConfig:
             # Cold routed profile: its own ``display.skin`` (nobody ran init_skin_from_config for it).
             init_skin_from_config(_profile_config())
             entry = _active_skin_by_home[home_key]
+        # A dynamic skin tracks the desktop scheme: one stat decides whether to rebuild.
+        if _canonical_dynamic_name(entry[0]) and skin_dynamic.scheme_changed():
+            entry = _active_skin_by_home[home_key] = (entry[0], load_skin(entry[0]))
         return entry[1]
     if _active_skin is None:
+        _active_skin = load_skin(_active_skin_name)
+    elif _canonical_dynamic_name(_active_skin_name) and skin_dynamic.scheme_changed():
         _active_skin = load_skin(_active_skin_name)
     return _active_skin
 
