@@ -297,11 +297,33 @@ def _tool_guidance_block(agent: Any) -> Optional[str]:
     return " ".join(g for g in tool_guidance if g) or None
 
 
+_SKILLS_ON_DEMAND_POINTER = (
+    "Skills are available on demand via the skills_list / skill_view tools — "
+    "call skills_list when a task could use a specialized skill, then skill_view(name) "
+    "to load it. The full catalog is omitted from this prompt to save context."
+)
+
+
+def _skills_index_enabled() -> bool:
+    """True only when the operator opts back into the always-on catalog."""
+    try:
+        from agent.skill_preprocessing import load_skills_config
+        return bool(load_skills_config().get("index_in_prompt", False))
+    except Exception:
+        return False
+
+
 def _skills_prompt(agent: Any) -> str:
     """Skills index (empty without skills tools).  Focus mode demotes non-coding
-    categories to names-only — never hidden, every name stays visible."""
+    categories to names-only — never hidden, every name stays visible.
+
+    Off by default (``skills.index_in_prompt: false``): returns a short
+    on-demand pointer so the ~7KB catalog isn't paid on every turn. The model
+    still discovers skills via skills_list / skill_view when needed."""
     if not any(name in agent.valid_tool_names for name in ['skills_list', 'skill_view', 'skill_manage']):
         return ""
+    if not _skills_index_enabled():
+        return _SKILLS_ON_DEMAND_POINTER
     import model_tools
     avail_toolsets = {model_tools.get_toolset_for_tool(tool_name) for tool_name in agent.valid_tool_names} - {None, ""}
     try:

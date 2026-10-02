@@ -68,7 +68,12 @@ def test_skills_breakdown_shape_sorted_and_attributed(isolated_home):
     """Per-skill breakdown reports index-line + on-disk SKILL.md bytes.
 
     Seeded before the first build (skills prompt is cached per-process).
+    Opts into the always-on catalog (skills.index_in_prompt), which the
+    breakdown parses — by default the prompt carries only the pointer.
     """
+    (isolated_home / "config.yaml").write_text(
+        "skills:\n  index_in_prompt: true\n", encoding="utf-8"
+    )
     _seed_skill(isolated_home, "small-skill", "short desc")
     _seed_skill(isolated_home, "big-skill", "a much longer description " * 20)
     data = compute_prompt_breakdown("cli")

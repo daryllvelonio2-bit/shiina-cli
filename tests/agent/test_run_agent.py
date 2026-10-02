@@ -979,6 +979,7 @@ class TestBuildSystemPrompt:
                 side_effect=AssertionError("should not re-check toolset requirements"),
             ),
             patch("model_tools.get_toolset_for_tool", create=True, side_effect=toolset_map.get),
+            patch("agent.system_prompt._skills_index_enabled", return_value=True),
             patch("agent.prompt_builder.build_skills_system_prompt", return_value="SKILLS_PROMPT") as mock_skills,
             patch("agent.process_bootstrap.OpenAI"),
         ):

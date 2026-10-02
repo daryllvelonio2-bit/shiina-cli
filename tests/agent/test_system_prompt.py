@@ -629,6 +629,7 @@ def _build(builder, **overrides):
         patch("agent.prompt_builder.build_environment_hints", return_value=""),
         patch("agent.prompt_builder.build_context_files_prompt", return_value=_CONTEXT),
         patch("model_tools.get_toolset_for_tool", return_value=None),
+        patch("agent.system_prompt._skills_index_enabled", return_value=True),
         patch("agent.prompt_builder.build_skills_system_prompt", return_value=_SKILLS),
     ):
         return builder(agent)
@@ -654,6 +655,26 @@ class TestSkillsInVolatileBand:
         full = _build(build_system_prompt)
         assert full.index(_CONTEXT) < full.index(_SKILLS)
         assert full.index(_SKILLS) < full.index("Conversation started:")
+
+
+class TestSkillsOnDemandByDefault:
+    """The full catalog is opt-in (skills.index_in_prompt); by default the
+    prompt carries a short pointer and never builds the ~7KB index."""
+
+    def test_pointer_replaces_index_by_default(self):
+        from agent.system_prompt import _SKILLS_ON_DEMAND_POINTER
+        agent = _make_agent(valid_tool_names=["skills_list"])
+        with (
+            patch("agent.prompt_builder.load_soul_md", return_value=""),
+            patch("agent.prompt_builder.build_environment_hints", return_value=""),
+            patch("agent.prompt_builder.build_context_files_prompt", return_value=_CONTEXT),
+            patch("agent.system_prompt._skills_index_enabled", return_value=False),
+            patch("agent.prompt_builder.build_skills_system_prompt") as mock_build,
+        ):
+            parts = build_system_prompt_parts(agent)
+        mock_build.assert_not_called()
+        assert parts["volatile"].startswith(_SKILLS_ON_DEMAND_POINTER)
+        assert _SKILLS not in parts["volatile"]
 
 
 class TestMemoryProviderSystemPromptGating:
