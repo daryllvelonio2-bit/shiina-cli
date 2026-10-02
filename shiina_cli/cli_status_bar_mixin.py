@@ -269,21 +269,21 @@ class CLIStatusBarMixin:
                 base_url = (getattr(agent, "base_url", None) if agent else None) or getattr(self, "base_url", None)
                 api_key = (getattr(agent, "api_key", None) if agent else None) or getattr(self, "api_key", None)
                 account_id = getattr(agent, "_credential_pool_entry_id", None)
-                try:
-                    from agent.credential_pool import load_pool
-                    pool = getattr(agent, "_credential_pool", None) or getattr(self, "_credential_pool", None) or load_pool(provider)
-                    if pool and pool.has_credentials():
-                        active_entry = (
-                            pool.find_by_id(account_id)
-                            if account_id and hasattr(pool, "find_by_id")
-                            else None
-                        ) or pool.peek()
-                        if active_entry:
-                            account_id = active_entry.id
-                            if not api_key:
-                                api_key = getattr(active_entry, "runtime_api_key", None) or getattr(active_entry, "access_token", None) or api_key
-                except Exception:
-                    pass
+                if not account_id and (api_key or base_url):
+                    # Bind the account WITHOUT load_pool()/resolve_runtime_provider(): a read-only
+                    # hot path must never run the seeding chain (SecretService probes + OAuth
+                    # refresh + auth.json rewrite, ~400ms-1.6s on the UI thread per repaint).
+                    # read_credential_pool answers from the persisted pool with a mtime-cached
+                    # deepcopy (~2ms) and writes nothing.
+                    from shiina_cli.auth import read_credential_pool
+                    entries = read_credential_pool(provider)
+                    if entries:
+                        candidates = sorted(
+                            (e for e in entries if isinstance(e, dict) and e.get("id")),
+                            key=lambda e: e.get("priority", 0),
+                        )
+                        if candidates:
+                            account_id = candidates[0].get("id")
                 invalidate_cb = getattr(self, "_invalidate", None)
                 snapshot["limits_snapshot"] = get_cached_account_limits(
                     provider, model=model_name, base_url=base_url, api_key=api_key, account_id=account_id, on_update=invalidate_cb

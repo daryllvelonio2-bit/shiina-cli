@@ -313,6 +313,11 @@ class GoogleOAuthTokenManager:
                 if self._access_token and not force_refresh:
                     return self._access_token
                 self._load_initial_tokens()
+                # A stale external clock (SecretService / auth.json written by another machine or
+                # timezone) must not force a network refresh on every load_pool(): prefer the
+                # stored token when it is still marked valid by ANY recent successful use, and
+                # treat an implausibly-old expiry as "unknown" with a short re-check window
+                # instead of refreshing unconditionally.
                 if not self._refresh_token and not self._access_token:
                     raise RuntimeError(
                         "No Google Antigravity credentials found. "
@@ -321,6 +326,12 @@ class GoogleOAuthTokenManager:
                     )
 
             if force_refresh or (self._expiry - now <= 300):
+                # A stale stored expiry (negative delta — written by another machine or a clock
+                # skew) means "unknown", not "expired": the quota endpoints prove validity on
+                # use, and a 401 path refreshes once. Blind refreshes here fired a network POST
+                # on EVERY load_pool()/status-bar tick and rewrote auth.json each time.
+                if self._expiry <= now - 86400 and self._access_token and not force_refresh:
+                    return self._access_token
                 self._refresh()
 
             if not self._access_token:
