@@ -291,6 +291,14 @@ def main():
     except Exception:
         logger.debug("picker cache prewarm (tui) failed to start", exc_info=True)
 
+    # Warm the process-registry import off-thread (else the first status-bar paint
+    # blocks ~0.6-1s on its import chain + delegation recovery).
+    try:
+        from shiina_cli.process_registry_prewarm import prewarm_process_registry_async
+        prewarm_process_registry_async()
+    except Exception:
+        logger.debug("process-registry prewarm (tui) failed to start", exc_info=True)
+
     while True:
         raw = sys.stdin.readline()
         if not raw:

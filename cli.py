@@ -3702,6 +3702,12 @@ class ShiinaCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
             from shiina_cli.model_switch_providers import prewarm_picker_cache_async
             prewarm_picker_cache_async()
 
+        # Warm the process-registry import off-thread (else the first status-bar paint
+        # blocks ~0.6-1s on its import chain + delegation recovery).
+        with suppress(Exception):
+            from shiina_cli.process_registry_prewarm import prewarm_process_registry_async
+            prewarm_process_registry_async()
+
         # Pre-import the agent runtime (~1.5s: run_agent + OpenAI SDK) off-thread; the import
         # lock makes an early submit block on the remaining work rather than redo it.
         # Skipped when Termux defers agent startup on purpose.
