@@ -609,6 +609,8 @@ def _defer_update_notice(max_wait: float = 30.0) -> None:
     Used when the banner rendered before the update prefetch finished so startup never blocks on
     git/network. The notice lands after prompt_toolkit owns the terminal, so it is routed through
     ``cprint`` (prompt_toolkit's renderer prints above a running application from any thread).
+    When ``updates.auto_update`` is on, a stale checkout fires a detached
+    ``shiina update --yes`` instead of just nagging (see ``maybe_auto_update``).
     """
     global _deferred_update_notice_started
     if _deferred_update_notice_started:
@@ -617,8 +619,89 @@ def _defer_update_notice(max_wait: float = 30.0) -> None:
 
     def _wait_and_print() -> None:
         if _update_check_done.wait(timeout=max_wait) and _update_result:
+            if _quiet(lambda: maybe_auto_update(_update_result)) is True:
+                cprint(_render_markup_to_ansi(
+                    "[bold yellow]⚠ update found[/][dim yellow] — auto-updating in the background; "
+                    "restart shiina to pick it up[/]"))
+                return
             cprint(_render_markup_to_ansi(_format_update_notice(_update_result)))
     _daemon("update-notice", _wait_and_print)  # never break the session over an update notice
+
+
+_AUTO_UPDATE_GUARD = ".auto_update_last"
+_AUTO_UPDATE_INTERVAL_SECONDS = 24 * 3600
+
+
+def _read_auto_update_opt_in() -> bool:
+    """True when the user opted into ``updates.auto_update``."""
+    from shiina_cli.config import load_config
+    updates = (load_config() or {}).get("updates", {})
+    return updates.get("auto_update") is True if isinstance(updates, dict) else False
+
+
+def _auto_update_guard_fresh(now: float) -> bool:
+    """True when an auto-update attempt ran inside the interval."""
+    try:
+        return now - float((get_shiina_home() / _AUTO_UPDATE_GUARD).read_text(
+            encoding="utf-8").strip() or 0) < _AUTO_UPDATE_INTERVAL_SECONDS
+    except (OSError, ValueError, UnicodeDecodeError):
+        return False
+
+
+def maybe_auto_update(behind: Optional[int]) -> bool:
+    """Fire a detached ``shiina update --yes`` when opted in and behind; True if fired.
+
+    Guards (all fail-closed to False): a known behind count (``-1`` counts —
+    update known, size unknown), ``updates.auto_update: true``, git install
+    only, at most once per 24h per home, never inside ``shiina update`` itself
+    or the re-exec child, never under pytest. Startup never blocks: the child
+    is fully detached and the session keeps running the old code until restart.
+    """
+    if not behind:
+        return False
+    if "PYTEST_CURRENT_TEST" in os.environ or "pytest" in sys.modules:
+        return False
+    if os.environ.get("SHIINA_AUTO_UPDATE_RUN") == "1":
+        return False
+    argv = [a.lower() for a in sys.argv]
+    if any(a == "update" or a.startswith("update:") for a in argv):
+        return False
+    if _quiet(_read_auto_update_opt_in) is not True:
+        return False
+    def _is_git_install() -> bool:
+        from shiina_cli.config import detect_install_method, get_project_root
+        return detect_install_method(get_project_root()) == "git"
+    if _quiet(_is_git_install) is not True:
+        return False
+    now = time.time()
+    if _quiet(lambda: _auto_update_guard_fresh(now)) is True:
+        return False
+    try:
+        (get_shiina_home() / _AUTO_UPDATE_GUARD).write_text(str(int(now)), encoding="utf-8")
+    except OSError:
+        pass
+    try:
+        from shiina_cli.config import get_project_root
+        exe = shutil.which("shiina")
+        if exe:
+            cmd = [exe, "update", "--yes"]
+        else:
+            cmd = [sys.executable, str(Path(get_project_root()) / "shiina"), "update", "--yes"]
+        env = dict(os.environ, SHIINA_AUTO_UPDATE_RUN="1")
+        log_dir = get_shiina_home() / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = open(log_dir / "auto_update.log", "ab")
+        subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=log_file, stderr=subprocess.STDOUT,
+                         start_new_session=(os.name != "nt"),
+                         creationflags=(getattr(subprocess, "DETACHED_PROCESS", 0)
+                                        | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+                         if os.name == "nt" else 0,
+                         cwd=str(get_project_root()), env=env,
+                         close_fds=(os.name != "nt"))
+        return True
+    except Exception:
+        logger.debug("auto-update spawn failed", exc_info=True)
+        return False
 
 
 # === Welcome banner ===
@@ -1006,7 +1089,12 @@ def build_welcome_banner(
         if behind is None and not _update_check_done.is_set():
             _defer_update_notice()
         elif behind is not None and behind != 0:
-            right_lines.append(_format_update_notice(behind))
+            if maybe_auto_update(behind) is True:
+                right_lines.append(
+                    "[bold yellow]⚠ update found[/]"
+                    "[dim yellow] — auto-updating in the background[/]")
+            else:
+                right_lines.append(_format_update_notice(behind))
     _quiet(_update_line)  # Never break the banner over an update check
     layout_table = Table.grid(padding=(0, 2))
     layout_table.add_column("left", justify="left")

@@ -2190,6 +2190,12 @@ DEFAULT_CONFIG = {
     "updates": {
         # Passive version/banner checks only; explicit `shiina update --check` remains enabled.
         "check": True,
+        # Background auto-update for git installs. When true and the passive check
+        # finds the checkout behind its origin, the CLI fires
+        # `shiina update --yes` once per 24h in a detached background process
+        # (startup never blocks). Off by default — opt in per machine with
+        # `shiina config set updates.auto_update true`.
+        "auto_update": False,
         # Pre-update backup. quick = snapshot small critical state (pairing JSONs, cron jobs,
         # config.yaml, .env, auth.json, profile DBs) into <SHIINA_HOME>/state-snapshots/, skipping
         # files >1 GiB; restore via ``/snapshot``. full = quick PLUS a ``shiina backup`` zip in
