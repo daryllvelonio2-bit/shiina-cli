@@ -14,11 +14,17 @@ def resolve_skin() -> dict:
         from shiina_cli.skin_engine import init_skin_from_config, get_active_skin
         init_skin_from_config(_load_cfg())
         skin = get_active_skin()
+        # The welcome line greets by name when this profile's memory knows one; every surface
+        # renders the same greeting from the same branding block.
+        branding = dict(skin.branding or {})
+        with contextlib.suppress(Exception):
+            from shiina_cli.welcome_line import get_welcome_text
+            branding["welcome"] = get_welcome_text(branding.get("welcome", ""))
         # light/dark are paired palettes: the TUI prefers the block matching terminal polarity.
         return {
             "name": skin.name, "colors": skin.colors,
             "light_colors": skin.light_colors, "dark_colors": skin.dark_colors,
-            "branding": skin.branding, "banner_logo": skin.banner_logo,
+            "branding": branding, "banner_logo": skin.banner_logo,
             "banner_hero": skin.banner_hero, "tool_prefix": skin.tool_prefix,
             "help_header": (skin.branding or {}).get("help_header", "")}
     except Exception:

@@ -124,6 +124,44 @@ def test_selection_chip_is_distinguishable(_isolated_scheme):
                                       skin.get_color("completion_menu_bg")) >= 1.15
 
 
+def test_semantic_colors_follow_the_scheme_hue(_isolated_scheme):
+    """Harmonized anchors track the wallpaper's hue while keeping their own identity."""
+    _write_scheme(_isolated_scheme, _DARK)  # a pink-family scheme
+    pink = skin_engine.load_skin("caelestia")
+    _write_scheme(_isolated_scheme, {**_LIGHT, "primary": "1f4d8f", "tertiary": "2f5f7f"},
+                  mode="light")  # a blue-family scheme
+    blue = skin_engine.load_skin("caelestia")
+
+    assert pink.get_color("ui_ok") != blue.get_color("ui_ok")
+    assert pink.get_color("ui_warn") != blue.get_color("ui_warn")
+    # ...and the identity survives: success stays green in both.
+    for skin in (pink, blue):
+        r, g, b = skin_dynamic._rgb(skin.get_color("ui_ok"))
+        assert g > r and g > b
+
+
+def test_art_recolours_into_the_scheme_hue(_isolated_scheme):
+    """The banner artwork follows the wallpaper instead of shipping a fixed shade ladder."""
+    _write_scheme(_isolated_scheme, _DARK)
+    art = "[#60a5fa]█[/][#3b82f6]█[/][#2563eb]█[/]"
+
+    recolored = skin_dynamic.recolor_markup(art)
+
+    shades = [m for m in recolored.split("[") if m.startswith("#")]
+    assert len(shades) == 3 and "#60a5fa" not in recolored
+    # Shading order survives: the brightest original tone stays the brightest.
+    lums = [skin_dynamic._luminance("#" + s[1:7]) for s in shades]
+    assert lums == sorted(lums, reverse=True)
+    assert skin_dynamic._rgb("#" + shades[0][1:7]) == skin_dynamic._rgb(
+        skin_dynamic._read_scheme()["primary"])
+
+
+def test_art_is_untouched_without_a_scheme():
+    art = "[#60a5fa]█[/][#2563eb]█[/]"
+
+    assert skin_dynamic.recolor_markup(art, {}) == art
+
+
 @pytest.mark.parametrize("colours", [_DARK, _LIGHT], ids=["dark", "light"])
 def test_every_foreground_clears_its_contrast_target(_isolated_scheme, colours):
     """Stronger than the pole floors: every foreground clears its own floor on EVERY surface."""

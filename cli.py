@@ -2224,6 +2224,53 @@ def _estimate_tui_input_height(
     return min(max(visual_lines, 1), max(1, int(max_height or 1)))
 
 
+_TUI_STYLE_FALLBACK: dict[str, str] = {
+    # Last-resort prompt_toolkit styles for the classic CLI's chrome. The active skin overrides
+    # every class the palette covers (see skin_engine.get_prompt_toolkit_style_overrides), so what
+    # matters here is that each key stays COVERED — a key only defined here renders a hardcoded
+    # color regardless of the skin. Empty strings inherit the terminal's own fg/bg (typed text
+    # must stay readable on both light and dark schemes).
+    'input-area': '',
+    'placeholder': '#888888 italic',
+    'prompt': '',
+    'prompt-working': '#888888 italic',
+    'hint': '#888888 italic',
+    'status-bar': 'bg:#1a1a2e #C0C0C0',
+    'status-bar-strong': 'bg:#1a1a2e #60a5fa bold',
+    'status-bar-dim': 'bg:#1a1a2e #8B8682',
+    'status-bar-good': 'bg:#1a1a2e #8FBC8F bold',
+    'status-bar-warn': 'bg:#1a1a2e #60a5fa bold',
+    'status-bar-bad': 'bg:#1a1a2e #ef5350 bold',
+    'status-bar-critical': 'bg:#1a1a2e #FF6B6B bold',
+    'status-bar-session-title': 'bg:#60a5fa #1a1a2e bold',
+    'input-rule': '#3b82f6',
+    'image-badge': '#87CEEB bold',
+    'completion-menu': 'bg:#1a1a2e #FFF8DC',
+    'completion-menu.completion': 'bg:#1a1a2e #FFF8DC',
+    'completion-menu.completion.current': 'bg:#243b55 #60a5fa',
+    'completion-menu.meta.completion': 'bg:#1a1a2e #888888',
+    'completion-menu.meta.completion.current': 'bg:#243b55 #38bdf8',
+    'clarify-border': '#3b82f6',
+    'clarify-title': '#60a5fa bold',
+    'clarify-question': '#FFF8DC bold',
+    'clarify-choice': '#AAAAAA',
+    'clarify-selected': '#60a5fa bold',
+    'clarify-active-other': '#60a5fa italic',
+    'clarify-countdown': '#3b82f6',
+    'sudo-prompt': '#FF6B6B bold',
+    'sudo-border': '#3b82f6',
+    'sudo-title': '#FF6B6B bold',
+    'sudo-text': '#FFF8DC',
+    'approval-border': '#3b82f6',
+    'approval-title': '#38bdf8 bold',
+    'approval-desc': '#FFF8DC bold',
+    'approval-cmd': '#AAAAAA italic',
+    'approval-choice': '#AAAAAA',
+    'approval-selected': '#60a5fa bold',
+    'voice-status': 'bg:#1a1a2e #87CEEB',
+    'voice-status-recording': 'bg:#1a1a2e #FF4444 bold'}
+
+
 def _status_bar_visible_from_display_config(display_config: object) -> bool:
     """Initial status-bar visibility; both YAML ``off`` (False) and strings like ``"hidden"`` mean off."""
     if not isinstance(display_config, dict):
@@ -3677,16 +3724,17 @@ class ShiinaCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
             self._display_resumed_history()
 
         _welcome_skin = None  # stays None when the skin engine failed
-        _welcome_text = "Welcome to Shiina Agent! Type your message or /help for commands."
+        _welcome_text = ""
         _welcome_color = "#FFF8DC"
         try:
             from shiina_cli.skin_engine import get_active_skin
             _welcome_skin = get_active_skin()
-            _welcome_text = _welcome_skin.get_branding("welcome", _welcome_text)
-            _welcome_color = _welcome_skin.get_color("banner_text", _welcome_color)
+            _welcome_text = _welcome_skin.get_branding("welcome", "")
+            _welcome_color = _welcome_skin.get_color("ui_accent", _welcome_color)
         except Exception:
             pass
-        self._console_print(f"[{_welcome_color}]{_welcome_text}[/]")
+        from shiina_cli.welcome_line import get_welcome_text
+        self._console_print(f"[{_welcome_color}]{get_welcome_text(_welcome_text)}[/]")
 
         self._tui_startup_prewarm_and_warnings(_welcome_skin)
         self._print_random_tip()

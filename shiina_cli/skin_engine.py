@@ -66,7 +66,7 @@ _SHIINA_BRANDING: Dict[str, str] = {
     "agent_name": "Shiina Agent",
     "symbol": "★",
     "icon": "★",
-    "welcome": "Welcome to Shiina Agent! Type your message or /help for commands.",
+    "welcome": "Welcome to Shiina CLI! Type your message or /help for commands.",
     "goodbye": "Goodbye!",
     "response_label": " Shiina ",
     "prompt_symbol": "❯",
@@ -579,10 +579,12 @@ _STYLE_TEMPLATES = {
     "placeholder": "{dim} italic", "prompt": "{prompt}", "prompt-working": "{dim} italic",
     "hint": "{dim} italic",
     "status-bar": "bg:{status_bg} {status_text}", "status-bar-strong": "bg:{status_bg} {status_strong} bold",
+    "status-bar-model": "bg:{menu_current_bg} {status_strong} bold",
     "status-bar-session-title": "bg:{status_strong} {status_bg} bold",
     "status-bar-dim": "bg:{status_bg} {status_dim}", "status-bar-good": "bg:{status_bg} {status_good} bold",
     "status-bar-warn": "bg:{status_bg} {status_warn} bold", "status-bar-bad": "bg:{status_bg} {status_bad} bold",
     "status-bar-critical": "bg:{status_bg} {status_critical} bold",
+    "status-bar-yolo": "bg:{status_bg} {status_critical} bold",
     "subagent-dock": "bg:{status_bg} {status_text}",
     "subagent-dock.heading": "bg:{status_bg} {status_strong} bold",
     "subagent-dock.selected": "bg:{menu_current_bg} {text} bold",
@@ -593,12 +595,13 @@ _STYLE_TEMPLATES = {
     "completion-menu.meta.completion.current": "bg:{menu_meta_current_bg} {label}",
     "clarify-border": "{input_rule}", "clarify-title": "{title} bold", "clarify-question": "{text} bold",
     "clarify-choice": "{dim}", "clarify-selected": "{title} bold", "clarify-active-other": "{title} italic",
-    "clarify-countdown": "{input_rule}",
+    "clarify-answer": "{ok} bold", "clarify-countdown": "{input_rule}",
     "sudo-prompt": "{error} bold", "sudo-border": "{input_rule}", "sudo-title": "{error} bold",
     "sudo-text": "{text}",
     "approval-border": "{input_rule}", "approval-title": "{warn} bold", "approval-desc": "{text} bold",
     "approval-cmd": "{dim} italic", "approval-choice": "{dim}", "approval-selected": "{title} bold",
-    "voice-status": "bg:{voice_bg} {label}", "voice-status-recording": "bg:{voice_bg} {error} bold"}
+    "voice-status": "bg:{voice_bg} {label}", "voice-status-recording": "bg:{voice_bg} {error} bold",
+    "voice-prompt": "{accent}", "voice-recording": "{error} bold", "voice-processing": "{label} italic"}
 
 
 def get_prompt_toolkit_style_overrides() -> Dict[str, str]:

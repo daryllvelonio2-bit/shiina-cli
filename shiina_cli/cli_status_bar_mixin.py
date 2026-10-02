@@ -19,6 +19,8 @@ from typing import Any, Dict, Optional
 _SB = "class:status-bar"
 _DIM = "class:status-bar-dim"
 _STRONG = "class:status-bar-strong"
+# The model pill gets its own palette-derived fill so it reads as a chip, not bar text.
+_MODEL = "class:status-bar-model"
 _AGENT_COUNTERS = (
     "session_input_tokens", "session_output_tokens", "session_cache_read_tokens",
     "session_cache_write_tokens", "session_prompt_tokens", "session_completion_tokens",
@@ -1083,7 +1085,7 @@ class CLIStatusBarMixin:
             except Exception:
                 brand_sym = "★"
             if styled:
-                segs.append([(_SB, f" {brand_sym} "), (_STRONG, f"{model_short}{cred_suffix} ")])
+                segs.append([(_MODEL, f" {brand_sym} {model_short}{cred_suffix} ")])
             else:
                 segs.append([("", f"{brand_sym} {model_short}{cred_suffix}")])
 
@@ -1240,7 +1242,7 @@ class CLIStatusBarMixin:
             if segs:
                 left_frags: list = list(segs[0])
             else:
-                left_frags = [(_SB, f" {brand_sym} "), (_STRONG, f"{snapshot['model_short']} ")]
+                left_frags = [(_MODEL, f" {brand_sym} {snapshot['model_short']} ")]
             if left_frags and not left_frags[-1][1].endswith(" "):
                 _s, _t = left_frags[-1]
                 left_frags[-1] = (_s, _t + " ")

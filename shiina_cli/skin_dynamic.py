@@ -18,6 +18,7 @@ Two halves, deliberately separate:
 import json
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -38,6 +39,9 @@ _ANCHORS = {
     "bad": "#E5484D", "bad_bright": "#FF6B6B",
     "warn": "#D9A03C",
 }
+
+# How far a hue-fixed anchor is pulled toward the scheme's own hue (keeps its identity).
+_HARMONY = 0.22
 
 # Shiina colour key -> (scheme role or anchor key, minimum contrast). A 0.0 target means the key
 # is a surface/decorative fill and is taken verbatim.
@@ -228,6 +232,18 @@ def enforce_contrast(color: str, backgrounds: Sequence[str], minimum: float) -> 
     return _hex(toward)
 
 
+def _harmonize(color: str, roles: Dict[str, str]) -> str:
+    """Pull a hue-fixed anchor toward the scheme's own hue so it sits in the wallpaper's family.
+
+    Identity is preserved (the anchor keeps ~78% of its own hue) — this is the analogous-colour
+    half of colour-wheel harmony; legibility comes from the contrast pass that follows.
+    """
+    source = roles.get("primary") or roles.get("surfaceTint") or ""
+    if not source:
+        return color
+    return _hex(_mix(_rgb(color), _rgb(source), _HARMONY))
+
+
 def build_colors(roles: Dict[str, str]) -> Dict[str, str]:
     """Map scheme roles onto Shiina colour keys with contrast enforced."""
     if not roles:
@@ -236,7 +252,8 @@ def build_colors(roles: Dict[str, str]) -> Dict[str, str]:
     backgrounds = [c for c in backgrounds if c] or [roles.get("surface", "#000000")]
     colors: Dict[str, str] = {}
     for key, (source, minimum) in _COLOR_SPEC.items():
-        base = _ANCHORS.get(source, roles.get(source, ""))
+        anchor = _ANCHORS.get(source)
+        base = _harmonize(anchor, roles) if anchor else roles.get(source, "")
         if not base:
             continue
         colors[key] = enforce_contrast(base, backgrounds, minimum)
@@ -246,3 +263,28 @@ def build_colors(roles: Dict[str, str]) -> Dict[str, str]:
 def live_colors() -> Dict[str, str]:
     """The current dynamic palette, or ``{}`` when no desktop scheme is available."""
     return build_colors(_read_scheme())
+
+
+def recolor_markup(markup: str, roles: Optional[Dict[str, str]] = None) -> str:
+    """Recolor a Rich-markup art block into the scheme's hue, preserving its shading ramp.
+
+    Art blocks ship with a fixed shade ladder (bright to dim); each distinct tone is mapped to an
+    equally-spaced step between the palette's accent and its outline, so the artwork keeps its
+    depth while following the wallpaper. Returns ``markup`` unchanged without a scheme.
+    """
+    roles = _read_scheme() if roles is None else roles
+    if not markup or not roles:
+        return markup
+    shades = list(dict.fromkeys(h.lower() for h in re.findall(r"#([0-9a-fA-F]{6})", markup)))
+    top = roles.get("primary") or roles.get("surfaceTint")
+    bottom = roles.get("outline") or roles.get("onSurfaceVariant")
+    if not top or not bottom:
+        return markup
+    rank = {h: i for i, h in enumerate(sorted(shades, key=lambda h: -_luminance("#" + h)))}
+    step = max(1, len(shades) - 1)
+
+    def swap(match: "re.Match") -> str:
+        index = rank.get(match.group(1).lower(), 0)
+        return _hex(_mix(_rgb(top), _rgb(bottom), index / step))
+
+    return re.sub(r"#([0-9a-fA-F]{6})", swap, markup)

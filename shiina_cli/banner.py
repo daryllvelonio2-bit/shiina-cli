@@ -44,6 +44,14 @@ def cprint(text: str):
         print(text)
 
 
+def _themed_art(art: str, skin) -> str:
+    """Dynamic skins repaint their art from the live scheme so the banner is never a fixed color."""
+    if not art or not getattr(skin, "dynamic", False):
+        return art
+    from shiina_cli.skin_dynamic import recolor_markup
+    return _quiet(lambda: recolor_markup(art), art)
+
+
 def _active_skin():
     """The active skin object (raises when the skin engine is unavailable)."""
     from shiina_cli.skin_engine import get_active_skin
@@ -1043,7 +1051,7 @@ def build_welcome_banner(
     text = _skin_color("banner_text", "#FFF8DC")
     # Use skin's custom caduceus art if provided
     _bskin = _quiet(_active_skin)
-    left_lines = ["", getattr(_bskin, "banner_hero", None) or SHIINA_CADUCEUS, ""]
+    left_lines = ["", _themed_art(getattr(_bskin, "banner_hero", None) or SHIINA_CADUCEUS, _bskin), ""]
     left_lines += _banner_left_lines(model, cwd, session_id, context_length, provider, accent=accent, dim=dim)
     right_lines = _banner_tool_lines(
         tools, availability.get("unavailable_toolsets", []), get_toolset_for_tool,
@@ -1109,6 +1117,6 @@ def build_welcome_banner(
         border_style=_skin_color("banner_border", "#CD7F32"), padding=(0, 2))
     console.print()
     if shutil.get_terminal_size().columns >= 95:
-        console.print(getattr(_bskin, "banner_logo", None) or SHIINA_AGENT_LOGO)
+        console.print(_themed_art(getattr(_bskin, "banner_logo", None) or SHIINA_AGENT_LOGO, _bskin))
         console.print()
     console.print(outer_panel)
