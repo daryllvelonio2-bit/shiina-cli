@@ -173,6 +173,41 @@ class GoogleOAuthTokenManager:
                 logger.debug("Failed querying tokeninfo for email: %s", e)
         return None
 
+    def _load_active_pool_tokens(self) -> bool:
+        """Load tokens from the ACTIVE pooled antigravity account (priority-0 / `shiina auth use`).
+
+        True when a pooled entry supplied tokens; the store and paths stay untouched. The
+        SecretService/secret-tool scan in ``_load_initial_tokens`` finds whichever account's
+        tokens the Antigravity IDE last wrote — frequently not the active one."""
+        try:
+            from agent.credential_pool import load_pool
+
+            pool = load_pool("antigravity")
+            if not (pool and pool.has_credentials()):
+                return False
+            active = pool.peek()
+            if active is None:
+                return False
+            token = getattr(active, "access_token", None) or ""
+            if not token and not getattr(active, "refresh_token", None):
+                return False
+            self._access_token = token or None
+            self._refresh_token = getattr(active, "refresh_token", None)
+            expires_at = getattr(active, "expires_at", None) or getattr(active, "expires_at_ms", None)
+            if expires_at:
+                try:
+                    # expires_at is an ISO string from to_dict(); expires_at_ms an epoch ms.
+                    value = float(expires_at)
+                    self._expiry = value / 1000.0 if value > 1e12 else value
+                except (TypeError, ValueError):
+                    self._expiry = time.time() + 1800
+            self._email = getattr(active, "label", None) or self._email
+            logger.debug("Loaded Antigravity OAuth tokens from the active pooled account.")
+            return True
+        except Exception as exc:
+            logger.debug("Active-pool antigravity token load failed: %s", exc)
+            return False
+
     def _load_initial_tokens(self) -> None:
         # 1. Environment variables
         env_token = (
@@ -190,6 +225,15 @@ class GoogleOAuthTokenManager:
                 or os.getenv("GOOGLE_REFRESH_TOKEN")
             )
             self._expiry = time.time() + 3600
+            return
+
+        # 1b. The ACTIVE pooled account (priority-0 / `shiina auth use` selection). The
+        # SecretService scan below finds WHICHEVER account's tokens the Antigravity IDE
+        # last wrote — with a multi-account pool that is frequently NOT the active one,
+        # so chat turns would use one account while the status bar / /usage report the
+        # other. The pool's active entry is the user's explicit selection and always wins
+        # when it carries credentials.
+        if self._load_active_pool_tokens():
             return
 
         # 2. Linux SecretService (service: gemini, username: antigravity)
