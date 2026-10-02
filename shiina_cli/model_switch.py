@@ -584,8 +584,14 @@ def parse_model_switch_args(raw: str) -> ModelSwitchRequest:
     ``--once`` + ``--global`` -> ``MODEL_SWITCH_ERR_ONCE_WITH_GLOBAL``; ``--once`` with neither
     a model nor ``--provider`` -> ``MODEL_SWITCH_ERR_ONCE_REQUIRES_TARGET``; an unknown
     ``--reasoning`` level -> ``MODEL_SWITCH_ERR_BAD_REASONING``. Targets pass through
-    untouched (bare names, ``vendor/model``, ``vendor:model``) for :func:`switch_model`."""
+    untouched (bare names, ``vendor/model``, ``vendor:model``) for :func:`switch_model`.
+    Bare ``refresh`` (``/model refresh``, ``/models refresh``) means re-fetch live model
+    lists — the word-only form of ``--refresh``, not a model name."""
     raw = str(raw or "")
+    # The bare-word subcommand: exactly "refresh" (a model literally named "refresh" is
+    # addressed as vendor/refresh or with --refresh alongside).
+    if raw.strip().lower() == "refresh":
+        raw = "--refresh"
     parsed = parse_model_flags_detailed(raw)
 
     errors: list = []

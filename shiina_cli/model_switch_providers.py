@@ -163,17 +163,35 @@ def _fetch_picker_live_models(
 _picker_prewarm_done = _threading.Event()
 
 
+# Usability-probe memo: (shiina_home_key(), provider) -> (expires_at, answer). One picker
+# open re-asks the same ~30 providers ~6x each through load_pool's full seeding chain
+# (~25ms per probe = ~5s of the open); the answer is stable within an open and any
+# auth.json rewrite bumps the key's cost through the mtime sig anyway.
+_pool_usable_memo: dict = {}
+_pool_usable_memo_ttl = 5.0
+_pool_usable_memo_lock = _threading.Lock()
+
+
 def _credential_pool_is_usable(provider: str, *, raw_pool_present: bool = False) -> bool:
     """Whether *provider* has a credential that can be selected now.
 
     Legacy opaque ``auth.json`` pool values that do not deserialize into ``PooledCredential``
     stay visible (``raw_pool_present``); a real pool's availability is authoritative — an
-    all-exhausted/dead pool is not authenticated."""
+    all-exhausted/dead pool is not authenticated. Memoized briefly (see ``_pool_usable_memo``)."""
     try:
+        from shiina_constants import shiina_home_key
+        memo_key = (shiina_home_key(), provider)
+        now = time.monotonic()
+        with _pool_usable_memo_lock:
+            hit = _pool_usable_memo.get(memo_key)
+            if hit is not None and now - hit[0] < _pool_usable_memo_ttl:
+                return hit[1]
         from agent.credential_pool import load_pool
         pool = load_pool(provider)
-        if pool.has_credentials():
-            return pool.has_available()
+        answer = bool(pool.has_available()) if pool.has_credentials() else raw_pool_present
+        with _pool_usable_memo_lock:
+            _pool_usable_memo[memo_key] = (now, answer)
+        return answer
     except Exception:
         pass
     return raw_pool_present
@@ -208,6 +226,37 @@ def prewarm_picker_cache_async() -> Optional["_threading.Thread"]:
     return t
 
 
+def _register_prefetch_inflight(provider_slugs: list[str]) -> list:
+    """Register every missing slug as in-flight BEFORE the prefetch runs (see the caller).
+
+    Returns the list of keys actually registered (already-inflight keys are skipped)."""
+    from shiina_constants import get_shiina_home_override, shiina_home_key
+    from shiina_cli.models import _swr_refresh_inflight, _swr_refresh_lock
+    from shiina_cli.models import _credential_fingerprint, _load_provider_models_cache, normalize_provider
+
+    cache = _load_provider_models_cache()
+    missing: list[str] = []
+    for slug in provider_slugs:
+        normalized = normalize_provider(slug) or (slug or "")
+        if not normalized:
+            continue
+        entry = cache.get(normalized)
+        if (
+            isinstance(entry, dict) and entry.get("fp") == _credential_fingerprint(normalized)
+            and isinstance(entry.get("models"), list) and entry["models"]):
+            continue  # a same-credentials row exists: SWR serves it, no prefetch needed
+        missing.append(normalized)
+    if not missing:
+        return []
+
+    home_scoped = get_shiina_home_override() is not None
+    keys = [(shiina_home_key(), s) if home_scoped else s for s in missing]
+    with _swr_refresh_lock:
+        keys = [k for k in keys if k not in _swr_refresh_inflight]
+        _swr_refresh_inflight.update(keys)
+    return keys
+
+
 def _prefetch_provider_models_parallel(provider_slugs: list[str]) -> None:
     """Fetch stale/missing provider catalogs in parallel before the serial picker loop.
 
@@ -215,13 +264,13 @@ def _prefetch_provider_models_parallel(provider_slugs: list[str]) -> None:
     the slowest single provider. Each worker re-persists through the thread-safe
     ``update_provider_cache_entry`` so concurrent writes cannot clobber each other."""
     from shiina_cli.models import (
-        _PROVIDER_MODELS_CACHE_TTL, _credential_fingerprint, _load_provider_models_cache,
+        _credential_fingerprint, _load_provider_models_cache,
         cached_provider_model_ids, normalize_provider)
 
     # Read-only staleness check mirroring cached_provider_model_ids (which re-reads the cache
     # itself, so a concurrent change between check and fetch is harmless).
     now = time.time()
-    stale_slugs: list[str] = []
+    missing_slugs: list[str] = []
     cache = _load_provider_models_cache()
     for slug in provider_slugs:
         normalized = normalize_provider(slug) or (slug or "")
@@ -230,30 +279,43 @@ def _prefetch_provider_models_parallel(provider_slugs: list[str]) -> None:
         entry = cache.get(normalized)
         if (
             isinstance(entry, dict) and entry.get("fp") == _credential_fingerprint(normalized)
-            and isinstance(entry.get("models"), list) and entry["models"]
-            and now - float(entry.get("at", 0)) < _PROVIDER_MODELS_CACHE_TTL):
+            and isinstance(entry.get("models"), list) and entry["models"]):
+            # A same-credentials entry exists (fresh or expired): the picker serves it stale
+            # (SWR) and a daemon refresh updates it — an open must never block on force-
+            # refreshing every expired catalog (~13-20s of live round-trips). Only entries
+            # with NO cached row are prefetched here.
             continue
-        stale_slugs.append(normalized)
+        missing_slugs.append(normalized)
 
-    if not stale_slugs:
+    if not missing_slugs:
         return
 
+    # The caller (list_authenticated_providers) registered these keys in-flight before
+    # spawning this thread; only unregister the ones THIS run owns after fetching.
     import concurrent.futures
-    def _fetch_one(slug: str) -> None:
-        try:
-            models = cached_provider_model_ids(slug, force_refresh=True)
-            # cached_provider_model_ids persists via a non-locked read-modify-write; re-persist
-            # through the locked path so no write is lost under concurrency.
-            if models:
-                from shiina_cli.models import update_provider_cache_entry
-                update_provider_cache_entry(slug, models)
-        except Exception:
-            pass  # best-effort; picker falls back to curated list
+    from shiina_constants import get_shiina_home_override, shiina_home_key
+    from shiina_cli.models import _swr_refresh_inflight, _swr_refresh_lock
+    home_scoped = get_shiina_home_override() is not None
+    keys = [(shiina_home_key(), s) if home_scoped else s for s in missing_slugs]
+    try:
+        def _fetch_one(slug: str) -> None:
+            try:
+                models = cached_provider_model_ids(slug)
+                # cached_provider_model_ids persists via a non-locked read-modify-write; re-persist
+                # through the locked path so no write is lost under concurrency.
+                if models:
+                    from shiina_cli.models import update_provider_cache_entry
+                    update_provider_cache_entry(slug, models)
+            except Exception:
+                pass  # best-effort; picker falls back to curated list
 
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=min(8, len(stale_slugs)), thread_name_prefix="model-cache-prefetch",
-    ) as executor:
-        list(executor.map(_fetch_one, stale_slugs))
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(8, len(keys)), thread_name_prefix="model-cache-prefetch",
+        ) as executor:
+            list(executor.map(_fetch_one, missing_slugs))
+    finally:
+        with _swr_refresh_lock:
+            _swr_refresh_inflight.difference_update(keys)
 
 
 def _any_env(env_vars, read_env=os.environ.get) -> bool:
@@ -303,11 +365,15 @@ def _iter_builtin_candidates(models_dev_data: dict, excluded: set, seen: set):
             yield shiina_id, mdev_id, pconfig, env_vars
 
 
-def _auth_store_has_provider(*keys: str) -> bool:
-    """True when ``auth.json`` has a ``providers`` entry under any of *keys*."""
+def _auth_store_has_provider(*keys: str, store: Optional[dict] = None) -> bool:
+    """True when ``auth.json`` has a ``providers`` entry under any of *keys*.
+
+    ``store`` (a snapshot the caller already read) skips the per-provider store re-read:
+    one picker scan otherwise re-reads the same auth store ~700x (~12ms deepcopy each)."""
     try:
-        from shiina_cli.auth import _load_auth_store
-        store = _load_auth_store()
+        if store is None:
+            from shiina_cli.auth import _load_auth_store
+            store = _load_auth_store()
         providers_store = store.get("providers", {})
         return bool(store and any(k in providers_store for k in keys))
     except Exception as exc:
@@ -315,11 +381,12 @@ def _auth_store_has_provider(*keys: str) -> bool:
         return False
 
 
-def _raw_pool_usable(shiina_id: str) -> bool:
+def _raw_pool_usable(shiina_id: str, *, store: Optional[dict] = None) -> bool:
     """Section-1 pool check: only consult the pool when auth.json lists a raw entry."""
     try:
-        from shiina_cli.auth import _load_auth_store
-        store = _load_auth_store()
+        if store is None:
+            from shiina_cli.auth import _load_auth_store
+            store = _load_auth_store()
         if store and store.get("credential_pool", {}).get(shiina_id):
             return _credential_pool_is_usable(shiina_id, raw_pool_present=True)
     except Exception:
@@ -614,13 +681,20 @@ def _collect_authed_provider_slugs(
     excluded_set = {str(p).strip().lower() for p in excluded if p}
     slugs: list[str] = []
     seen: set[str] = set()
+    # ONE auth-store read for the whole scan: the per-provider checks below otherwise re-read
+    # the same store ~700x (~12ms deepcopy each = ~8s of the picker open).
+    try:
+        from shiina_cli.auth import _load_auth_store
+        _store_snapshot = _load_auth_store()
+    except Exception:
+        _store_snapshot = None
 
     def _emit(slug: str, *keys: str) -> None:
         slugs.append(slug)
         seen.update(k.lower() for k in keys)
 
     for shiina_id, _mdev_id, _pconfig, env_vars in _iter_builtin_candidates(models_dev_data, excluded_set, seen):
-        if _any_env(env_vars, _scoped_key_env) or _raw_pool_usable(shiina_id):
+        if _any_env(env_vars, _scoped_key_env) or _raw_pool_usable(shiina_id, store=_store_snapshot):
             _emit(shiina_id, shiina_id)
 
     mdev_to_shiina = {v: k for k, v in PROVIDER_TO_MODELS_DEV.items()}
@@ -637,7 +711,7 @@ def _collect_authed_provider_slugs(
                 pass
         if (
             _overlay_has_env_creds(pid, shiina_slug, overlay, _scoped_key_env)
-            or _auth_store_has_provider(pid, shiina_slug) or _pool_usable(shiina_slug)
+            or _auth_store_has_provider(pid, shiina_slug, store=_store_snapshot) or _pool_usable(shiina_slug)
             or has_cline):
             _emit(shiina_slug, pid, shiina_slug)
 
@@ -647,7 +721,7 @@ def _collect_authed_provider_slugs(
         cp_config = PROVIDER_REGISTRY.get(cp.slug)
         has_creds = bool(
             cp_config and cp_config.api_key_env_vars and _any_env(cp_config.api_key_env_vars, _scoped_key_env))
-        if has_creds or _auth_store_has_provider(cp.slug) or _pool_usable(cp.slug):
+        if has_creds or _auth_store_has_provider(cp.slug, store=_store_snapshot) or _pool_usable(cp.slug):
             _emit(cp.slug, cp.slug)
 
     # Nous excluded: its picker branch builds from the curated list and never reads the
@@ -674,6 +748,10 @@ class _PickerBuild:
     curated: dict
     results: list = field(default_factory=list)
     seen_slugs: set = field(default_factory=set)  # lowercase-normalized to catch case variants
+    # ONE _load_auth_store() snapshot threaded through every section's credential checks
+    # (assigned in list_authenticated_providers); None = unreadable, checks fall back to
+    # their own read.
+    store_snapshot: Optional[dict] = None
     # Effective base URLs of every built-in row: section 4 hides ``custom_providers`` duplicates.
     builtin_endpoints: set = field(default_factory=set)
     # (display_name, base_url) pairs from section 3 so section 4 skips overlapping rows.
@@ -794,7 +872,7 @@ def _lap_builtin_rows(b: _PickerBuild, data: dict, user_providers: dict) -> None
     for shiina_id, mdev_id, pconfig, env_vars in _iter_builtin_candidates(data, b.excluded, b.seen_slugs):
         # Per-profile scope, never raw os.environ: a secondary profile's picker otherwise listed the
         # LAUNCH profile's env-keyed providers and hid its own .env-keyed ones.
-        if not (_any_env(env_vars, _scoped_key_env) or _raw_pool_usable(shiina_id)):
+        if not (_any_env(env_vars, _scoped_key_env) or _raw_pool_usable(shiina_id, store=b.store_snapshot)):
             continue
         model_ids = _live_or_curated_ids(shiina_id, b.curated)
         # A providers.<built-in>.models block extends the discovered catalog; section 3 cannot
@@ -830,7 +908,7 @@ def _overlay_has_creds(b: _PickerBuild, pid: str, shiina_slug: str, overlay) -> 
             logger.debug("External-process check failed for %s: %s", pid, exc)
     # Auth store / credential pool cover OAuth providers AND api_key providers that also support
     # OAuth (anthropic via Claude Code credential files).
-    has_creds = has_creds or _auth_store_has_provider(pid, shiina_slug)
+    has_creds = has_creds or _auth_store_has_provider(pid, shiina_slug, store=b.store_snapshot)
     if not has_creds:
         # Full auto-seeding pool check catches external stores (Codex CLI ~/.codex/auth.json)
         # not yet in auth.json.
@@ -922,7 +1000,7 @@ def _lap_canonical_rows(b: _PickerBuild) -> None:
             sib_vars = set(sib.api_key_env_vars) if sib else set()
             if lit and lit <= sib_vars < set(cp_config.api_key_env_vars) and cp.slug != b.current_provider:
                 continue
-        has_creds = has_creds or _auth_store_has_provider(cp.slug) or _pool_usable(cp.slug) or (
+        has_creds = has_creds or _auth_store_has_provider(cp.slug, store=b.store_snapshot) or _pool_usable(cp.slug) or (
             _is_aws_sdk(cp_config) and _has_aws_sdk_creds_for_listing(cp.slug, b.current_provider))
         if not has_creds:
             continue
@@ -1179,13 +1257,34 @@ def list_authenticated_providers(
         refresh=refresh, excluded={str(p).strip().lower() for p in (excluded_providers or []) if p},
         curated=_build_curated_lists(current_provider, current_base_url, current_model))
 
-    # Warm the disk cache in parallel before the serial section loops (otherwise 15-30s of live
-    # round-trips on a cold cache). Skipped when refresh=True (serial path force-refreshes) and
-    # for <=3 providers (serial is fast enough; avoids thread-pool overhead).
+    # ONE auth-store read for the whole build: the per-provider checks in every section
+    # otherwise re-read the same store ~700x (~12ms deepcopy each = ~8s of the picker open).
+    try:
+        from shiina_cli.auth import _load_auth_store
+        b.store_snapshot = _load_auth_store()
+    except Exception:
+        b.store_snapshot = None
+
+    # Fill missing disk-cache entries in a BACKGROUND thread (fire-and-forget): the picker
+    # serves whatever is cached (SWR window, curated fallback) and the prefetch lands for the
+    # NEXT open. A foreground prefetch blocked the open on ~7x1.4s of live round-trips.
+    # refresh=True skips it: the explicit /model --refresh re-fetches live in the serial path.
+    # The missing slugs are registered in-flight HERE, synchronously, before the laps run —
+    # a spawn-time registration would race the serial path (the bg thread registers keys
+    # microseconds later, but the laps ask the same providers immediately and would block
+    # on the same live fetches).
     prefetch_slugs = [] if refresh else _collect_authed_provider_slugs(data, b.curated, excluded_providers or [])
+    if prefetch_slugs and not refresh:
+        try:
+            _register_prefetch_inflight(prefetch_slugs)
+        except Exception:
+            pass
     if len(prefetch_slugs) > 3:
         try:
-            _prefetch_provider_models_parallel(prefetch_slugs)
+            _threading.Thread(
+                target=_prefetch_provider_models_parallel, args=(prefetch_slugs,),
+                daemon=True, name="model-cache-prefetch",
+            ).start()
         except Exception:
             pass  # best-effort; serial path still works
 

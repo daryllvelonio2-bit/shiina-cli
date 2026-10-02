@@ -361,13 +361,22 @@ def fetch_nous_recommended_models(
 
     Cached per portal URL for ``_NOUS_RECOMMENDED_CACHE_TTL`` seconds in process (``force_refresh``
     bypasses); a successful fetch is also persisted as last-known-good on disk, which serves a live
-    failure so a transient Portal hiccup doesn't drop the recommendations.
+    failure so a transient Portal hiccup doesn't drop the recommendations. A stale-but-present disk
+    payload is served IMMEDIATELY while a daemon thread refreshes (SWR) — a foreground 5s GET
+    stalled every picker open in a fresh process.
     """
     base = (portal_base_url or "https://portal.nousresearch.com").rstrip("/")
     now = time.monotonic()
     cached = _nous_recommended_cache.get(base)
     if not force_refresh and cached is not None and now - cached[1] < _NOUS_RECOMMENDED_CACHE_TTL:
         return cached[0]
+    disk_fresh = _read_nous_recommended_disk(base)
+    if not force_refresh and disk_fresh:
+        # SWR: serve the disk last-known-good now, refresh in a daemon thread (one in flight
+        # per base). The in-process cache is stamped so the next 10 minutes skip the probe.
+        _nous_recommended_cache[base] = (disk_fresh, now)
+        _spawn_nous_recommended_refresh(base)
+        return disk_fresh
     try:
         data = _get_json(
             f"{base}{NOUS_RECOMMENDED_MODELS_PATH}", timeout=timeout, headers={"Accept": "application/json"}
@@ -382,6 +391,35 @@ def fetch_nous_recommended_models(
         data = _read_nous_recommended_disk(base) or data
     _nous_recommended_cache[base] = (data, now)
     return data
+
+
+# One background refresh in flight per portal base (SWR dedupe).
+_nous_recommended_refresh_inflight: set[str] = set()
+_nous_recommended_refresh_lock = threading.Lock()
+
+
+def _spawn_nous_recommended_refresh(base: str) -> None:
+    """Fire-and-forget daemon refresh of *base*'s recommended-models payload."""
+    with _nous_recommended_refresh_lock:
+        if base in _nous_recommended_refresh_inflight:
+            return
+        _nous_recommended_refresh_inflight.add(base)
+
+    def _refresh() -> None:
+        try:
+            data = _get_json(
+                f"{base}{NOUS_RECOMMENDED_MODELS_PATH}", timeout=8.0,
+                headers={"Accept": "application/json"})
+            if isinstance(data, dict) and data:
+                _write_nous_recommended_disk(base, data)
+                _nous_recommended_cache[base] = (data, time.monotonic())
+        except Exception:
+            logger.debug("nous recommended-models SWR refresh failed for %s", base, exc_info=True)
+        finally:
+            with _nous_recommended_refresh_lock:
+                _nous_recommended_refresh_inflight.discard(base)
+
+    threading.Thread(target=_refresh, daemon=True, name=f"nous-recommended-swr-{base}").start()
 
 
 def _resolve_nous_portal_url() -> str:
@@ -1713,10 +1751,21 @@ def cached_provider_model_ids(
     provider: Optional[str], *, force_refresh: bool = False,
     ttl_seconds: int = _PROVIDER_MODELS_CACHE_TTL) -> list[str]:
     """Disk-cached :func:`provider_model_ids`: fresh cache hit, else live fetch persisting a non-empty
-    result. Always returns a list."""
+    result. Always returns a list.
+
+    A MISSING entry never blocks the caller on a live fetch when a background refresh for the
+    key is already in flight (prefetch/SWR): the caller's curated fallback answers and the
+    background fetch lands in the disk cache for the next open. ``force_refresh`` bypasses
+    this (an explicit /model --refresh means the user asked to wait)."""
     normalized = _normalized_cache_slug(provider)
     if not normalized:
         return []
+    from shiina_constants import get_shiina_home_override, shiina_home_key
+    inflight_key = normalized if get_shiina_home_override() is None else (shiina_home_key(), normalized)
+    if not force_refresh:
+        with _swr_refresh_lock:
+            if inflight_key in _swr_refresh_inflight:
+                return []
     is_ollama = normalized == "ollama"
     if is_ollama:
         ttl_seconds = min(ttl_seconds, _OLLAMA_LOCAL_MODELS_CACHE_TTL)
