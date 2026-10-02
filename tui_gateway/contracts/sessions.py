@@ -398,6 +398,34 @@ method("session.status", params=SessionStatusParams, result=SessionStatusResult,
        doc="Rendered /status text for the session.")
 
 
+class ChangedFile(Result):
+    """One entry of the session's working-tree change list."""
+
+    path: str
+    added: int = 0
+    removed: int = 0
+    status: str = ""
+
+
+class SessionChangesParams(SessionParams):
+    pass
+
+
+class SessionChangesResult(Result):
+    """Working-tree changes in the session cwd: a collapsed list + line totals."""
+
+    repo: bool
+    branch: str | None = None
+    changed: int = 0
+    added: int = 0
+    removed: int = 0
+    files: list[ChangedFile] = Field(default_factory=list)
+
+
+method("session.changes", params=SessionChangesParams, result=SessionChangesResult,
+       doc="Files changed in the session's working directory, with +/- line totals.")
+
+
 class SessionHistoryParams(SessionParams):
     pass
 

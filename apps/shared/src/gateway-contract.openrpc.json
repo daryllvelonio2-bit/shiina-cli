@@ -2689,6 +2689,24 @@
       }
     },
     {
+      "name": "session.changes",
+      "summary": "Files changed in the session's working directory, with +/- line totals.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/SessionChangesParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SessionChangesResult"
+        }
+      }
+    },
+    {
       "name": "session.close",
       "summary": "Tear down a live session (its stored row stays resumable).",
       "params": [
@@ -6840,6 +6858,36 @@
         "description": "``change_watcher._CHANGE_WATCHES`` payload fn \u2014 ``{}`` for every watch except pet.changed.",
         "properties": {},
         "title": "ChangeSignalPayload",
+        "type": "object"
+      },
+      "ChangedFile": {
+        "additionalProperties": false,
+        "description": "One entry of the session's working-tree change list.",
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "added": {
+            "default": 0,
+            "title": "Added",
+            "type": "integer"
+          },
+          "removed": {
+            "default": 0,
+            "title": "Removed",
+            "type": "integer"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "ChangedFile",
         "type": "object"
       },
       "ClarifyLockParams": {
@@ -24265,6 +24313,81 @@
           "info"
         ],
         "title": "SessionBranchResult",
+        "type": "object"
+      },
+      "SessionChangesParams": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "title": "SessionChangesParams",
+        "type": "object"
+      },
+      "SessionChangesResult": {
+        "additionalProperties": false,
+        "description": "Working-tree changes in the session cwd: a collapsed list + line totals.",
+        "properties": {
+          "repo": {
+            "title": "Repo",
+            "type": "boolean"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Branch"
+          },
+          "changed": {
+            "default": 0,
+            "title": "Changed",
+            "type": "integer"
+          },
+          "added": {
+            "default": 0,
+            "title": "Added",
+            "type": "integer"
+          },
+          "removed": {
+            "default": 0,
+            "title": "Removed",
+            "type": "integer"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ChangedFile"
+            },
+            "title": "Files",
+            "type": "array"
+          }
+        },
+        "required": [
+          "repo"
+        ],
+        "title": "SessionChangesResult",
         "type": "object"
       },
       "SessionCloseParams": {

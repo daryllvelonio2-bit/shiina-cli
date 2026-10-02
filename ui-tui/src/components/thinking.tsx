@@ -812,6 +812,36 @@ export const ToolTrail = memo(function ToolTrail({
     setOpenThinking(reasoningActive)
   }, [thinkingAuto, reasoningActive])
 
+  // The loop finished: collapse every section (thinking, tools, subagents, activity) so the
+  // panel reads as one compact summary instead of a wall of finished steps. A section the user
+  // pinned open via /details stays open; an MoA reference panel is never touched.
+  const wasBusy = useRef(busy)
+  useEffect(() => {
+    const finished = wasBusy.current && !busy
+    wasBusy.current = busy
+
+    if (!finished) {
+      return
+    }
+
+    if (thinkingAuto) {
+      setOpenThinking(false)
+    }
+
+    if (visible.tools !== 'expanded') {
+      setOpenTools(false)
+    }
+
+    if (visible.subagents !== 'expanded') {
+      setOpenSubagents(false)
+      setDeepSubagents(false)
+    }
+
+    if (visible.activity !== 'expanded') {
+      setOpenMeta(false)
+    }
+  }, [busy, thinkingAuto, visible])
+
   const cot = useMemo(() => thinkingPreview(reasoning, 'full', THINKING_COT_MAX), [reasoning])
 
   // Spawn-tree derivations must live above any early return so React's

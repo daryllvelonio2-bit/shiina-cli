@@ -5,6 +5,7 @@ helpers (``_sessions``, ``_ok``, ``_err``, ...) bare; module-level helpers are p
 server.py the same way (tests monkeypatching ``server.X`` still intercept)."""
 
 import contextlib
+import time
 
 from .method_ctx import HandlerRegistry, bind_module
 
@@ -1719,6 +1720,47 @@ def _(rid, params: dict, session: dict) -> dict:
         *([f"Project: {project['name']}"] if project else []),
         *status_lines(fields, "title", "model", "created", "last_activity", "tokens", "agent_running")]
     return _ok(rid, {"output": "\n".join(lines)})
+
+
+@_session_method("session.changes")
+def _(rid, params: dict, session: dict) -> dict:
+    """Working-tree changes for the session cwd (the TUI's collapsed change list).
+
+    ``repo_status`` shells out to git, so the answer is memoized for a couple of seconds: the
+    client re-asks at every loop end and after each write tool, and neither needs a fresh scan.
+    """
+    cwd = _display_session_cwd(session)
+    status = _repo_status_cached(cwd)
+    if not status:
+        return _ok(rid, {"repo": False})
+    files = [{"path": f.get("path", ""), "added": int(f.get("added") or 0),
+              "removed": int(f.get("removed") or 0), "status": f.get("status", "")}
+             for f in status.get("files", [])]
+    return _ok(rid, {"repo": True, "branch": status.get("branch"),
+                     "changed": int(status.get("changed") or 0), "added": int(status.get("added") or 0),
+                     "removed": int(status.get("removed") or 0), "files": files})
+
+
+_REPO_STATUS_TTL = 2.0
+_repo_status_cache: dict[str, tuple[float, dict | None]] = {}
+
+
+def _repo_status_cached(cwd: str) -> dict | None:
+    """``repo_status`` with a short TTL (None on a non-repo cwd)."""
+    if not cwd:
+        return None
+    now = time.monotonic()
+    cached = _repo_status_cache.get(cwd)
+    if cached and now - cached[0] < _REPO_STATUS_TTL:
+        return cached[1]
+    from shiina_cli.web_git import repo_status
+    try:
+        status = repo_status(cwd)
+    except Exception:
+        logger.debug("repo_status failed for %s", cwd, exc_info=True)
+        status = None
+    _repo_status_cache[cwd] = (now, status)
+    return status
 
 
 @_session_method("session.history")

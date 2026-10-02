@@ -2763,6 +2763,26 @@ export interface SessionStatusParams {
 export interface SessionStatusResult {
   output: string
 }
+export interface SessionChangesParams {
+  session_id: string
+  profile?: string | null
+}
+/** Working-tree changes in the session cwd: a collapsed list + line totals. */
+export interface SessionChangesResult {
+  repo: boolean
+  branch?: string | null
+  changed?: number
+  added?: number
+  removed?: number
+  files?: ChangedFile[]
+}
+/** One entry of the session's working-tree change list. */
+export interface ChangedFile {
+  path: string
+  added?: number
+  removed?: number
+  status?: string
+}
 export interface SessionHistoryParams {
   session_id: string
   profile?: string | null
@@ -4480,6 +4500,8 @@ export interface RpcMethods {
   'session.active_list': { params: SessionActiveListParams; result: SessionActiveListResult }
   /** Fork a live session into a new stored child that shares the parent's history so far. */
   'session.branch': { params: SessionBranchParams; result: SessionBranchResult }
+  /** Files changed in the session's working directory, with +/- line totals. */
+  'session.changes': { params: SessionChangesParams; result: SessionChangesResult }
   /** Tear down a live session (its stored row stays resumable). */
   'session.close': { params: SessionCloseParams; result: SessionCloseResult }
   /** Manual /compress of an idle session, optionally focused on a topic. */
@@ -4770,6 +4792,7 @@ export const RPC_METHODS = [
   'session.activate',
   'session.active_list',
   'session.branch',
+  'session.changes',
   'session.close',
   'session.compress',
   'session.context_breakdown',
