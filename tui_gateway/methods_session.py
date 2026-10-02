@@ -1733,12 +1733,16 @@ def _(rid, params: dict, session: dict) -> dict:
     status = _repo_status_cached(cwd)
     if not status:
         return _ok(rid, {"repo": False})
-    files = [{"path": f.get("path", ""), "added": int(f.get("added") or 0),
-              "removed": int(f.get("removed") or 0), "status": f.get("status", "")}
-             for f in status.get("files", [])]
-    return _ok(rid, {"repo": True, "branch": status.get("branch"),
-                     "changed": int(status.get("changed") or 0), "added": int(status.get("added") or 0),
-                     "removed": int(status.get("removed") or 0), "files": files})
+    from shiina_cli.web_git import fill_untracked_counts
+    # A new file's insertions are not in `git diff`, so fill them per row first: the collapsed
+    # totals must equal the sum of the rows the user expands.
+    files = fill_untracked_counts(cwd, [{"path": f.get("path", ""), "added": int(f.get("added") or 0),
+                                         "removed": int(f.get("removed") or 0),
+                                         "status": f.get("status", "")}
+                                        for f in status.get("files", [])])
+    return _ok(rid, {"repo": True, "branch": status.get("branch"), "changed": len(files),
+                     "added": sum(f["added"] for f in files),
+                     "removed": sum(f["removed"] for f in files), "files": files})
 
 
 _REPO_STATUS_TTL = 2.0

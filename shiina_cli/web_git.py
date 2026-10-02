@@ -235,13 +235,21 @@ def repo_status(cwd: str) -> dict | None:
 # ── review pane ──────────────────────────────────────────────────────────────
 
 
+def fill_untracked_counts(cwd: str, files: list[dict]) -> list[dict]:
+    """Fill ``added`` for untracked rows — ``git diff`` ignores them, so they read 0 otherwise.
+
+    The scan is bounded (``_UNTRACKED_SCAN_CAP``) exactly like the repo-level total, so a row's
+    count always matches the summary above it.
+    """
+    for file in files[:_UNTRACKED_SCAN_CAP]:
+        if file.get("status") == "?" and not file.get("added"):
+            file["added"] = _untracked_insertions(cwd, file.get("path", ""))
+    return files
+
+
 def _review_result(cwd: str, files: list[dict], base: str | None) -> dict:
-    """Sorted rows; untracked rows with no counts get their insertion count filled in."""
-    files.sort(key=lambda f: f["path"])
-    for file in files:
-        if file["status"] == "?" and file["added"] == 0 and file["removed"] == 0:
-            file["added"] = _untracked_insertions(cwd, file["path"])
-    return {"files": files, "base": base}
+    """Sorted rows; untracked rows get their insertion count filled in."""
+    return {"files": fill_untracked_counts(cwd, sorted(files, key=lambda f: f["path"])), "base": base}
 
 
 def review_list(cwd: str, scope: str, base_ref: str | None) -> dict:

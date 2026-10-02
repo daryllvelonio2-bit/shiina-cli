@@ -48,7 +48,7 @@ def test_reports_files_and_totals(monkeypatch):
         seen.append(cwd)
 
         return {
-            "branch": "main", "changed": 2, "added": 42, "removed": 7,
+            "branch": "main", "changed": 2, "added": 42, "removed": 2,
             "files": [
                 {"path": "src/app.py", "added": 30, "removed": 2, "status": "M"},
                 {"path": "src/new.py", "added": 12, "removed": 0, "status": "?"},
@@ -66,9 +66,28 @@ def test_reports_files_and_totals(monkeypatch):
     assert len(seen) == 1 and seen[0]  # the session cwd was probed exactly once
     assert result["repo"] is True
     assert result["branch"] == "main"
-    assert (result["changed"], result["added"], result["removed"]) == (2, 42, 7)
+    assert (result["changed"], result["added"], result["removed"]) == (2, 42, 2)
     assert [f["path"] for f in result["files"]] == ["src/app.py", "src/new.py"]
     assert result["files"][1]["status"] == "?"
+
+
+def test_totals_match_the_rows_they_summarize(monkeypatch):
+    """The collapsed line must equal the sum of the rows the user expands (untracked included)."""
+    monkeypatch.setattr("shiina_cli.web_git.repo_status", lambda cwd: {
+        "branch": "main", "changed": 1, "added": 3, "removed": 0,
+        "files": [{"path": "new.py", "added": 0, "removed": 0, "status": "?"}],
+    })
+    monkeypatch.setattr("shiina_cli.web_git.fill_untracked_counts",
+                        lambda cwd, files: [{**f, "added": 3} for f in files])
+    server._sessions["sid"] = _session()
+    try:
+        resp = server.handle_request({"id": "1", "method": "session.changes", "params": {"session_id": "sid"}})
+    finally:
+        server._sessions.pop("sid", None)
+
+    result = resp["result"]
+    assert (result["changed"], result["added"], result["removed"]) == (1, 3, 0)
+    assert result["files"][0]["added"] == result["added"]
 
 
 def test_non_repo_cwd_reports_no_repo(monkeypatch):
