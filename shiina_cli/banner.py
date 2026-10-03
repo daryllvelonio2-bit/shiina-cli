@@ -391,6 +391,16 @@ def check_for_updates(*, passive: bool = False) -> Optional[int]:
     compare the local checkout's HEAD. Both go through the GitHub API, never ``git fetch``.
     """
     def _read_config_opt_out():
+        # Cheap gate: a config.yaml that doesn't mention `updates` at all cannot set
+        # `updates.check`, so the value is its default (True = checks enabled) → not opted out,
+        # and the ~800 ms shiina_cli.config import is skipped. Only a file that may carry the key
+        # takes the authoritative read (conservative: it never changes the answer).
+        try:
+            text = (get_shiina_home() / "config.yaml").read_text(encoding="utf-8")
+        except OSError:
+            return False
+        if "updates" not in text.lower():
+            return False
         from shiina_cli.config import load_config
         return load_config().get("updates", {}).get("check", True) is False
 
@@ -403,8 +413,8 @@ def check_for_updates(*, passive: bool = False) -> Optional[int]:
     # None makes both the Rich banner and the Ink badge show nothing, mirroring the dashboard's
     # `/api/shiina/update/check` short-circuit so the surfaces agree.
     def _install_method():
-        from shiina_cli.config import detect_install_method, get_project_root
-        return detect_install_method(get_project_root())
+        from shiina_cli import _startup_fast
+        return _startup_fast.detect_install_method()
 
     if _quiet(_install_method) in {"docker", "apt"}:
         return None

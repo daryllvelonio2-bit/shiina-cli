@@ -16,6 +16,7 @@ __all__ = [
     "is_termux_fast_version_argv", "is_global_fast_version_argv",
     "is_container_startup_environment", "active_profile_may_override_home",
     "container_mode_may_be_active", "read_openai_version", "read_install_method",
+    "detect_install_method", "recommended_update_command",
     "print_fast_version_info", "try_fast_version",
 ]
 
@@ -127,6 +128,92 @@ def read_install_method() -> str | None:
     return (method or "").strip().lower() or None
 
 
+# The two helpers below mirror ``shiina_cli/config.py``'s install-method resolver step for step,
+# stdlib only, so ``shiina --version`` never pays the ~800 ms ``shiina_cli.config`` import. Keep
+# them in lockstep with config.py — parity is pinned by tests/shiina_cli/test_startup_fast_version.py.
+_SUPPORTED_INSTALL_METHODS = frozenset({"apt", "docker", "nix", "nixos", "home-manager", "git", "unknown"})
+_NIX_MANAGED_SYSTEMS = frozenset({"nixos", "home-manager"})
+_MANAGED_TRUE_VALUES = ("true", "1", "yes")
+_MANAGED_FALSE_VALUES = frozenset({"false", "0", "no", "off"})
+_IGNORED_MANAGED_VALUES = frozenset({"brew", "homebrew"})
+_LEGACY_MANAGED_SYSTEM = "nixos"
+_NIX_STORE = "/nix/store"
+# Nix installs arrive by several routes (nix run, nix profile, system flake, home-manager) and the
+# running process cannot tell which, so the text names the routes instead of one command.
+_NIX_UPDATE_MSG = (
+    "Update Shiina through the Nix source that installed it "
+    "(e.g. nix profile upgrade, or update your flake input and rebuild with nixos-rebuild or home-manager switch)"
+)
+_UPDATE_COMMAND_BY_METHOD = {
+    "docker": "docker pull nousresearch/shiina-agent:latest",
+    "apt": "pkg upgrade shiina-agent",  # "apt" == Termux APT by contract; uses Termux's `pkg`.
+}
+
+
+def _install_method_stamp(path: str) -> str | None:
+    method = (_read_text(path) or "").strip().lower()
+    return method if method in _SUPPORTED_INSTALL_METHODS else None
+
+
+def _managed_system() -> str | None:
+    """Package manager owning this install, or None — mirrors ``config.get_managed_system``."""
+    marker = os.environ.get("SHIINA_MANAGED", "").strip().lower() or None
+    if marker is None:
+        managed_marker = os.path.join(_resolved_home(), ".managed")
+        if os.path.exists(managed_marker):
+            marker = (_read_text(managed_marker) or "").strip().lower()
+    if marker is None or marker in _IGNORED_MANAGED_VALUES or marker in _MANAGED_FALSE_VALUES:
+        return None
+    if marker == "" or marker in _MANAGED_TRUE_VALUES:
+        return _LEGACY_MANAGED_SYSTEM
+    return marker
+
+
+def detect_install_method(project_root: str | None = None) -> str:
+    """Detect the install method (apt/docker/nix/nixos/home-manager/git/unknown) — stdlib only.
+
+    Mirrors ``shiina_cli.config.detect_install_method`` step for step: code-scoped stamp ->
+    legacy ``$SHIINA_HOME`` stamp (a ``docker`` value is ignored unless we are really inside a
+    container) -> managed marker -> ``/nix/store`` -> ``.git`` -> ``unknown``. See that function
+    for why the code-scoped stamp wins (a home can be shared by a container and a host install).
+    """
+    root = project_root if project_root is not None else project_root_str()
+    method = _install_method_stamp(os.path.join(root, ".install_method"))
+    if method:
+        return method
+    method = _install_method_stamp(os.path.join(_resolved_home(), ".install_method"))
+    if method and not (method == "docker" and not is_container_startup_environment()):
+        return method
+    managed = _managed_system()
+    if managed:
+        return managed.lower().replace(" ", "-")
+    # Code under /nix/store/ is the hallmark of a nix-built install.
+    resolved = os.path.realpath(root)
+    if resolved != _NIX_STORE and resolved.startswith(_NIX_STORE + os.sep):
+        return "nix"
+    # A .git directory, or a ``gitdir:`` pointer file for worktrees.
+    git_path = os.path.join(root, ".git")
+    if os.path.isdir(git_path):
+        return "git"
+    pointer = _read_text(git_path)
+    if pointer and pointer.strip().startswith("gitdir:"):
+        return "git"
+    return "unknown"
+
+
+def recommended_update_command(method: str) -> str:
+    """Update command/guidance for ``method`` — mirrors ``config.recommended_update_command``.
+
+    Managed state wins over the code-scoped stamp: a managed install can carry a stale stamp
+    naming an update path the managed guard refuses.
+    """
+    if _managed_system() in _NIX_MANAGED_SYSTEMS:
+        return _NIX_UPDATE_MSG
+    if method == "nix" or method in _NIX_MANAGED_SYSTEMS:
+        return _NIX_UPDATE_MSG
+    return _UPDATE_COMMAND_BY_METHOD.get(method, "shiina update")
+
+
 def print_fast_version_info(*, check_updates: bool = True) -> None:
     """THE canonical ``shiina --version`` output (also used by /version).
 
@@ -144,16 +231,9 @@ def print_fast_version_info(*, check_updates: bool = True) -> None:
 
         print(f"Shiina Agent v{__version__} ({__release_date__})")
     print(f"Install directory: {project_root_str()}")
-    # Authoritative resolver first (code-scoped stamp → managed → nix → git → pip; also self-heals
-    # poisoned shared-home 'docker' stamps); cheap stdlib stamp probe only if it fails.
-    try:
-        from pathlib import Path
-
-        from shiina_cli.config import detect_install_method
-
-        install_method = detect_install_method(Path(project_root_str()))
-    except Exception:
-        install_method = read_install_method()
+    # stdlib-only resolver (config.detect_install_method's exact order) — keeps shiina_cli.config
+    # off this path.
+    install_method = detect_install_method(project_root_str())
     if install_method:
         print(f"Install method: {install_method}")
     print(f"Python: {sys.version.split()[0]}")
@@ -165,14 +245,14 @@ def print_fast_version_info(*, check_updates: bool = True) -> None:
     # and its 6-hour cache; any failure prints nothing.
     try:
         from shiina_cli.banner import UPDATE_AVAILABLE_NO_COUNT, check_for_updates
-        from shiina_cli.config import recommended_update_command
 
+        update_command = recommended_update_command(install_method)
         behind = check_for_updates(passive=True)
         if behind == UPDATE_AVAILABLE_NO_COUNT:
-            print(f"Update available — run '{recommended_update_command()}'")
+            print(f"Update available — run '{update_command}'")
         elif behind and behind > 0:
             commits_word = "commit" if behind == 1 else "commits"
-            print(f"Update available: {behind} {commits_word} behind — run '{recommended_update_command()}'")
+            print(f"Update available: {behind} {commits_word} behind — run '{update_command}'")
         elif behind == 0:
             print("Up to date")
     except Exception:

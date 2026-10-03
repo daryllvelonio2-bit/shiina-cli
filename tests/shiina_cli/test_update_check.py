@@ -28,8 +28,7 @@ def git_repo(tmp_path, monkeypatch):
     monkeypatch.setenv("SHIINA_HOME", str(tmp_path))
     monkeypatch.delenv("SHIINA_REVISION", raising=False)
     monkeypatch.setattr(banner, "_resolve_repo_dir", lambda: repo_dir)
-    monkeypatch.setattr("shiina_cli.config.detect_install_method", lambda root: "git")
-    monkeypatch.setattr("shiina_cli.config.get_project_root", lambda: repo_dir)
+    monkeypatch.setattr("shiina_cli._startup_fast.detect_install_method", lambda *a, **k: "git")
     return repo_dir
 
 
