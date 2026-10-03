@@ -40,13 +40,13 @@ def _cfg_path() -> str:
 
 
 @lru_cache(maxsize=1)
-def top_level_value_flag_sets() -> tuple[frozenset[str], frozenset[str]]:
-    """(required-value, optional-value) top-level flags, derived from the REAL parser.
+def top_level_flag_sets() -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
+    """(required-value, optional-value, all) option strings of the top-level parser.
 
-    Introspects ``build_top_level_parser()`` (every option with nargs != 0) so the argv scanners in
-    ``main.py`` (``_first_positional_argv``, ``_apply_profile_override``) can never drift from the
-    argparse surface — the drift that made ``shiina --reasoning high chat …`` misread ``high`` as
-    the subcommand and forced eager plugin discovery.
+    One introspection feeds three consumers: ``top_level_value_flag_sets`` (the argv scanners in
+    ``main.py`` — ``_first_positional_argv``, ``_apply_profile_override``) and
+    ``main._single_build_target`` (which must know whether a pre-positional flag belongs to the
+    top-level surface or only to a subcommand). Derived from the REAL parser, never a snapshot.
 
     Mirrors the ``update_cmd._holder_value_flags`` precedent, including the handwritten-snapshot fallback
     for a broken parser import. Cached per process. See #93530.
@@ -55,14 +55,23 @@ def top_level_value_flag_sets() -> tuple[frozenset[str], frozenset[str]]:
         parser = build_top_level_parser()[0]
         required: set[str] = set()
         optional: set[str] = set()
+        every: set[str] = set()
         for action in parser._actions:
-            if not action.option_strings or action.nargs == 0:
+            if not action.option_strings:
+                continue
+            every.update(action.option_strings)
+            if action.nargs == 0:
                 continue
             target = optional if action.nargs == "?" else required
             target.update(action.option_strings)
-        return frozenset(required), frozenset(optional)
+        return frozenset(required), frozenset(optional), frozenset(every)
     except Exception:
-        return _VALUE_FLAGS_FALLBACK, _OPTIONAL_VALUE_FLAGS_FALLBACK
+        return _VALUE_FLAGS_FALLBACK, _OPTIONAL_VALUE_FLAGS_FALLBACK, frozenset()
+
+
+def top_level_value_flag_sets() -> tuple[frozenset[str], frozenset[str]]:
+    required, optional, _every = top_level_flag_sets()  # unchanged public contract
+    return required, optional
 
 
 def _inherited_flag(parser, *args, **kwargs):
