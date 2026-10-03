@@ -1508,7 +1508,18 @@ class TestDerivedProviderIndex:
         md._index_slices.clear()
         md._index_signature.clear()
         md._index_checked.clear()
+        md._disk_cache_sig = None
         yield
+        md._index_slices.clear()
+        md._index_signature.clear()
+        md._index_checked.clear()
+        md._disk_cache_sig = None
+
+    @staticmethod
+    def _new_process(md):
+        """Drop every process-global the index layer memoizes, as a fresh process would start."""
+        md._models_dev_cache = {}
+        md._disk_cache_sig = None
         md._index_slices.clear()
         md._index_signature.clear()
         md._index_checked.clear()
@@ -1585,4 +1596,62 @@ class TestDerivedProviderIndex:
             assert not (tmp_path / "models_dev_index" / "_index.json").exists()
             assert md._index_live_signature() is None
             assert md._load_index_provider("anthropic") is None
+            assert lookup_models_dev_context("anthropic", "claude-opus-4-6") == 123456
+
+    def test_lazy_index_writes_only_the_requested_slice_and_heals_a_missing_one(self, tmp_path):
+        """A cold resolution writes ONE slice + the manifest, not the whole registry; a second
+        provider heals its own slice without pruning the first; both then serve from the index with
+        no parse at all."""
+        import agent.models_dev as md
+
+        cache_patch, index_patch, etag_patch = self._patch_paths(md, tmp_path)
+        index_dir = tmp_path / "models_dev_index"
+        with cache_patch, index_patch, etag_patch:
+            md.atomic_json_write(tmp_path / "models_dev_cache.json", json.loads(json.dumps(SAMPLE_REGISTRY)),
+                                 indent=None, separators=(",", ":"))
+            self._new_process(md)
+
+            assert lookup_models_dev_context("anthropic", "claude-opus-4-6") == 1000000
+            assert {p.name for p in index_dir.glob("*.json")} == {"anthropic.json", "_index.json"}
+
+            self._new_process(md)
+            assert lookup_models_dev_context("deepseek", "deepseek-chat") == 128000
+            # The heal kept the sibling slice the first resolution wrote.
+            assert {p.name for p in index_dir.glob("*.json")} == {
+                "anthropic.json", "deepseek.json", "_index.json"}
+
+            self._new_process(md)
+            with patch.object(md, "_read_cache_file", side_effect=AssertionError("full parse on the hot path")):
+                assert lookup_models_dev_context("anthropic", "claude-opus-4-6") == 1000000
+                assert lookup_models_dev_context("deepseek", "deepseek-chat") == 128000
+
+    def test_lazy_build_prunes_a_stale_generation_slice(self, tmp_path):
+        """A lazy build against a NEW cache generation must prune the previous generation's slices,
+        so no reader can ever be served stale metadata — while the requested provider still resolves
+        to the new value."""
+        import agent.models_dev as md
+
+        cache_patch, index_patch, etag_patch = self._patch_paths(md, tmp_path)
+        index_dir = tmp_path / "models_dev_index"
+        with cache_patch, index_patch, etag_patch:
+            md._save_disk_cache(json.loads(json.dumps(SAMPLE_REGISTRY)))
+            sig_g1 = md._cache_signature()
+            assert {"anthropic.json", "deepseek.json"} <= {p.name for p in index_dir.glob("*.json")}
+
+            g2 = json.loads(json.dumps(SAMPLE_REGISTRY))
+            g2["anthropic"]["models"]["claude-opus-4-6"]["limit"]["context"] = 123456
+            md.atomic_json_write(tmp_path / "models_dev_cache.json", g2, indent=None, separators=(",", ":"))
+            sig_g2 = md._cache_signature()
+            assert sig_g2 != sig_g1
+            self._new_process(md)
+
+            assert lookup_models_dev_context("deepseek", "deepseek-chat") == 128000
+            # Only the requested slice survives; the old generation's other slices are gone.
+            assert {p.name for p in index_dir.glob("*.json")} == {"deepseek.json", "_index.json"}
+
+            md._index_checked.clear()
+            md._index_signature.clear()
+            assert md._index_live_signature() == sig_g2
+
+            self._new_process(md)
             assert lookup_models_dev_context("anthropic", "claude-opus-4-6") == 123456

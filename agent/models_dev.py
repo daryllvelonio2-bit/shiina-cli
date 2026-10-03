@@ -307,6 +307,10 @@ _index_signature: Dict[str, Optional[Tuple[int, int, int, int]]] = {}  # home ->
 _index_checked: Dict[str, bool] = {}                                   # home -> manifest checked
 
 _Sig = Tuple[int, int, int, int]
+# Signature of the disk generation _models_dev_cache was parsed from (mirrors that global; the
+# same-handle sig from _read_cache_file, so it names the exact content). Lets the recovery path
+# stamp its one slice with the generation it actually parsed rather than re-statting the file.
+_disk_cache_sig: Optional[_Sig] = None
 
 
 def _cache_signature() -> Optional[_Sig]:
@@ -354,12 +358,15 @@ def _read_manifest_sig() -> Optional[_Sig]:
         and isinstance(cache_sig, list) and len(cache_sig) == 4 else None
 
 
-def _write_index(data: Dict[str, Any], sig: Optional[_Sig]) -> bool:
-    """Re-shard the registry into one file per provider id, manifest last, and return True iff the
+def _write_index(data: Dict[str, Any], sig: Optional[_Sig], *, only: Optional[set] = None) -> bool:
+    """Shard the registry into one file per provider id, manifest last, and return True iff the
     manifest landed. *sig* is the signature of the exact cache content *data* was parsed from: the
     manifest may never name a generation the slices were not written from, so if the live cache no
     longer matches *sig* (at entry, or again before the manifest write) nothing is written and
-    readers fall back to the full cache."""
+    readers fall back to the full cache. When *only* is a set of provider ids, only those slices are
+    written and the rest are pruned ONLY when the on-disk manifest does not already name *sig*
+    (stale/absent generation) — a heal at the live sig keeps the sibling slices, which are this
+    generation's by construction. ``only=None`` re-shards the whole registry."""
     def build() -> bool:
         if sig is None or _cache_signature() != sig:
             return False
@@ -369,13 +376,16 @@ def _write_index(data: Dict[str, Any], sig: Optional[_Sig]) -> bool:
             if not isinstance(provider_id, str) or not isinstance(entry, dict) \
                     or not _INDEX_ID_RE.fullmatch(provider_id):
                 continue
+            if only is not None and provider_id not in only:
+                continue
             written.add(f"{provider_id}.json")
             atomic_json_write(index_dir / f"{provider_id}.json", entry,
                               indent=None, separators=(",", ":"))
-        for stale in index_dir.glob("*.json"):
-            if stale.name not in written and stale.name != _INDEX_MANIFEST:
-                with contextlib.suppress(OSError):
-                    stale.unlink()
+        if only is None or _read_manifest_sig() != sig:
+            for stale in index_dir.glob("*.json"):
+                if stale.name not in written and stale.name != _INDEX_MANIFEST:
+                    with contextlib.suppress(OSError):
+                        stale.unlink()
         if _cache_signature() != sig:
             return False
         atomic_json_write(index_dir / _INDEX_MANIFEST,
@@ -385,22 +395,24 @@ def _write_index(data: Dict[str, Any], sig: Optional[_Sig]) -> bool:
     return bool(_quietly("write models.dev provider index", build, False))
 
 
-def _ensure_index(data: Dict[str, Any], sig: Optional[_Sig]) -> None:
-    """Heal a missing/stale index from the registry we just parsed. Runs only on the recovery path,
-    after a rejected index forced the full parse, so it can never slow the fast path. Serialized
-    against registry commits via _models_dev_fetch_lock: a heal must not write slices for a stale
-    generation while a commit (or another heal) writes another. A busy lock means a commit path is
-    running; skip rather than stall the first resolution, and let a later cold start re-derive it.
-    The signature is recorded ONLY when the manifest actually landed with this stamp — a swallowed
-    manifest-write failure must not mark an unverified index live."""
+def _ensure_index_slice(mdev_id: str, data: Dict[str, Any], sig: Optional[_Sig]) -> None:
+    """Heal an index miss by recording the ONE provider slice the resolution asked for, from the
+    registry we just parsed. Runs only on the recovery path, after a rejected/absent slice forced
+    the full parse, so it can never slow the fast path. Serialized against registry commits via
+    _models_dev_fetch_lock: a heal must not write a slice for a stale generation while a commit (or
+    another heal) writes another. A busy lock means a commit path is running; skip rather than stall
+    the first resolution, and let a later cold start re-derive it. The signature is recorded ONLY
+    when the manifest actually landed with this stamp — a swallowed manifest-write failure must not
+    mark an unverified index live. Sibling slices already memoized for this home are this
+    generation's on a heal, so they are kept (the on-disk manifest gate in _write_index prunes only
+    when it names a different generation)."""
     home = shiina_home_key()
     if not data or sig is None:
         return
     if not _models_dev_fetch_lock.acquire(blocking=False):
         return
     try:
-        if _write_index(data, sig) and _read_manifest_sig() == sig:
-            _index_slices.setdefault(home, {}).clear()
+        if _write_index(data, sig, only={mdev_id}) and _read_manifest_sig() == sig:
             _index_signature[home] = sig
     finally:
         _models_dev_fetch_lock.release()
@@ -573,15 +585,15 @@ def fetch_models_dev(force_refresh: bool = False, *, allow_network: bool = True)
     singleflight foreground fetch. A failed refresh suppresses automatic refreshes for 5 minutes.
     ``force_refresh=True`` bypasses the cache fast paths and the backoff, falling back to cached data
     only if the call fails. ``allow_network=False`` returns any memory/disk cache and never makes a request."""
-    global _models_dev_cache, _models_dev_cache_time, _models_dev_retry_after
+    global _models_dev_cache, _models_dev_cache_time, _models_dev_retry_after, _disk_cache_sig
     if not allow_network:
         if not _models_dev_cache:
             disk_data, disk_sig = _read_cache_file()
             if disk_data:
                 _models_dev_cache = disk_data
+                _disk_cache_sig = disk_sig
                 disk_age = _disk_cache_age_seconds()
                 _models_dev_cache_time = time.time() - disk_age if disk_age is not None else 0
-                _ensure_index(disk_data, disk_sig)
         return _models_dev_cache
     if not force_refresh:
         # Stage 1: fresh in-memory cache — the hot path, no I/O.
@@ -631,12 +643,18 @@ def _registry_provider(mdev_id: str, allow_network: bool) -> Optional[Dict[str, 
     """The raw models.dev provider entry, or None."""
     # Index fast path: a hot-path resolution reads one provider slice instead of parsing the
     # registry. Only when the in-memory cache is empty — a populated cache short-circuits it.
+    recovering = False
     if not allow_network and not _models_dev_cache:
         entry = _load_index_provider(mdev_id)
         if entry is not None:
             return entry
+        recovering = True
     # Keep the zero-argument call on the allow_network path: dozens of test sites monkeypatch fetch_models_dev with zero-arg lambdas.
     registry = fetch_models_dev() if allow_network else fetch_models_dev(allow_network=False)
+    if recovering:
+        # An absent slice forced the full parse; record this provider's slice so the next process
+        # reads it from the index. _disk_cache_sig names the generation just parsed.
+        _ensure_index_slice(mdev_id, registry, _disk_cache_sig)
     provider_data = registry.get(mdev_id)
     return provider_data if isinstance(provider_data, dict) else None
 
