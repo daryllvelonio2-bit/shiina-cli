@@ -3450,6 +3450,81 @@ _SUBPARSER_BUILDER_BY_NAME = {
 }
 
 
+_SESSION_NAME_FLAGS = ("-c", "--continue", "-r", "--resume")
+# generate_bash/zsh/fish introspect the WHOLE tree, so `completion` never builds alone.
+_FULL_PARSER_COMMANDS = frozenset({"completion"})
+
+
+def _single_build_target(argv: list[str]) -> str | None:
+    """The one top-level command to build in isolation, or None to build the full tree.
+
+    Every None case here is today's full-build outcome kept verbatim: the single build may
+    only forgo a speedup, never change a parse.
+    """
+    if any(tok in _SESSION_NAME_FLAGS for tok in argv):
+        # `_coalesce_session_name_args` reshapes argv around these and
+        # `_rewrite_named_session_flags` early-returns on them, so the post-build rewrite
+        # guard cannot see this class and the resolver's candidate is not the token argparse
+        # routes (`["-c","x","kanban","acp"]` → full `acp`, single-built `kanban` → exit 2).
+        return None
+    from shiina_cli._parser import top_level_flag_sets
+
+    required, optional, top_opts = top_level_flag_sets()
+    value_flags = required | optional
+    i = 0
+    while i < len(argv):
+        tok = argv[i]
+        if tok == "--":
+            i += 1
+            break
+        if tok in ("-h", "--help"):
+            return None  # top-level help enumerates all 74 → full build
+        if not tok.startswith("-"):
+            break
+        # A pre-positional flag the TOP-LEVEL parser does not define is either a named-session
+        # convenience (`shiina --tui --shiina`) or, when it is really a subcommand's flag
+        # (`--blank`, `--force`, `--json`, …, seen before the positional), something the full
+        # build's `_rewrite_named_session_flags` would NOT rewrite and argparse would reject.
+        # Either way only the full build produces today's exact outcome → defer.
+        if tok.split("=", 1)[0] not in top_opts:
+            return None
+        i += 2 if ("=" not in tok and tok in value_flags and i + 1 < len(argv)) else 1
+    else:
+        return None  # no positional → chat / top-level paths → full build
+    candidate = argv[i] if i < len(argv) else None
+    if candidate is None or candidate in _FULL_PARSER_COMMANDS:
+        return None
+    # `scan` lands here (and so does any plugin command or unknown token): absent from
+    # `_BUILTIN_SUBCOMMANDS`, `_plugin_cli_discovery_needed()` is True for it and the full
+    # build runs `_register_plugin_cli_commands` → `discover_plugins()`. Keep that decision.
+    if candidate not in _BUILTIN_SUBCOMMANDS:
+        return None
+    if candidate not in _SUBPARSER_BUILDER_BY_NAME:
+        return None  # table drift → fail safe
+    if candidate == "chat":
+        # chat's subparser defines `--resume`, so a single-built chat tree rewrites a
+        # post-positional `--<flag>` into `--resume <flag>` and RUNS, where the full build
+        # exits 2. Its valid launches never reach this build anyway (`_try_fast_chat_launch`
+        # intercepts them), so defer it.
+        return None
+    return candidate
+
+
+def _build_tree_for_argv(argv: list[str]):
+    """Build the smallest tree that reproduces the FULL build's parse for ``argv``.
+
+    ``_rewrite_named_session_flags`` derives ``known_opts`` from the built tree, so a single build
+    can rewrite a post-positional token the full build leaves alone (chat's ``--resume``, or an
+    abbreviation like ``desktop --force`` → ``--force-build``). The resolver never admits an unknown
+    PRE-positional flag, so any rewrite here is post-positional → the full build is the authority.
+    """
+    target = _single_build_target(argv)
+    parser, subparsers = _build_cli_parser(target)
+    if target is not None and _rewrite_named_session_flags(argv, parser, subparsers)[1]:
+        parser, subparsers = _build_cli_parser()
+    return parser, subparsers
+
+
 def _iter_cli_parsers(parser, subparsers):
     """``parser`` plus every subparser nested at any depth.
 
@@ -3618,7 +3693,7 @@ def main():
     if _try_fast_chat_launch():
         return
 
-    parser, subparsers = _build_cli_parser()
+    parser, subparsers = _build_tree_for_argv(sys.argv[1:])
 
     # NixOS container mode routes ALL invocations into the managed container.
     # MUST run before parse_args() so --help, unrecognised flags and every
