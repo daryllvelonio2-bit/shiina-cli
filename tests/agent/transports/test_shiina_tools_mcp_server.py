@@ -112,6 +112,48 @@ class TestModuleSurface:
 
 
 
+class TestResolveExposedTools:
+    """Per-invocation permission scoping for the exposed tool set."""
+
+    def test_no_env_equals_curated_tuple(self, monkeypatch):
+        """Unset env ⇒ today's EXPOSED_TOOLS tuple, in order (codex path unchanged)."""
+        monkeypatch.delenv("SHIINA_TOOLS_MCP_EXPOSE", raising=False)
+        monkeypatch.delenv("SHIINA_TOOLS_MCP_DENY", raising=False)
+        from agent.transports import shiina_tools_mcp_server as m
+
+        assert m.resolve_exposed_tools() == m.EXPOSED_TOOLS
+
+    def test_blank_env_is_treated_as_unset(self, monkeypatch):
+        monkeypatch.setenv("SHIINA_TOOLS_MCP_EXPOSE", "  , ")
+        monkeypatch.setenv("SHIINA_TOOLS_MCP_DENY", "")
+        from agent.transports import shiina_tools_mcp_server as m
+
+        assert m.resolve_exposed_tools() == m.EXPOSED_TOOLS
+
+    def test_deny_subtracts_only_that_member(self, monkeypatch):
+        monkeypatch.delenv("SHIINA_TOOLS_MCP_EXPOSE", raising=False)
+        monkeypatch.setenv("SHIINA_TOOLS_MCP_DENY", "web_search")
+        from agent.transports import shiina_tools_mcp_server as m
+
+        resolved = m.resolve_exposed_tools()
+        assert "web_search" in m.EXPOSED_TOOLS
+        assert "web_search" not in resolved
+        assert set(resolved) == set(m.EXPOSED_TOOLS) - {"web_search"}
+        assert len(resolved) == len(m.EXPOSED_TOOLS) - 1
+
+    def test_expose_narrows_but_cannot_add_outside_curated_set(self, monkeypatch):
+        """EXPOSE is an allow-list over EXPOSED_TOOLS: it names a subset, never a superset.
+
+        'terminal' is intentionally outside the curated set (codex has a builtin); naming
+        it must not leak it in.
+        """
+        monkeypatch.setenv("SHIINA_TOOLS_MCP_EXPOSE", "web_search, terminal")
+        monkeypatch.delenv("SHIINA_TOOLS_MCP_DENY", raising=False)
+        from agent.transports import shiina_tools_mcp_server as m
+
+        assert m.resolve_exposed_tools() == ("web_search",)
+
+
 class TestMain:
     def test_main_returns_2_when_mcp_unavailable(self, monkeypatch):
         """When the mcp package isn't installed, main() should exit

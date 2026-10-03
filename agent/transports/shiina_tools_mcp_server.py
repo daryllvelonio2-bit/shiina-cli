@@ -58,6 +58,30 @@ EXPOSED_TOOLS: tuple[str, ...] = (
 )
 
 
+def _env_name_set(name: str) -> set[str]:
+    """Parse a comma-separated tool-name env var; blank entries ignored."""
+    return {item.strip() for item in os.environ.get(name, "").split(",") if item.strip()}
+
+
+def resolve_exposed_tools() -> tuple[str, ...]:
+    """Resolve the per-invocation exposed-tool set (permission half of agent scoping).
+
+    ``SHIINA_TOOLS_MCP_EXPOSE`` (comma list) narrows to the named tools **already in**
+    ``EXPOSED_TOOLS`` — it can never add a tool the curated set excludes, so it cannot
+    undo the codex-builtin safety contract. ``SHIINA_TOOLS_MCP_DENY`` (comma list) then
+    subtracts names. Both unset/empty ⇒ ``EXPOSED_TOOLS`` unchanged, so the codex path
+    (which passes no such env) keeps today's byte-identical tool list.
+    """
+    selected = list(EXPOSED_TOOLS)
+    expose = _env_name_set("SHIINA_TOOLS_MCP_EXPOSE")
+    if expose:
+        selected = [n for n in selected if n in expose]
+    deny = _env_name_set("SHIINA_TOOLS_MCP_DENY")
+    if deny:
+        selected = [n for n in selected if n not in deny]
+    return tuple(selected)
+
+
 def _build_server() -> Any:
     """Create the MCP server with Shiina tools attached (lazy imports: importable without ``mcp``)."""
     try:
@@ -104,8 +128,9 @@ def _build_server() -> Any:
         _dispatch.__annotations__ = {**annots, "return": str}
         return _dispatch
 
+    exposed = resolve_exposed_tools()
     exposed_count = 0
-    for name in EXPOSED_TOOLS:
+    for name in exposed:
         spec = all_defs.get(name)
         if spec is None:
             logger.debug("skipping %s — not registered in this Shiina process", name)
@@ -119,7 +144,7 @@ def _build_server() -> Any:
             mcp.tool(name=name, description=description)(_make_handler(name, params_schema, description))
         exposed_count += 1
 
-    logger.info("shiina-tools MCP server registered %d/%d tools", exposed_count, len(EXPOSED_TOOLS))
+    logger.info("shiina-tools MCP server registered %d/%d tools", exposed_count, len(exposed))
     return mcp
 
 
