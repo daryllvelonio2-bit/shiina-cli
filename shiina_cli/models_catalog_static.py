@@ -113,13 +113,16 @@ def _xai_finalize_catalog(ids: list[str]) -> list[str]:
 
 
 def _xai_curated_models() -> list[str]:
-    """Offline curated floor for xAI / xAI OAuth pickers: $SHIINA_HOME/models_dev_cache.json
-    (no network), else ``_XAI_STATIC_FALLBACK``. Any failure falls through to the static list."""
+    """Offline curated floor for xAI / xAI OAuth pickers: the derived models_dev_index (read only
+    when it provably matches the disk cache), else $SHIINA_HOME/models_dev_cache.json (no network),
+    else ``_XAI_STATIC_FALLBACK``. Any failure falls through to the static list."""
     try:
-        from agent.models_dev import _load_disk_cache
-        data = _load_disk_cache()
-        xai = data.get("xai") if isinstance(data, dict) else None
-        models = xai.get("models") if isinstance(xai, dict) else None
+        from agent.models_dev import _load_disk_cache, _load_index_provider
+        entry = _load_index_provider("xai")
+        if entry is None:
+            data = _load_disk_cache()
+            entry = data.get("xai") if isinstance(data, dict) else None
+        models = entry.get("models") if isinstance(entry, dict) else None
         if isinstance(models, dict) and models:
             ids = [mid for mid in models if isinstance(mid, str)]
             if ids:
