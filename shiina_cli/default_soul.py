@@ -39,9 +39,21 @@ _LEGACY_TEMPLATE_SOULS = (
     ) + _SCAFFOLD_TAIL,
     # Bare scaffold without the "Examples" block, shipped briefly.
     _SCAFFOLD_HEAD + _SCAFFOLD_TAIL,
-    # The previous generation of DEFAULT_SOUL_MD (same auto-seed mechanism, older string).
+    # Earlier generations of the auto-seeded DEFAULT_SOUL_MD text, both older than the #95681 rewrite
+    # and both shipped as first-run defaults: the original ("created by Nous Research") and its later
+    # "created by Shiina" rename.
     (
         "You are Shiina Agent, an intelligent AI assistant created by Shiina. You are helpful, "
+        "knowledgeable, and direct. You assist users with a wide range of tasks including answering questions, "
+        "writing and editing code, analyzing information, creative work, and executing actions via your tools. "
+        "You communicate clearly, admit uncertainty when appropriate, and prioritize being genuinely useful over "
+        "being verbose unless otherwise directed below. Be targeted and efficient in your exploration and "
+        "investigations."
+    ),
+    # The FIRST auto-seeded generation: the same text with "created by Nous Research". Every install
+    # seeded before the "Shiina" rename carries it, so it must upgrade in place too.
+    (
+        "You are Shiina Agent, an intelligent AI assistant created by Nous Research. You are helpful, "
         "knowledgeable, and direct. You assist users with a wide range of tasks including answering questions, "
         "writing and editing code, analyzing information, creative work, and executing actions via your tools. "
         "You communicate clearly, admit uncertainty when appropriate, and prioritize being genuinely useful over "
