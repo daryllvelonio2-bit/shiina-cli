@@ -18,6 +18,7 @@
   "/kanban": "advanced",
   "/login": "settings",
   "/model": "hidden",
+  "/models": "hidden",
   "/paste": "terminal",
   "/platforms": "terminal",
   "/plugins": "terminal",
