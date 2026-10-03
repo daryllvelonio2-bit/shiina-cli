@@ -15,17 +15,9 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-# The Bitwarden backend pulls in ``cryptography`` at import time; on Windows that mapped native
-# module makes the ``shiina update`` self-lock preflight defer. This module is registered
-# parse-time from ``shiina_cli.main``, so the backend import stays lazy (nothing touches ``bw``
-# until a handler runs) and ``_BWS_VERSION`` is duplicated here for the ``install --help`` text.
-# ``agent.secret_sources.bitwarden._BWS_VERSION`` is the source of truth; bump both together.
-# See #86781.
-_BWS_VERSION = "2.0.0"
-
 from shiina_cli._secrets_common import (
-    arg, cfg_str, cli_version, disable_secret_source, flag, print_status_panel, print_table,
-    prompt_index, register_subcommands, require_enabled, rotate_token, secret_cli_env, section_cfg,
+    cfg_str, cli_version, disable_secret_source, print_status_panel, print_table,
+    prompt_index, require_enabled, rotate_token, secret_cli_env, section_cfg,
     yn,
 )
 from shiina_cli.config import get_env_path, load_config, save_config, save_env_value
@@ -64,37 +56,6 @@ def __getattr__(name: str):
     if name == "bw":
         return _load_bw()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-# ── Argparse wiring — called from shiina_cli.main ──
-
-
-def register_cli(parent_parser: argparse.ArgumentParser) -> None:
-    """Attach the ``bitwarden`` subcommand tree to a parent parser."""
-    register_subcommands(parent_parser, "secrets_bw_command", (
-        ("setup", "Interactive wizard: install bws, store access token, pick project", cmd_setup, (
-            arg("--project-id", "Pre-select a project UUID instead of prompting"),
-            arg("--access-token", "Provide the access token non-interactively (will be stored in .env)"),
-            arg("--server-url", (
-                "Bitwarden region / self-hosted endpoint. Examples: "
-                "https://vault.bitwarden.com (US, default), "
-                "https://vault.bitwarden.eu (EU), or your self-hosted URL. "
-                "Skips the interactive region prompt."
-            )),
-        )),
-        ("status", "Show config + binary + token validation status", cmd_status, ()),
-        ("token", "Rotate the access token: validate a new one and store it in .env", cmd_token, (
-            arg("--access-token", "Provide the new token non-interactively (default: masked prompt)"),
-            flag("--no-verify", "Store without probing Bitwarden first (not recommended)"),
-        )),
-        ("sync", "Fetch secrets now and report what changed", cmd_sync, (
-            flag("--apply", "Actually export the secrets into the current shell's env (default: dry-run)"),
-        )),
-        ("disable", "Turn off the Bitwarden integration", cmd_disable, ()),
-        ("install", f"Download and verify the pinned bws binary (v{_BWS_VERSION})", cmd_install, (
-            flag("--force", "Re-download even if a managed copy already exists"),
-        )),
-    ))
 
 
 # ── Handlers ──

@@ -21,30 +21,43 @@ def _run_isolated(code: str) -> subprocess.CompletedProcess[str]:
 class TestLazySecretsImport:
     """Verify that the secrets_cli import is lazy, not eager."""
 
-    def test_secrets_parser_does_not_load_cryptography(self) -> None:
-        """The secrets CLI parser should not import the secrets backends."""
+    def test_cli_parser_build_does_not_import_secrets_handlers(self) -> None:
+        """Building the full CLI tree must not import the secrets handler modules.
+
+        They pull in rich + the Bitwarden crypto stack, so importing them at parse
+        time is paid by every ``shiina`` invocation.
+        """
         result = _run_isolated(
             """
 import sys
 
-# Import main (this builds the parser, including the secrets subparser)
-import shiina_cli.main
+import shiina_cli.main as m
 
-# Check if cryptography was loaded eagerly
-if 'cryptography.hazmat.bindings._rust' in sys.modules:
-    print('FAIL: cryptography._rust loaded eagerly by main()')
-    sys.exit(1)
-else:
-    print('PASS: cryptography._rust NOT loaded by main()')
-    sys.exit(0)
+m._build_cli_parser()
+handlers = ('shiina_cli.secrets_cli', 'shiina_cli.onepassword_secrets_cli')
+leaked = [name for name in handlers if name in sys.modules]
+assert leaked == [], f'CLI build eagerly imported the secrets handlers: {leaked}'
+print('PASS: secrets handler modules stay unimported by the CLI build')
 """
         )
         assert result.returncode == 0, (
-            f"cryptography._rust was loaded eagerly by main():\n"
+            f"secrets handler modules were imported by _build_cli_parser():\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}"
         )
         assert "PASS" in result.stdout
+
+    def test_secrets_parser_still_wires_a_dispatchable_handler(self) -> None:
+        """The lazy move must not drop registration: `secrets bitwarden setup` keeps a handler."""
+        import argparse
+
+        from shiina_cli.subcommands.secrets import build_secrets_parser
+
+        parser = argparse.ArgumentParser(prog="shiina")
+        sub = parser.add_subparsers(dest="command")
+        build_secrets_parser(sub)
+        ns = parser.parse_args(["secrets", "bitwarden", "setup"])
+        assert callable(getattr(ns, "func", None))
 
     def test_secrets_dispatch_loads_cryptography_only_on_demand(self) -> None:
         """Running a secrets subcommand should load cryptography lazily."""

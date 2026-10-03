@@ -18,14 +18,11 @@ from rich.panel import Panel
 
 from agent.secret_sources import onepassword as op_src
 from shiina_cli._secrets_common import (
-    arg,
     cfg_str,
     cli_version,
     disable_secret_source,
-    flag,
     print_status_panel,
     print_table,
-    register_subcommands,
     require_enabled,
     rotate_token,
     secret_cli_env,
@@ -52,35 +49,6 @@ def _op_cfg_for_write(cfg: dict) -> dict:
 def _references(op_cfg: dict) -> dict:
     env = op_cfg.get("env")
     return env if isinstance(env, dict) else {}
-
-
-
-def register_cli(parent_parser: argparse.ArgumentParser) -> None:
-    """Attach the ``onepassword`` subcommand tree to a parent parser."""
-    register_subcommands(parent_parser, "secrets_op_command", (
-        ("setup", "Verify the op CLI, set account / token env var, and enable", cmd_setup, (
-            arg("--account", "1Password account shorthand or sign-in address (op --account)"),
-            arg("--token-env", f"Env var holding a service-account token (default {_DEFAULT_TOKEN_ENV})"),
-            arg("--token", "Service-account token to store in .env non-interactively"),
-            arg("--binary-path", "Absolute path to the op binary (skips PATH lookup)"),
-        )),
-        ("status", "Show config + op binary + references", cmd_status, ()),
-        ("token", "Rotate the service-account token: validate and store it in .env", cmd_token, (
-            arg("--token", "Provide the new token non-interactively (default: masked prompt)"),
-            flag("--no-verify", "Store without probing 1Password first (not recommended)"),
-        )),
-        ("set", "Map an env var to an op:// reference", cmd_set, (
-            arg("env_var", "Environment variable name, e.g. OPENAI_API_KEY"),
-            arg("reference", "1Password reference, e.g. op://Private/OpenAI/api key"),
-        )),
-        ("remove", "Remove an env-var → reference mapping", cmd_remove, (
-            arg("env_var", "Environment variable name to unmap"),
-        )),
-        ("sync", "Resolve references now and report what changed", cmd_sync, (
-            flag("--apply", "Actually export resolved values into the current shell (default: dry-run)"),
-        )),
-        ("disable", "Turn off the 1Password integration", cmd_disable, ()),
-    ))
 
 
 def cmd_setup(args: argparse.Namespace) -> int:

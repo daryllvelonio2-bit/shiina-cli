@@ -6,7 +6,6 @@ Import-light on purpose: ``shiina_cli.secrets_cli`` must stay free of the Bitwar
 
 from __future__ import annotations
 
-import argparse
 import os
 import subprocess
 import sys
@@ -33,26 +32,6 @@ def section_cfg(cfg: dict, section: str) -> dict:
 def cfg_str(cfg: dict, key: str) -> str:
     """A stripped string config value; ``""`` for missing/None."""
     return str(cfg.get(key, "") or "").strip()
-
-
-def arg(name: str, help_text: str, **kwargs) -> tuple:
-    """One ``add_argument`` spec for :func:`register_subcommands`."""
-    return name, dict(help=help_text, **kwargs)
-
-
-def flag(name: str, help_text: str) -> tuple:
-    """A boolean ``store_true`` spec for :func:`register_subcommands`."""
-    return arg(name, help_text, action="store_true")
-
-
-def register_subcommands(parent: argparse.ArgumentParser, dest: str, commands: Iterable) -> None:
-    """Attach ``(name, help, handler, [arg(...), ...])`` subcommands to ``parent``."""
-    sub = parent.add_subparsers(dest=dest)
-    for name, help_text, func, arguments in commands:
-        parser = sub.add_parser(name, help=help_text)
-        for arg_name, kwargs in arguments:
-            parser.add_argument(arg_name, **kwargs)
-        parser.set_defaults(func=func)
 
 
 def require_enabled(console: Console, cfg: dict, product: str, command: str) -> bool:
