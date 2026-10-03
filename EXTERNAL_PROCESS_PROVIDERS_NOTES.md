@@ -7,7 +7,7 @@ binary the user already has installed and logged in.
 
 Keep this file append-friendly — add new sections as more of these providers get fixed.
 
-Last updated: 2026-09-30
+Last updated: 2026-10-04
 
 ---
 
@@ -64,6 +64,7 @@ for i, r in enumerate(rp._ladder_rungs('kiro', None, None, 'qwen3-coder-next')):
 | Credential-pool seeding (reads the local CLI's own store) | `agent/credential_pool.py` | `_seed_kiro_singleton` (2527), `_seed_antigravity_singleton` (2492), `_seed_freebuff_singleton` (2513), `_seed_opencode_singleton` (2555) |
 | Pool persistence / read | `agent/credential_pool.py` | `load_pool` (2833), `read_credential_pool`, `write_credential_pool` |
 | The client that actually shells out | `agent/kiro_client.py` (KiroClient, ~246), `agent/freebuff_client.py`, `agent/antigravity_client.py`, `agent/opencode_client.py` | |
+| opencode-cli **shiina-tools MCP bridge** (config handed to the child via `OPENCODE_CONFIG`) | `agent/opencode_mcp_bridge.py` + `agent/opencode_client.py` | `build_opencode_mcp_config` / `write_opencode_config`; `_opencode_mcp_enabled` / `_opencode_mcp_profile_env` / `_discard_spawn_config` (opencode_client) — see §9 |
 
 Provider profiles registered under `plugins/model-providers/` get auto-added to
 `PROVIDER_REGISTRY` by `_register_plugin_provider`: `auth_type=external_process` providers
@@ -347,6 +348,75 @@ Test: `tests/agent/test_account_usage_fetch.py::test_fetch_account_usage_antigra
 
 ---
 
-## 9. Add more below
+## 9. opencode-cli: the shiina-tools MCP bridge (added 2026-10-04, PLAN-7)
+
+On the `opencode-cli` path the opencode child is **model-driving**: it owns the turn, so shiina
+cannot hand it tools the normal way (the parent loop normally sends every model tool on every API
+call). Instead shiina gives the child a **per-invocation opencode config** declaring shiina's own
+stdio MCP server, and opencode spawns that server; the model then calls real shiina tools over MCP.
+
+**(a) Hand-off — `OPENCODE_CONFIG` + the generated `shiina-tools` entry.**
+`agent/opencode_client.py::_create_completion` builds the child env with
+`tools.environments.local.shiina_subprocess_env(inherit_credentials=True)` and sets
+`OPENCODE_CONFIG=<temp file>`. The generated config (`agent/opencode_mcp_bridge.py::build_opencode_mcp_config`) is:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "shiina-tools": {
+      "type": "local",
+      "command": ["<sys.executable>", "-m", "agent.transports.shiina_tools_mcp_server"],
+      "enabled": true,
+      "environment": { "SHIINA_HOME": "<spawn home>", "SHIINA_KANBAN_*": "..." }
+    }
+  }
+}
+```
+
+`shiina-tools` is the name constant `SHIINA_TOOLS_MCP_SERVER_NAME`; the server is the same in-tree
+one codex uses (`agent/transports/shiina_tools_mcp_server.py`), exposing real shiina tools by name
+(schema from `model_tools.get_tool_definitions()`, executor `model_tools.handle_function_call`).
+`environment` carries the spawn-resolved profile scope: `SHIINA_HOME`, plus the `SHIINA_KANBAN_*`
+keys when a dispatcher-owned kanban worker is spawning (mirrors the codex app-server hand-off). The
+user's `~/.config/opencode/opencode.json` is never touched.
+
+**(b) Location / source.**
+Builder: `agent/opencode_mcp_bridge.py` (`build_opencode_mcp_config`, `write_opencode_config`).
+Caller: `agent/opencode_client.py::_create_completion`. `write_opencode_config` writes a fresh
+`tempfile.mkstemp` file (prefix `opencode-config-`, suffix `.json`, mode `0600`). The resulting env
+is threaded into the `Popen` in both `_execute_sync` and `_stream_generator`, and the temp file is
+unlinked in each method's `finally` once the child has exited (no leftover config).
+
+**(c) Kill switch.**
+`SHIINA_OPENCODE_MCP=0` makes `_opencode_mcp_enabled()` false: `spawn_env` stays `None`, no
+`OPENCODE_CONFIG` is injected, and `Popen(env=None)` inherits the parent env exactly as before
+(byte-identical). Any other value — including unset — leaves the bridge ON by default. A
+`config.yaml` key is explicitly out of scope for PLAN-7.
+
+**(d) Fidelity.**
+On this path **opencode owns iteration, stopping and context**; shiina's agent loop, budget
+accounting and prompt caching do **not** apply. This is "opencode as a subagent with shiina's
+tools", not a drop-in provider (muse-spark is prompt-sensitive at tool-calling — a caveat, not a
+blocker). Related: the client folds a completed `tool_use` part into assistant content
+(`agent/opencode_client.py::_format_tool_use`) — shown, never re-executed; a `tool-calls` turn with
+no content and no tool activity raises instead of returning a hollow `"completed"`.
+
+Verify the bridge without a live opencode run:
+
+```bash
+cd /home/janelle/Downloads/shiina
+.venv/bin/python - <<'PY'
+from agent.opencode_mcp_bridge import build_opencode_mcp_config
+import json
+print(json.dumps(build_opencode_mcp_config({"SHIINA_HOME": "/tmp/home"}), indent=2))
+PY
+scripts/run_tests.sh tests/agent/test_opencode_mcp_bridge.py
+scripts/run_tests.sh tests/agent/test_opencode_client.py -k "mcp or opencode_config"
+```
+
+---
+
+## 10. Add more below
 
 <!-- Append new providers, bugs, and verification steps here. -->
