@@ -335,7 +335,7 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 
 from shiina_cli.subcommands.cron import build_cron_parser
@@ -3081,7 +3081,7 @@ def _try_fast_serve_launch() -> bool:
 def _try_fast_chat_launch() -> bool:
     """Fast path for unambiguous interactive chat launches (all hosts).
 
-    Building all ~40 subcommand parsers costs ~140ms the chat path never
+    Building all 74 subcommand parsers costs ~230-300 ms the chat path never
     uses. Bails out (False) whenever the invocation is not certainly a chat
     launch — subcommand positional, ``--help``, unknown flags. Mirrors
     ``_try_termux_fast_cli_launch`` minus the Termux deferred startup; kept
@@ -3285,118 +3285,169 @@ def _cmd_sessions_lazy(args, **kwargs):
     return cmd_sessions(args, **kwargs)
 
 
-def _build_cli_parser():
-    """Build the full ``shiina`` argparse tree -> ``(parser, subparsers)``.
-
-    Registration ORDER is the ``shiina --help`` order; keep it stable. Groups
-    live in ``shiina_cli/subcommands/<group>.py`` with handlers injected so
-    those modules never import main.
-    """
-    from shiina_cli._parser import build_top_level_parser
-
-    parser, subparsers, chat_parser = build_top_level_parser()
-    chat_parser.set_defaults(func=cmd_chat)
-
-    build_model_parser(subparsers, cmd_model=cmd_model)
-    build_moa_parser(subparsers)
-    build_fallback_parser(subparsers)
-    build_worktree_parser(subparsers)
-    build_browser_parser(subparsers)
-    build_secrets_parser(subparsers)
-    # OUTBOUND egress firewall; ``shiina proxy`` (gateway group) is the INBOUND one.
-    build_egress_parser(subparsers)
-    build_migrate_parser(subparsers)
-    build_gateway_parser(
-        subparsers, cmd_gateway=cmd_gateway, cmd_proxy=cmd_proxy, cmd_gateway_enroll=cmd_gateway_enroll
-    )
-
-    # LSP is optional — a registration failure must not break the CLI.
+def _build_lsp(subparsers, _parser) -> None:
+    """LSP is optional — a registration failure must not break the CLI."""
     try:
         from agent.lsp.cli import register_subparser as _lsp_register
         _lsp_register(subparsers)
     except Exception as _lsp_err:  # noqa: BLE001
         logger.debug("LSP CLI registration failed: %s", _lsp_err)
 
-    build_setup_parser(subparsers, cmd_setup=cmd_setup)
-    build_whatsapp_parser(subparsers, cmd_whatsapp=cmd_whatsapp)
-    build_whatsapp_cloud_parser(subparsers, cmd_whatsapp_cloud=cmd_whatsapp_cloud)
-    build_slack_parser(subparsers, cmd_slack=cmd_slack)
 
-    from shiina_cli.send_cmd import register_send_subparser
-    register_send_subparser(subparsers)
-
-    build_login_parser(subparsers, cmd_login=cmd_login)
-    build_logout_parser(subparsers, cmd_logout=cmd_logout)
-    build_auth_parser(subparsers, cmd_auth=cmd_auth)
+def _add_scan_parser(subparsers) -> None:
     scan_parser = subparsers.add_parser("scan", help="Scan external CLI tools and sync detected accounts")
     scan_parser.set_defaults(func=cmd_scan)
-    build_status_parser(subparsers, cmd_status=cmd_status)
-    build_pause_parser(subparsers)
-    build_cron_parser(subparsers, cmd_cron=cmd_cron)
-    build_sync_parser(subparsers, cmd_sync=cmd_sync)
-    build_webhook_parser(subparsers, cmd_webhook=cmd_webhook)
 
+
+def _build_send_parser(subparsers):
+    from shiina_cli.send_cmd import register_send_subparser
+
+    return register_send_subparser(subparsers)
+
+
+def _build_peer_parser(subparsers):
     from shiina_cli.subcommands.peer import build_peer_parser
-    build_peer_parser(subparsers)
 
-    from shiina_cli.portal_cli import add_parser as _add_portal_parser
-    _add_portal_parser(subparsers)
+    return build_peer_parser(subparsers)
 
-    from shiina_cli.kanban import build_parser as _build_kanban_parser
-    _build_kanban_parser(subparsers).set_defaults(func=cmd_kanban)
 
-    from shiina_cli.projects_cmd import build_parser as _build_project_parser
-    _build_project_parser(subparsers).set_defaults(func=cmd_project)
+def _add_portal_parser(subparsers):
+    from shiina_cli.portal_cli import add_parser
 
-    build_hooks_parser(subparsers, cmd_hooks=cmd_hooks)
-    build_doctor_parser(subparsers, cmd_doctor=cmd_doctor)
-    build_verify_parser(subparsers, cmd_verify=cmd_verify)
-    build_security_parser(subparsers, cmd_security=cmd_security)
-    build_approvals_parser(subparsers, cmd_approvals=cmd_approvals)
-    build_dump_parser(subparsers, cmd_dump=cmd_dump)
-    build_debug_parser(subparsers, cmd_debug=cmd_debug)
-    build_backup_parser(subparsers, cmd_backup=cmd_backup)
-    build_checkpoints_parser(subparsers)
-    build_import_cmd_parser(subparsers, cmd_import=cmd_import)
-    build_import_agent_parser(subparsers, cmd_import_agent=cmd_import_agent)
-    build_config_parser(subparsers, cmd_config=cmd_config)
-    build_skin_parser(subparsers, cmd_skin=cmd_skin)
-    build_console_parser(subparsers, cmd_console=cmd_console)
-    build_pairing_parser(subparsers, cmd_pairing=cmd_pairing)
-    build_skills_parser(subparsers, cmd_skills=cmd_skills)
-    build_bundles_parser(subparsers)
-    build_plugins_parser(subparsers, cmd_plugins=cmd_plugins)
+    return add_parser(subparsers)
 
-    _register_plugin_cli_commands(subparsers)
 
-    build_curator_parser(subparsers)
-    build_pets_parser(subparsers)
-    build_journey_parser(subparsers)
-    build_memory_parser(subparsers, cmd_memory=cmd_memory)
-    build_tools_parser(subparsers, cmd_tools=cmd_tools)
-    build_computer_use_parser(subparsers)
-    build_mcp_parser(subparsers, cmd_mcp=cmd_mcp)
-    build_sessions_parser(subparsers, cmd_sessions=_cmd_sessions_lazy)
-    build_insights_parser(subparsers, cmd_insights=cmd_insights)
-    build_monitoring_parser(subparsers, cmd_monitoring=cmd_monitoring)
-    build_claw_parser(subparsers, cmd_claw=cmd_claw)
-    build_vault_parser(subparsers)
-    build_update_parser(subparsers, cmd_update=cmd_update)
-    build_uninstall_parser(subparsers, cmd_uninstall=cmd_uninstall)
-    build_acp_parser(subparsers, cmd_acp=cmd_acp)
-    build_profile_parser(subparsers, cmd_profile=cmd_profile)
-    build_completion_parser(subparsers, cmd_completion=cmd_completion, parser=parser)
-    build_dashboard_parser(
-        subparsers,
-        cmd_dashboard=cmd_dashboard,
-        cmd_dashboard_register=cmd_dashboard_register,
-    )
+def _build_kanban_parser(subparsers):
+    from shiina_cli.kanban import build_parser
+
+    return build_parser(subparsers).set_defaults(func=cmd_kanban)
+
+
+def _build_project_parser(subparsers):
+    from shiina_cli.projects_cmd import build_parser
+
+    return build_parser(subparsers).set_defaults(func=cmd_project)
+
+
+def _build_cli_parser(command: str | None = None):
+    """Build the ``shiina`` argparse tree -> ``(parser, subparsers)``.
+
+    With no ``command`` this is the FULL tree (every caller and test today);
+    with a name it builds only that entry's subparser (top level + chat + the
+    target). Registration ORDER is the ``shiina --help`` order; keep it
+    stable — the table below IS that order. Groups live in
+    ``shiina_cli/subcommands/<group>.py`` with handlers injected so those
+    modules never import main.
+    """
+    from shiina_cli._parser import build_top_level_parser
+
+    parser, subparsers, chat_parser = build_top_level_parser()
+    chat_parser.set_defaults(func=cmd_chat)
+
+    if command is None:
+        for _names, builder in _CLI_SUBPARSER_BUILDERS:
+            builder(subparsers, parser)
+    else:
+        _SUBPARSER_BUILDER_BY_NAME[command](subparsers, parser)
+    return parser, subparsers
+
+
+# (names, builder) — names covers canonical + aliases; ORDER is the ``shiina --help`` order.
+# ``help`` is NOT a builder (table drift defers to the full build); ``scan`` is an inline
+# add_parser entry. Function-local imports stay inside their builder so a non-target command
+# never pays them.
+_CLI_SUBPARSER_BUILDERS: tuple[tuple[tuple[str, ...], Callable], ...] = (
+    (("model",), lambda s, p: build_model_parser(s, cmd_model=cmd_model)),
+    (("moa",), lambda s, p: build_moa_parser(s)),
+    (("fallback",), lambda s, p: build_fallback_parser(s)),
+    (("worktree",), lambda s, p: build_worktree_parser(s)),
+    (("browser",), lambda s, p: build_browser_parser(s)),
+    (("secrets",), lambda s, p: build_secrets_parser(s)),
+    # OUTBOUND egress firewall; ``shiina proxy`` (gateway group) is the INBOUND one.
+    (("egress",), lambda s, p: build_egress_parser(s)),
+    (("migrate",), lambda s, p: build_migrate_parser(s)),
+    (
+        ("gateway", "proxy"),
+        lambda s, p: build_gateway_parser(
+            s, cmd_gateway=cmd_gateway, cmd_proxy=cmd_proxy, cmd_gateway_enroll=cmd_gateway_enroll
+        ),
+    ),
+    (("lsp",), _build_lsp),
+    (("setup",), lambda s, p: build_setup_parser(s, cmd_setup=cmd_setup)),
+    (("whatsapp",), lambda s, p: build_whatsapp_parser(s, cmd_whatsapp=cmd_whatsapp)),
+    (("whatsapp-cloud",), lambda s, p: build_whatsapp_cloud_parser(s, cmd_whatsapp_cloud=cmd_whatsapp_cloud)),
+    (("slack",), lambda s, p: build_slack_parser(s, cmd_slack=cmd_slack)),
+    (("send",), lambda s, p: _build_send_parser(s)),
+    (("login",), lambda s, p: build_login_parser(s, cmd_login=cmd_login)),
+    (("logout",), lambda s, p: build_logout_parser(s, cmd_logout=cmd_logout)),
+    (("auth",), lambda s, p: build_auth_parser(s, cmd_auth=cmd_auth)),
+    (("scan",), lambda s, p: _add_scan_parser(s)),
+    (("status",), lambda s, p: build_status_parser(s, cmd_status=cmd_status)),
+    (("pause", "resume"), lambda s, p: build_pause_parser(s)),
+    (("cron",), lambda s, p: build_cron_parser(s, cmd_cron=cmd_cron)),
+    (("sync",), lambda s, p: build_sync_parser(s, cmd_sync=cmd_sync)),
+    (("webhook",), lambda s, p: build_webhook_parser(s, cmd_webhook=cmd_webhook)),
+    (("peer",), lambda s, p: _build_peer_parser(s)),
+    (("portal",), lambda s, p: _add_portal_parser(s)),
+    (("kanban",), lambda s, p: _build_kanban_parser(s)),
+    (("project",), lambda s, p: _build_project_parser(s)),
+    (("hooks",), lambda s, p: build_hooks_parser(s, cmd_hooks=cmd_hooks)),
+    (("doctor",), lambda s, p: build_doctor_parser(s, cmd_doctor=cmd_doctor)),
+    (("verify",), lambda s, p: build_verify_parser(s, cmd_verify=cmd_verify)),
+    (("security",), lambda s, p: build_security_parser(s, cmd_security=cmd_security)),
+    (("approvals",), lambda s, p: build_approvals_parser(s, cmd_approvals=cmd_approvals)),
+    (("dump",), lambda s, p: build_dump_parser(s, cmd_dump=cmd_dump)),
+    (("debug",), lambda s, p: build_debug_parser(s, cmd_debug=cmd_debug)),
+    (("backup",), lambda s, p: build_backup_parser(s, cmd_backup=cmd_backup)),
+    (("checkpoints",), lambda s, p: build_checkpoints_parser(s)),
+    (("import",), lambda s, p: build_import_cmd_parser(s, cmd_import=cmd_import)),
+    (("import-agent",), lambda s, p: build_import_agent_parser(s, cmd_import_agent=cmd_import_agent)),
+    (("config",), lambda s, p: build_config_parser(s, cmd_config=cmd_config)),
+    (("skin",), lambda s, p: build_skin_parser(s, cmd_skin=cmd_skin)),
+    (("console",), lambda s, p: build_console_parser(s, cmd_console=cmd_console)),
+    (("pairing",), lambda s, p: build_pairing_parser(s, cmd_pairing=cmd_pairing)),
+    (("skills",), lambda s, p: build_skills_parser(s, cmd_skills=cmd_skills)),
+    (("bundles",), lambda s, p: build_bundles_parser(s)),
+    (("plugins",), lambda s, p: build_plugins_parser(s, cmd_plugins=cmd_plugins)),
+    ((), lambda s, p: _register_plugin_cli_commands(s)),  # full-build-only, exact position
+    (("curator",), lambda s, p: build_curator_parser(s)),
+    (("pets",), lambda s, p: build_pets_parser(s)),
+    (("journey", "learning", "memory-graph"), lambda s, p: build_journey_parser(s)),
+    (("memory",), lambda s, p: build_memory_parser(s, cmd_memory=cmd_memory)),
+    (("tools",), lambda s, p: build_tools_parser(s, cmd_tools=cmd_tools)),
+    (("computer-use",), lambda s, p: build_computer_use_parser(s)),
+    (("mcp",), lambda s, p: build_mcp_parser(s, cmd_mcp=cmd_mcp)),
+    (("sessions",), lambda s, p: build_sessions_parser(s, cmd_sessions=_cmd_sessions_lazy)),
+    (("insights",), lambda s, p: build_insights_parser(s, cmd_insights=cmd_insights)),
+    (("monitoring",), lambda s, p: build_monitoring_parser(s, cmd_monitoring=cmd_monitoring)),
+    (("claw",), lambda s, p: build_claw_parser(s, cmd_claw=cmd_claw)),
+    (("vault",), lambda s, p: build_vault_parser(s)),
+    (("update",), lambda s, p: build_update_parser(s, cmd_update=cmd_update)),
+    (("uninstall",), lambda s, p: build_uninstall_parser(s, cmd_uninstall=cmd_uninstall)),
+    (("acp",), lambda s, p: build_acp_parser(s, cmd_acp=cmd_acp)),
+    (("profile",), lambda s, p: build_profile_parser(s, cmd_profile=cmd_profile)),
+    (("completion",), lambda s, p: build_completion_parser(s, cmd_completion=cmd_completion, parser=p)),
+    (
+        ("dashboard", "serve"),
+        lambda s, p: build_dashboard_parser(
+            s,
+            cmd_dashboard=cmd_dashboard,
+            cmd_dashboard_register=cmd_dashboard_register,
+        ),
+    ),
     # "desktop" is canonical (Shiina-Setup.exe tells users to run it, so it
     # must be the name --help shows); "gui" is a deprecated alias.
-    build_gui_parser(subparsers, cmd_gui=cmd_gui)
-    build_logs_parser(subparsers, cmd_logs=cmd_logs)
-    build_prompt_size_parser(subparsers, cmd_prompt_size=cmd_prompt_size)
-    return parser, subparsers
+    (("desktop", "gui"), lambda s, p: build_gui_parser(s, cmd_gui=cmd_gui)),
+    (("logs",), lambda s, p: build_logs_parser(s, cmd_logs=cmd_logs)),
+    (("prompt-size",), lambda s, p: build_prompt_size_parser(s, cmd_prompt_size=cmd_prompt_size)),
+    (("chat",), lambda s, p: None),  # chat's parser is created by build_top_level_parser
+)
+
+# name -> builder; the parity contract (table keys == the built tree's choices) is
+# tests/shiina_cli/test_cli_parser_dispatch.py.
+_SUBPARSER_BUILDER_BY_NAME = {
+    name: builder for names, builder in _CLI_SUBPARSER_BUILDERS for name in names
+}
 
 
 def _iter_cli_parsers(parser, subparsers):
