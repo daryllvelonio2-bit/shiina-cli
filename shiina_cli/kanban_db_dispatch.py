@@ -66,16 +66,15 @@ _RESPAWN_GUARD_SUCCESS_WINDOW = 3600  # 1 hour
 
 # Cooldown after a rate-limited (quota-wall) requeue before re-spawning. Without
 # it the task would re-spawn on the very next tick and bounce off the same quota
-# wall, burning a worker slot every tick for hours. Consecutive rate-limited
-# requeues DOUBLE this from the base up to ``RATE_LIMIT_COOLDOWN_MAX_SECONDS``, so
-# a multi-hour wall costs a handful of respawns instead of one per cooldown.
-# Overridable via ``SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS`` (0 disables).
+# wall, burning a worker slot every tick for hours. On the built-in default the
+# wait DOUBLES per consecutive rate-limited requeue (300 -> 600 -> 1200 -> 1800),
+# so a multi-hour wall costs a handful of respawns instead of one per cooldown.
+# An explicit ``SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS`` is instead a FLAT wait
+# at every step — the operator named one number, honor it (0 disables).
 DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS = 300  # 5 minutes
 
-# Ceiling for the exponential rate-limit cooldown. The base is
-# ``_resolve_rate_limit_cooldown_seconds()`` (env override / default), so an
-# operator-set override is never undercut and, when larger than this default,
-# becomes the ceiling itself.
+# Ceiling for the doubling default ladder; an explicit operator override is flat
+# by definition and never climbs toward it.
 RATE_LIMIT_COOLDOWN_MAX_SECONDS = 1800  # 30 minutes
 
 # Closed runs walked when counting the trailing rate-limited streak; the cooldown
@@ -1398,15 +1397,24 @@ def _rate_limit_streak(conn: sqlite3.Connection, task_id: str) -> int:
 
 def rate_limit_cooldown_seconds(step: int, base: Optional[int] = None) -> int:
     """Cooldown before probing a task on its ``step``-th consecutive rate-limited
-    requeue (1-based): ``base * 2**(step-1)``, capped at
-    ``RATE_LIMIT_COOLDOWN_MAX_SECONDS``.
+    requeue (1-based).
 
-    ``base`` defaults to ``SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS`` (or
-    ``DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS``): the operator override sets the floor
-    of every cooldown and, when larger than the default ceiling, the ceiling too.
-    ``base <= 0`` disables the cooldown (probe next tick).
+    An explicit ``SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS`` override is a FLAT
+    cooldown at every step — the operator named one exact wait, not a floor that
+    silently doubles. With the variable unset the built-in default doubles:
+    ``base * 2**(step-1)`` capped at ``RATE_LIMIT_COOLDOWN_MAX_SECONDS``.
+
+    ``base`` (a programmatic override) always follows the doubling ladder.
+    A resolved value ``<= 0`` disables the cooldown (probe next tick).
     """
     if base is None:
+        raw = os.environ.get("SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "").strip()
+        try:
+            override = int(raw) if raw else -1
+        except ValueError:
+            override = -1
+        if override >= 0:
+            return override
         base = _kb._resolve_rate_limit_cooldown_seconds()
     if base <= 0:
         return 0

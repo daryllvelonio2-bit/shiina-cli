@@ -1,8 +1,12 @@
-"""Exponential rate-limit cooldown: consecutive quota-wall requeues must double
-the respawn-guard cooldown (300s → 600s → 1200s → 1800s cap) instead of holding a
-flat 300s, so a multi-hour provider wall costs a handful of respawns rather than
-one per cooldown. The counter is the trailing run of ``rate_limited`` outcomes, so
-a successful run resets the backoff.
+"""Rate-limit respawn cooldown.
+
+Built-in default: consecutive quota-wall requeues DOUBLE the respawn-guard
+cooldown (300s → 600s → 1200s → 1800s cap) instead of holding a flat 300s, so a
+multi-hour provider wall costs a handful of respawns rather than one per cooldown.
+An explicit ``SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS`` override is instead FLAT
+at every step — the operator named one exact wait, not a floor that doubles. The
+counter is the trailing run of ``rate_limited`` outcomes, so a successful run
+resets the backoff, and 0 disables the cooldown (next-tick probe).
 """
 
 from __future__ import annotations
@@ -60,17 +64,36 @@ def test_cooldown_sequence_doubles_then_caps(monkeypatch):
     seq = [kbd.rate_limit_cooldown_seconds(step) for step in range(1, 8)]
     assert seq[:4] == [300, 600, 1200, 1800]
     assert all(value == 1800 for value in seq[3:])
-    # 0 disables the cooldown entirely (next-tick probe).
+    # A programmatic ``base`` keeps the doubling ladder.
+    assert [kbd.rate_limit_cooldown_seconds(s, base=300) for s in range(1, 5)] == [
+        300, 600, 1200, 1800,
+    ]
+    # base=0 disables the cooldown entirely (next-tick probe).
     assert kbd.rate_limit_cooldown_seconds(1, base=0) == 0
 
 
-def test_env_override_is_the_floor(monkeypatch):
-    """An operator override is never undercut: env=900 starts at 900, then the
-    ceiling is raised to 1800 rather than the default 300-series."""
+def test_explicit_env_override_is_flat(monkeypatch):
+    """An explicit operator override is the FLAT wait at every step — no doubling.
+
+    The operator set 180 expecting a flat 3 minutes; the override must not climb
+    toward the 1800 ceiling.
+    """
+    monkeypatch.setenv("SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "180")
+    assert [kbd.rate_limit_cooldown_seconds(s) for s in range(1, 6)] == [180] * 5
+    # A larger override is still flat (the ceiling governs the default ladder only).
     monkeypatch.setenv("SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "900")
-    assert kbd.rate_limit_cooldown_seconds(1) == 900
-    assert kbd.rate_limit_cooldown_seconds(2) == 1800
-    assert kbd.rate_limit_cooldown_seconds(5) == 1800
+    assert kbd.rate_limit_cooldown_seconds(5) == 900
+    # 0 disables (next-tick probe), through the override path.
+    monkeypatch.setenv("SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
+    assert kbd.rate_limit_cooldown_seconds(3) == 0
+
+
+def test_invalid_override_falls_back_to_default_ladder(monkeypatch):
+    """Garbage / negative values are not an override: the default ladder applies."""
+    for raw in ("nope", "-5"):
+        monkeypatch.setenv("SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", raw)
+        assert kbd.rate_limit_cooldown_seconds(1) == 300, raw
+        assert kbd.rate_limit_cooldown_seconds(2) == 600, raw
 
 
 def test_consecutive_rate_limits_escalate_then_cap(kanban_home, monkeypatch):
@@ -100,6 +123,44 @@ def test_consecutive_rate_limits_escalate_then_cap(kanban_home, monkeypatch):
                 # probe: proves the wait actually escalated, not stayed flat.
                 clock["now"] = ended + expected[step - 2] + 1
                 assert kbd.check_respawn_guard(conn, tid) == "rate_limit_cooldown", step
+
+
+def test_flat_override_holds_through_guard(kanban_home, monkeypatch):
+    """env=180: every consecutive quota wall waits the same 180s — the guard clears
+    at 181s on step 5, which the old doubling ladder (1800s) would still hold."""
+    import shiina_cli.kanban_db as _kb
+
+    monkeypatch.setenv("SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "180")
+    clock = {"now": 6_000_000}
+    monkeypatch.setattr(_kb.time, "time", lambda: clock["now"])
+
+    with kbc.connect() as conn:
+        tid = kb.create_task(conn, title="rl-flat", assignee="a")
+        for step in range(1, 6):
+            ended = 6_000_000 + step * 10_000
+            _seed_run(conn, tid, "rate_limited", ended)
+            assert kbd._rate_limit_streak(conn, tid) == step
+
+            clock["now"] = ended + 179
+            assert kbd.check_respawn_guard(conn, tid) == "rate_limit_cooldown", step
+
+            clock["now"] = ended + 181
+            assert kbd.check_respawn_guard(conn, tid) is None, step
+
+
+def test_zero_override_disables_guard(kanban_home, monkeypatch):
+    """env=0 disables the cooldown: a quota-walled task is not held back."""
+    import shiina_cli.kanban_db as _kb
+
+    monkeypatch.setenv("SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
+    clock = {"now": 7_000_000}
+    monkeypatch.setattr(_kb.time, "time", lambda: clock["now"])
+
+    with kbc.connect() as conn:
+        tid = kb.create_task(conn, title="rl-zero", assignee="a")
+        _seed_run(conn, tid, "rate_limited", 7_010_000)
+        clock["now"] = 7_010_000
+        assert kbd.check_respawn_guard(conn, tid) is None
 
 
 def test_successful_run_resets_backoff(kanban_home, monkeypatch):
