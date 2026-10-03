@@ -1,10 +1,17 @@
 """Kanban specify/decompose run headless (no agent turn), yet their auxiliary calls must still carry a
 relay-affinity key — the OpenCode Go relay rejects a request without ``x-opencode-session`` with
-400 MissingSessionID (#112043). ``_call_aux`` declares a per-task affinity scope unless one is bound."""
+400 MissingSessionID (#112043). ``_call_aux`` declares a per-task affinity scope unless one is bound.
+
+The header value is the *derived* OpenCode SessionID for that scope, never the raw scope: OpenCode's
+canonical SessionID shape is ``ses_`` + 12 lowercase-hex + 14 Base62 characters (30 total), and the
+Zen free tier rejects any other shape. ``derive_opencode_session_id()`` hashes the scope into that
+shape, so one task keeps one stable id across its headless aux calls.
+"""
 
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,8 +19,12 @@ from unittest.mock import patch
 
 import pytest
 
+from agent.opencode_affinity import derive_opencode_session_id
 from shiina_cli import kanban_decompose as decompose
 from shiina_cli import kanban_specify as specify
+
+# Canonical OpenCode SessionID: "ses_" + 12 lowercase-hex + 14 Base62 (30 chars).
+_CANONICAL_SESSION_ID_RE = re.compile(r"^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$")
 
 
 def _capturing_call_llm(seen: list):
@@ -22,6 +33,11 @@ def _capturing_call_llm(seen: list):
         seen.append(opencode_session_headers("opencode-go", None).get("x-opencode-session"))
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))])
     return call_llm
+
+
+def _assert_canonical(seen: list):
+    for value in seen:
+        assert _CANONICAL_SESSION_ID_RE.match(value), value  # OpenCode/Zen-valid, not the raw scope
 
 
 @pytest.mark.parametrize("caller", [specify._call_aux, decompose._call_aux])
@@ -34,7 +50,12 @@ def test_headless_kanban_aux_call_declares_a_stable_per_task_affinity_key(caller
                 "specify", task_id, aux_task="triage_specifier", system="s", user="u",
                 max_tokens=10, timeout=5)
             assert (reply, reason) == ("ok", "")
-    assert seen == ["kanban:t_123", "kanban:t_123", "kanban:t_456"]
+    assert seen == [
+        derive_opencode_session_id("kanban:t_123"),
+        derive_opencode_session_id("kanban:t_123"),
+        derive_opencode_session_id("kanban:t_456"),
+    ]
+    _assert_canonical(seen)
     assert get_affinity_scope() is None  # nothing leaks past the call
 
 
@@ -48,7 +69,8 @@ def test_in_turn_caller_keeps_its_declared_affinity_key():
                               max_tokens=10, timeout=5)
     finally:
         reset_affinity_scope(token)
-    assert seen == ["conversation-root"]
+    assert seen == [derive_opencode_session_id("conversation-root")]
+    _assert_canonical(seen)
 
 
 def _dashboard_plugin_api():
@@ -71,5 +93,9 @@ def test_dashboard_estimate_declares_an_affinity_key_too():
     with patch("agent.auxiliary_client.call_llm", _capturing_call_llm(seen)):
         api._run_estimate("title", "body", task_id="t_1")
         api._run_estimate("title", "body", task_id=None)
-    assert seen == ["kanban:t_1", "kanban:estimate"]
+    assert seen == [
+        derive_opencode_session_id("kanban:t_1"),
+        derive_opencode_session_id("kanban:estimate"),
+    ]
+    _assert_canonical(seen)
     assert get_affinity_scope() is None
