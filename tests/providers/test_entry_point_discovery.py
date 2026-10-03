@@ -67,10 +67,13 @@ def _enable(monkeypatch, *names, disabled=()):
     ``plugins.enabled`` opt-in allow-list, so tests must enable their fake
     entry points explicitly.
     """
-    import shiina_cli.plugins as hp
+    import shiina_cli.config as cfg_mod
 
-    monkeypatch.setattr(hp, "_get_enabled_plugins", lambda: set(names))
-    monkeypatch.setattr(hp, "_get_disabled_plugins", lambda: set(disabled))
+    monkeypatch.setattr(
+        cfg_mod,
+        "load_config",
+        lambda: {"plugins": {"enabled": list(names), "disabled": list(disabled)}},
+    )
 
 
 class _FakeEntryPoints:

@@ -262,22 +262,28 @@ def _discover_entry_point_providers() -> None:
     ``register_provider()`` — a pip package cannot hijack a first-party
     provider name.
     """
+    # Same opt-in gate as the general PluginManager: only entry points named
+    # in ``plugins.enabled`` load, and ``plugins.disabled`` always wins.
+    # Read the gate FIRST, straight from the config layer: on a stock install
+    # ``plugins.enabled`` is unset, and importing ``importlib.metadata`` +
+    # the plugin-manager facade below that early costs ~345 ms for nothing.
+    try:
+        from shiina_cli.config import cfg_get, load_config
+        _raw = cfg_get(load_config(), "plugins", "enabled")
+        enabled = set(_raw) if isinstance(_raw, list) else None   # None = opt-in default
+    except Exception:  # pragma: no cover — config layer unavailable
+        enabled = None
+    if not enabled:
+        return
     try:
         import importlib.metadata as _md
     except Exception:  # pragma: no cover — importlib.metadata always present ≥3.8
         return
-
-    # Same opt-in gate as the general PluginManager: only entry points named
-    # in ``plugins.enabled`` load, and ``plugins.disabled`` always wins.
     try:
-        from shiina_cli.plugins import _get_disabled_plugins, _get_enabled_plugins
-
-        enabled = _get_enabled_plugins()  # None = nothing enabled yet (opt-in default)
+        from shiina_cli.plugins import _get_disabled_plugins
         disabled = _get_disabled_plugins()
     except Exception:  # pragma: no cover — config layer unavailable
-        enabled, disabled = None, set()
-    if not enabled:
-        return
+        disabled = set()
 
     group = "shiina_agent.plugins"
     try:
