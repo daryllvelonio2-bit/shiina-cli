@@ -1,7 +1,10 @@
 """Unit tests for native OpenCodeClient."""
 
 import json
+import os
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from agent.opencode_client import (
@@ -249,6 +252,103 @@ class TestOpenCodeClient(unittest.TestCase):
                 model="opencode/big-pickle",
                 stream=True,
             ))
+
+    def _bridge_env(self):
+        home = tempfile.mkdtemp(prefix="shiina-home-")
+        self.addCleanup(os.rmdir, home)
+        self._bridge_home = home
+        return patch.dict(os.environ, {"SHIINA_OPENCODE_MCP": "1", "SHIINA_HOME": home}, clear=False)
+
+    @patch("agent.opencode_client.subprocess.Popen")
+    @patch("agent.opencode_client.find_opencode_binary")
+    def test_create_completion_injects_opencode_config_when_mcp_enabled(self, mock_bin, mock_popen):
+        mock_bin.return_value = "/usr/bin/opencode"
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.communicate.return_value = (
+            json.dumps({"type": "step_finish", "part": {"reason": "stop"}}), "")
+        seen = {}
+
+        def _capture(cmd, **kwargs):
+            seen["env"] = kwargs.get("env") or {}
+            cfg_path = seen["env"].get("OPENCODE_CONFIG")
+            seen["cfg_path"] = cfg_path
+            if cfg_path:
+                seen["cfg_existed_at_spawn"] = Path(cfg_path).is_file()
+                seen["cfg"] = json.loads(Path(cfg_path).read_text(encoding="utf-8"))
+            return mock_proc
+
+        mock_popen.side_effect = _capture
+
+        with self._bridge_env():
+            OpenCodeClient().chat.completions.create(
+                messages=[{"role": "user", "content": "Hi"}],
+                model="opencode/big-pickle",
+                stream=False,
+            )
+
+        self.assertIn("OPENCODE_CONFIG", seen["env"], "OPENCODE_CONFIG must be set when the bridge is on")
+        self.assertTrue(seen["cfg_existed_at_spawn"], "config must exist when the child is spawned")
+        entry = seen["cfg"]["mcp"]["shiina-tools"]
+        self.assertEqual(entry["type"], "local")
+        self.assertEqual(entry["environment"]["SHIINA_HOME"], self._bridge_home)
+        self.assertFalse(
+            Path(seen["cfg_path"]).exists(), "config file must be removed once the child exits")
+
+    @patch("agent.opencode_client.subprocess.Popen")
+    @patch("agent.opencode_client.find_opencode_binary")
+    def test_create_completion_stream_injects_opencode_config_when_mcp_enabled(self, mock_bin, mock_popen):
+        mock_bin.return_value = "/usr/bin/opencode"
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.poll.return_value = 0
+        mock_proc.stdout = iter([
+            json.dumps({"type": "step_finish", "part": {"reason": "stop"}}) + "\n",
+        ])
+        seen = {}
+
+        def _capture(cmd, **kwargs):
+            seen["env"] = kwargs.get("env") or {}
+            cfg_path = seen["env"].get("OPENCODE_CONFIG")
+            seen["cfg_path"] = cfg_path
+            if cfg_path:
+                seen["cfg"] = json.loads(Path(cfg_path).read_text(encoding="utf-8"))
+            return mock_proc
+
+        mock_popen.side_effect = _capture
+
+        with self._bridge_env():
+            list(OpenCodeClient().chat.completions.create(
+                messages=[{"role": "user", "content": "Hi"}],
+                model="opencode/big-pickle",
+                stream=True,
+            ))
+
+        self.assertIn("OPENCODE_CONFIG", seen["env"])
+        self.assertIn("shiina-tools", seen["cfg"]["mcp"])
+        self.assertFalse(
+            Path(seen["cfg_path"]).exists(), "config file must be removed once the child exits")
+
+    @patch("agent.opencode_client.subprocess.Popen")
+    @patch("agent.opencode_client.find_opencode_binary")
+    def test_create_completion_skips_opencode_config_when_mcp_kill_switch(self, mock_bin, mock_popen):
+        mock_bin.return_value = "/usr/bin/opencode"
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.communicate.return_value = (
+            json.dumps({"type": "step_finish", "part": {"reason": "stop"}}), "")
+        mock_popen.return_value = mock_proc
+
+        with patch.dict(os.environ, {"SHIINA_OPENCODE_MCP": "0"}, clear=False):
+            OpenCodeClient().chat.completions.create(
+                messages=[{"role": "user", "content": "Hi"}],
+                model="opencode/big-pickle",
+                stream=False,
+            )
+
+        self.assertIsNone(
+            mock_popen.call_args.kwargs.get("env"),
+            "SHIINA_OPENCODE_MCP=0 must leave the child env inherited (today's behaviour)")
 
 
 if __name__ == "__main__":
