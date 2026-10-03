@@ -82,6 +82,33 @@ def _format_tool_use(part: Dict[str, Any]) -> Optional[str]:
     return f"[tool: {part.get('tool') or 'tool'}] {raw_input}\n{output if isinstance(output, str) else ''}"
 
 
+def _opencode_mcp_enabled() -> bool:
+    """D4: the shiina-tools bridge is on for the opencode-cli path; SHIINA_OPENCODE_MCP=0 kills it."""
+    return os.environ.get("SHIINA_OPENCODE_MCP", "1").strip() != "0"
+
+
+def _opencode_mcp_profile_env() -> Dict[str, str]:
+    """D3: profile scope handed to the generated MCP entry (mirrors codex app-server)."""
+    env: Dict[str, str] = {}
+    if os.environ.get("SHIINA_HOME"):
+        env["SHIINA_HOME"] = os.environ["SHIINA_HOME"]
+    if os.environ.get("SHIINA_KANBAN_TASK"):
+        from agent.delegation_context import KANBAN_ENV_KEYS, is_dispatcher_owned_worker_context
+
+        if is_dispatcher_owned_worker_context():
+            for key in (*KANBAN_ENV_KEYS, "SHIINA_KANBAN_DB", "SHIINA_KANBAN_BOARD"):
+                if key in os.environ:
+                    env[key] = os.environ[key]
+    return env
+
+
+def _discard_spawn_config(env: Optional[Dict[str, str]]) -> None:
+    """Remove the per-invocation OPENCODE_CONFIG file once the child has exited."""
+    path = (env or {}).get("OPENCODE_CONFIG")
+    if path:
+        Path(path).unlink(missing_ok=True)
+
+
 def get_opencode_credentials() -> Dict[str, Any]:
     """Dynamically discover OpenCode credentials from local auth storage or environment."""
     candidates = [
@@ -227,11 +254,19 @@ class OpenCodeClient:
 
         logger.debug("Executing opencode command: %s", cmd[:7])
 
-        if stream:
-            return self._stream_generator(cmd, target_model)
-        return self._execute_sync(cmd, target_model)
+        spawn_env: Optional[Dict[str, str]] = None
+        if _opencode_mcp_enabled():
+            from agent.opencode_mcp_bridge import write_opencode_config
+            from tools.environments.local import shiina_subprocess_env
 
-    def _execute_sync(self, cmd: List[str], model: str) -> Any:
+            spawn_env = shiina_subprocess_env(inherit_credentials=True)
+            spawn_env["OPENCODE_CONFIG"] = str(write_opencode_config(_opencode_mcp_profile_env()))
+
+        if stream:
+            return self._stream_generator(cmd, target_model, spawn_env)
+        return self._execute_sync(cmd, target_model, spawn_env)
+
+    def _execute_sync(self, cmd: List[str], model: str, env: Optional[Dict[str, str]] = None) -> Any:
         session_id = f"ses_{int(time.time() * 1000)}"
         full_text: List[str] = []
         full_reasoning: List[str] = []
@@ -246,6 +281,7 @@ class OpenCodeClient:
                 stderr=subprocess.PIPE,
                 text=True,
                 bufsize=1,
+                env=env,
             )
             stdout, stderr = proc.communicate(timeout=self.timeout)
             if proc.returncode != 0 and not stdout:
@@ -285,6 +321,8 @@ class OpenCodeClient:
         except subprocess.TimeoutExpired:
             proc.kill()
             raise TimeoutError(f"opencode run timed out after {self.timeout} seconds.")
+        finally:
+            _discard_spawn_config(env)
 
         content_str = "".join(full_text).strip()
         reasoning_str = "".join(full_reasoning).strip() or None
@@ -314,7 +352,7 @@ class OpenCodeClient:
             usage=usage,
         )
 
-    def _stream_generator(self, cmd: List[str], model: str) -> Iterator[Any]:
+    def _stream_generator(self, cmd: List[str], model: str, env: Optional[Dict[str, str]] = None) -> Iterator[Any]:
         session_id = f"ses_{int(time.time() * 1000)}"
         last_finish = "stop"
         saw_output = False
@@ -324,6 +362,7 @@ class OpenCodeClient:
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1,
+            env=env,
         )
 
         try:
@@ -386,3 +425,4 @@ class OpenCodeClient:
         finally:
             if proc.poll() is None:
                 proc.kill()
+            _discard_spawn_config(env)
