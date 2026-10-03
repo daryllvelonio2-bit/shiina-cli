@@ -66,9 +66,21 @@ _RESPAWN_GUARD_SUCCESS_WINDOW = 3600  # 1 hour
 
 # Cooldown after a rate-limited (quota-wall) requeue before re-spawning. Without
 # it the task would re-spawn on the very next tick and bounce off the same quota
-# wall, burning a worker slot every tick for hours. Overridable via
-# ``SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS``.
+# wall, burning a worker slot every tick for hours. Consecutive rate-limited
+# requeues DOUBLE this from the base up to ``RATE_LIMIT_COOLDOWN_MAX_SECONDS``, so
+# a multi-hour wall costs a handful of respawns instead of one per cooldown.
+# Overridable via ``SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS`` (0 disables).
 DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS = 300  # 5 minutes
+
+# Ceiling for the exponential rate-limit cooldown. The base is
+# ``_resolve_rate_limit_cooldown_seconds()`` (env override / default), so an
+# operator-set override is never undercut and, when larger than this default,
+# becomes the ceiling itself.
+RATE_LIMIT_COOLDOWN_MAX_SECONDS = 1800  # 30 minutes
+
+# Closed runs walked when counting the trailing rate-limited streak; the cooldown
+# saturates after a few steps anyway.
+_RATE_LIMIT_STREAK_SCAN_LIMIT = 50
 
 # Within this window a GitHub PR URL in a comment blocks re-spawn.
 _RESPAWN_GUARD_PR_WINDOW = 86400  # 24 hours
@@ -1362,6 +1374,46 @@ def _clear_failure_counter(conn: sqlite3.Connection, task_id: str) -> None:
         )
 
 
+def _rate_limit_streak(conn: sqlite3.Connection, task_id: str) -> int:
+    """Trailing count of consecutive ``rate_limited`` runs for ``task_id``.
+
+    This is the backoff step: each consecutive quota-wall requeue doubles the
+    cooldown. Any other closed outcome ends the streak, so a successful
+    (``completed``) run resets the backoff. Runs are walked newest-first with the
+    same ordering ``check_respawn_guard`` uses to pick the latest run.
+    """
+    streak = 0
+    rows = conn.execute(
+        "SELECT outcome FROM task_runs "
+        "WHERE task_id = ? AND ended_at IS NOT NULL "
+        "ORDER BY ended_at DESC, id DESC LIMIT ?",
+        (task_id, _RATE_LIMIT_STREAK_SCAN_LIMIT),
+    ).fetchall()
+    for row in rows:
+        if row["outcome"] != "rate_limited":
+            break
+        streak += 1
+    return streak
+
+
+def rate_limit_cooldown_seconds(step: int, base: Optional[int] = None) -> int:
+    """Cooldown before probing a task on its ``step``-th consecutive rate-limited
+    requeue (1-based): ``base * 2**(step-1)``, capped at
+    ``RATE_LIMIT_COOLDOWN_MAX_SECONDS``.
+
+    ``base`` defaults to ``SHIINA_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS`` (or
+    ``DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS``): the operator override sets the floor
+    of every cooldown and, when larger than the default ceiling, the ceiling too.
+    ``base <= 0`` disables the cooldown (probe next tick).
+    """
+    if base is None:
+        base = _kb._resolve_rate_limit_cooldown_seconds()
+    if base <= 0:
+        return 0
+    cap = max(base, RATE_LIMIT_COOLDOWN_MAX_SECONDS)
+    return min(base << (max(1, int(step)) - 1), cap)
+
+
 def check_respawn_guard(
     conn: sqlite3.Connection, task_id: str, *, lane: str = "ready",
 ) -> Optional[str]:
@@ -1392,14 +1444,15 @@ def check_respawn_guard(
 
     # 1. Rate-limit cooldown — see docstring for why this precedes blocker_auth.
     #    LATEST run only: a newer crash/completion supersedes the rate-limit run.
-    rl_cooldown = _kb._resolve_rate_limit_cooldown_seconds()
+    #    The wait doubles per consecutive rate-limited requeue (``_rate_limit_streak``).
     latest_run = conn.execute(
         "SELECT outcome, ended_at FROM task_runs "
         "WHERE task_id = ? AND ended_at IS NOT NULL "
-        "ORDER BY ended_at DESC LIMIT 1",
+        "ORDER BY ended_at DESC, id DESC LIMIT 1",
         (task_id,),
     ).fetchone()
     if latest_run is not None and latest_run["outcome"] == "rate_limited":
+        rl_cooldown = rate_limit_cooldown_seconds(_rate_limit_streak(conn, task_id))
         if rl_cooldown <= 0:
             # Cooldown disabled — respawn immediately, skipping blocker_auth so
             # the stamped rate-limit text doesn't re-trap the task.
