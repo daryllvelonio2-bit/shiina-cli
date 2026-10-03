@@ -646,7 +646,7 @@ if sys.platform == "win32":
 
 # Load .env from ~/.shiina/.env first, then project root as dev fallback.
 # User-managed env files should override stale shell exports on restart.
-from shiina_cli.config import get_shiina_home
+from shiina_constants import get_shiina_home
 from shiina_cli.env_loader import load_shiina_dotenv
 
 # ``update`` must not resolve external secret sources (Windows self-lock via cryptography, slow
@@ -663,10 +663,10 @@ try:
     # The effective-config cache (shared raw parse with read_raw_config()) means this SAME parse
     # serves shiina_logging, shiina_time and later raw reads: 3-4 config.yaml parses become one.
     # Managed overlay included: administrator-pinned redact_secrets / force_ipv4 win here too.
-    from shiina_cli.config_effective import load_user_config_effective as _load_effective_early
-
     _cfg_path = get_shiina_home() / "config.yaml"
     if _cfg_path.exists():
+        from shiina_cli.config_effective import load_user_config_effective as _load_effective_early
+
         _early_cfg_raw = _load_effective_early(_cfg_path)
         if "SHIINA_REDACT_SECRETS" not in os.environ:
             _early_sec_cfg = _early_cfg_raw.get("security", {})
