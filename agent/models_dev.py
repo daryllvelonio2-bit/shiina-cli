@@ -1,15 +1,22 @@
 """Models.dev registry integration — primary database for providers and models.
 
 Resolution: in-memory cache (fresh, or stale served while one background daemon
-thread refreshes) → disk cache (~/.shiina/models_dev_cache.json, any age) →
+thread refreshes) → derived per-provider index (``models_dev_index/``; a
+random-access view over the disk cache, so the first context resolution reads one
+provider slice instead of parsing the whole registry) → disk cache (any age) →
 network only when no cache exists. Failed refreshes back off 5 min process-wide.
 Refreshes use ETag conditional GET when a servable registry is held. Hot paths
-pass ``allow_network=False`` and never do I/O. A corrupt/empty disk cache is
-quarantined, never served as ``{}``. ``models_dev.url`` in config.yaml = mirror."""
+pass ``allow_network=False`` and never hit the network: they read the index when it
+provably matches the live cache, otherwise they parse the disk cache once. The
+index is DERIVED — never authoritative, always rebuildable from the cache, and
+ignored whenever its recorded signature does not match the live cache file. A
+corrupt/empty disk cache is quarantined, never served as ``{}``.
+``models_dev.url`` in config.yaml = mirror."""
 
 import contextlib
 import json
 import logging
+import os
 import re
 import threading
 import time
@@ -17,9 +24,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from utils import atomic_json_write, atomic_write_text
+from utils import atomic_json_write, atomic_write_text, file_signature, read_json_or_empty
 
-from shiina_constants import openrouter_variant_base
+from shiina_constants import openrouter_variant_base, shiina_home_key
 
 import requests
 
@@ -208,6 +215,10 @@ def _get_etag_path() -> Path:
     return _shiina_path("models_dev_cache.etag")
 
 
+def _get_index_dir() -> Path:
+    return _shiina_path(_INDEX_DIRNAME)
+
+
 def _quietly(what: str, fn, default=None):
     """Run *fn*; on any exception log ``"Failed to <what>: %s"`` at debug and return *default*."""
     try:
@@ -250,23 +261,149 @@ def _validate_registry(data: Any) -> bool:
     return isinstance(data, dict) and len(data) > 0
 
 
-def _load_disk_cache() -> Dict[str, Any]:
-    """Load the disk cache; a corrupt/empty one is quarantined with a warning so it never
-    masquerades as ``{}`` and breaks provider/model resolution."""
+def _read_cache_file() -> Tuple[Dict[str, Any], Optional["_Sig"]]:
+    """Parse the disk cache and return ``(data, signature)``. The signature comes from the SAME open
+    handle the bytes were read through, so it names the exact generation parsed even if the path is
+    replaced mid-read (an atomic replace leaves the open fd on the old inode). ``({}, None)`` on any
+    failure; a corrupt/empty cache is quarantined exactly as before."""
     try:
         cache_path = _get_cache_path()
         if cache_path.exists():
             with open(cache_path, encoding="utf-8") as f:
                 data = json.load(f)
+                sig = file_signature(os.fstat(f.fileno()))
             if _validate_registry(data):
-                return data
+                return data, sig
             logger.warning("models.dev disk cache is corrupt or empty; quarantining (will refetch from network)")
             _quarantine_corrupt_cache(cache_path)
     except Exception as e:
         logger.warning("Failed to load models.dev disk cache; quarantining: %s", e)
         with contextlib.suppress(Exception):
             _quarantine_corrupt_cache(_get_cache_path())
-    return {}
+    return {}, None
+
+
+def _load_disk_cache() -> Dict[str, Any]:
+    """The disk cache (dict only); a corrupt/empty one is quarantined with a warning so it never
+    masquerades as ``{}`` and breaks provider/model resolution. Dict contract preserved for its
+    other callers (``shiina_cli/models_catalog_static.py``); the hot path uses ``_read_cache_file``
+    so it also gets the signature the parser saw."""
+    return _read_cache_file()[0]
+
+
+# --- derived per-provider index -------------------------------------------------
+# A random-access view over models_dev_cache.json: the first context resolution per
+# process reads one provider slice instead of parsing 5.3 MB. Never authoritative —
+# only trusted while its recorded file_signature(cache) matches the live cache file,
+# and only ever stamped with the signature of the exact content its slices came from.
+_INDEX_DIRNAME = "models_dev_index"
+_INDEX_MANIFEST = "_index.json"
+_INDEX_VERSION = 1
+_INDEX_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+# Keyed by shiina_home_key(): the index dir, manifest and cache are per-SHIINA_HOME, and
+# under multiplex one process serves several homes.
+_index_slices: Dict[str, Dict[str, Dict[str, Any]]] = {}               # home -> {mdev_id: entry}
+_index_signature: Dict[str, Optional[Tuple[int, int, int, int]]] = {}  # home -> validated sig
+_index_checked: Dict[str, bool] = {}                                   # home -> manifest checked
+
+_Sig = Tuple[int, int, int, int]
+
+
+def _cache_signature() -> Optional[_Sig]:
+    def stat() -> Optional[_Sig]:
+        cache_path = _get_cache_path()
+        return file_signature(cache_path.stat()) if cache_path.exists() else None
+    return _quietly("stat models.dev disk cache", stat)
+
+
+def _index_live_signature() -> Optional[_Sig]:
+    """The cache signature the CURRENT home's on-disk index is valid for, checked once per
+    (process, home); None when the index is absent, stale, or was never built. Read-only and
+    non-raising."""
+    home = shiina_home_key()
+    if not _index_checked.get(home):
+        _index_checked[home] = True
+        manifest = read_json_or_empty(_get_index_dir() / _INDEX_MANIFEST)
+        sig = _cache_signature()
+        if manifest.get("version") == _INDEX_VERSION and sig is not None \
+                and list(sig) == manifest.get("cache_sig"):
+            _index_signature[home] = sig
+    return _index_signature.get(home)
+
+
+def _load_index_provider(mdev_id: str) -> Optional[Dict[str, Any]]:
+    """The models.dev provider entry from the derived index when it provably matches the live disk
+    cache, else None. Successful slices are memoized per home; misses are not — a heal may make the
+    same id readable a moment later. A rejected id (no path traversal) is never looked up."""
+    if _index_live_signature() is None or not _INDEX_ID_RE.fullmatch(mdev_id or ""):
+        return None
+    slices = _index_slices.setdefault(shiina_home_key(), {})
+    if mdev_id not in slices:
+        entry = read_json_or_empty(_get_index_dir() / f"{mdev_id}.json") or None
+        if entry is not None:
+            slices[mdev_id] = entry
+    return slices.get(mdev_id)
+
+
+def _read_manifest_sig() -> Optional[_Sig]:
+    """The cache signature the on-disk manifest names, or None. Verifies that a manifest write
+    actually landed with the stamp we intended (a write that failed under _quietly must not count)."""
+    manifest = read_json_or_empty(_get_index_dir() / _INDEX_MANIFEST)
+    cache_sig = manifest.get("cache_sig")
+    return tuple(cache_sig) if manifest.get("version") == _INDEX_VERSION \
+        and isinstance(cache_sig, list) and len(cache_sig) == 4 else None
+
+
+def _write_index(data: Dict[str, Any], sig: Optional[_Sig]) -> bool:
+    """Re-shard the registry into one file per provider id, manifest last, and return True iff the
+    manifest landed. *sig* is the signature of the exact cache content *data* was parsed from: the
+    manifest may never name a generation the slices were not written from, so if the live cache no
+    longer matches *sig* (at entry, or again before the manifest write) nothing is written and
+    readers fall back to the full cache."""
+    def build() -> bool:
+        if sig is None or _cache_signature() != sig:
+            return False
+        index_dir = _get_index_dir()
+        written = set()
+        for provider_id, entry in data.items():
+            if not isinstance(provider_id, str) or not isinstance(entry, dict) \
+                    or not _INDEX_ID_RE.fullmatch(provider_id):
+                continue
+            written.add(f"{provider_id}.json")
+            atomic_json_write(index_dir / f"{provider_id}.json", entry,
+                              indent=None, separators=(",", ":"))
+        for stale in index_dir.glob("*.json"):
+            if stale.name not in written and stale.name != _INDEX_MANIFEST:
+                with contextlib.suppress(OSError):
+                    stale.unlink()
+        if _cache_signature() != sig:
+            return False
+        atomic_json_write(index_dir / _INDEX_MANIFEST,
+                          {"version": _INDEX_VERSION, "cache_sig": list(sig)},
+                          indent=None, separators=(",", ":"))
+        return True
+    return bool(_quietly("write models.dev provider index", build, False))
+
+
+def _ensure_index(data: Dict[str, Any], sig: Optional[_Sig]) -> None:
+    """Heal a missing/stale index from the registry we just parsed. Runs only on the recovery path,
+    after a rejected index forced the full parse, so it can never slow the fast path. Serialized
+    against registry commits via _models_dev_fetch_lock: a heal must not write slices for a stale
+    generation while a commit (or another heal) writes another. A busy lock means a commit path is
+    running; skip rather than stall the first resolution, and let a later cold start re-derive it.
+    The signature is recorded ONLY when the manifest actually landed with this stamp — a swallowed
+    manifest-write failure must not mark an unverified index live."""
+    home = shiina_home_key()
+    if not data or sig is None:
+        return
+    if not _models_dev_fetch_lock.acquire(blocking=False):
+        return
+    try:
+        if _write_index(data, sig) and _read_manifest_sig() == sig:
+            _index_slices.setdefault(home, {}).clear()
+            _index_signature[home] = sig
+    finally:
+        _models_dev_fetch_lock.release()
 
 
 def _quarantine_corrupt_cache(cache_path: Path) -> None:
@@ -291,8 +428,15 @@ def _disk_cache_age_seconds() -> Optional[float]:
 
 
 def _save_disk_cache(data: Dict[str, Any], etag: str = "") -> None:
-    """Save the registry atomically, plus the ETag sidecar when non-empty."""
-    _quietly("save models.dev disk cache", lambda: atomic_json_write(_get_cache_path(), data, indent=None, separators=(",", ":")))
+    """Save the registry atomically, plus the ETag sidecar when non-empty. The index is re-derived
+    from the SAME ``data`` in the same critical section, stamped with the signature of the cache
+    content just written, so the manifest can only name the generation the slices were built from."""
+    def save() -> None:
+        atomic_json_write(_get_cache_path(), data, indent=None, separators=(",", ":"))
+        sig = _cache_signature()
+        if sig is not None:
+            _write_index(data, sig)
+    _quietly("save models.dev disk cache", save)
     if etag:
         _save_etag(etag)
 
@@ -431,10 +575,13 @@ def fetch_models_dev(force_refresh: bool = False, *, allow_network: bool = True)
     only if the call fails. ``allow_network=False`` returns any memory/disk cache and never makes a request."""
     global _models_dev_cache, _models_dev_cache_time, _models_dev_retry_after
     if not allow_network:
-        if not _models_dev_cache and (disk_data := _load_disk_cache()):
-            _models_dev_cache = disk_data
-            disk_age = _disk_cache_age_seconds()
-            _models_dev_cache_time = time.time() - disk_age if disk_age is not None else 0
+        if not _models_dev_cache:
+            disk_data, disk_sig = _read_cache_file()
+            if disk_data:
+                _models_dev_cache = disk_data
+                disk_age = _disk_cache_age_seconds()
+                _models_dev_cache_time = time.time() - disk_age if disk_age is not None else 0
+                _ensure_index(disk_data, disk_sig)
         return _models_dev_cache
     if not force_refresh:
         # Stage 1: fresh in-memory cache — the hot path, no I/O.
@@ -482,6 +629,12 @@ def fetch_models_dev(force_refresh: bool = False, *, allow_network: bool = True)
 
 def _registry_provider(mdev_id: str, allow_network: bool) -> Optional[Dict[str, Any]]:
     """The raw models.dev provider entry, or None."""
+    # Index fast path: a hot-path resolution reads one provider slice instead of parsing the
+    # registry. Only when the in-memory cache is empty — a populated cache short-circuits it.
+    if not allow_network and not _models_dev_cache:
+        entry = _load_index_provider(mdev_id)
+        if entry is not None:
+            return entry
     # Keep the zero-argument call on the allow_network path: dozens of test sites monkeypatch fetch_models_dev with zero-arg lambdas.
     registry = fetch_models_dev() if allow_network else fetch_models_dev(allow_network=False)
     provider_data = registry.get(mdev_id)

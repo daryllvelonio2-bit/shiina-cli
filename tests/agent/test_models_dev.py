@@ -1,4 +1,5 @@
 """Tests for agent.models_dev — models.dev registry integration."""
+import json
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -1491,3 +1492,97 @@ class TestOpenRouterRoutingVariantCatalogLookup:
         with patch("agent.models_dev.fetch_models_dev", return_value=self.REGISTRY):
             assert lookup_models_dev_context("openrouter", "z-ai/glm-5.2:free") == 256000
             assert lookup_models_dev_context("openrouter", "z-ai/glm-5.3-flash:free") is None
+
+
+# =========================================================================
+# Derived per-provider index — fast path, staleness gate, heal
+# =========================================================================
+
+class TestDerivedProviderIndex:
+    """models_dev_index/ is a derived view: consumed on the fast path, never trusted when stale,
+    never marked valid unless its manifest actually landed, and keyed per SHIINA_HOME."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_index_state(self):
+        import agent.models_dev as md
+        md._index_slices.clear()
+        md._index_signature.clear()
+        md._index_checked.clear()
+        yield
+        md._index_slices.clear()
+        md._index_signature.clear()
+        md._index_checked.clear()
+
+    @staticmethod
+    def _patch_paths(md, tmp_path):
+        return (
+            patch.object(md, "_get_cache_path", return_value=tmp_path / "models_dev_cache.json"),
+            patch.object(md, "_get_index_dir", return_value=tmp_path / "models_dev_index"),
+            patch.object(md, "_get_etag_path", return_value=tmp_path / "models_dev_cache.etag"),
+        )
+
+    def test_index_is_a_faithful_stand_in_and_keeps_the_parser_off_the_hot_path(self, tmp_path):
+        """The index serves the hot path verbatim — with neither the full parse nor fetch on it."""
+        import agent.models_dev as md
+
+        cache_patch, index_patch, etag_patch = self._patch_paths(md, tmp_path)
+        with cache_patch, index_patch, etag_patch:
+            md._save_disk_cache(json.loads(json.dumps(SAMPLE_REGISTRY)))
+            md._index_slices.clear()
+            md._index_signature.clear()
+            md._index_checked.clear()
+            md._models_dev_cache = {}
+            with patch.object(md, "_read_cache_file", side_effect=AssertionError("full parse on the hot path")), \
+                 patch.object(md, "fetch_models_dev", side_effect=AssertionError("fetch on the hot path")):
+                assert lookup_models_dev_context("anthropic", "claude-opus-4-6") == 1000000
+                caps = get_model_capabilities("anthropic", "claude-opus-4-6")
+
+        assert caps is not None and caps.context_window == 1000000
+
+    def test_stale_index_is_never_served(self, tmp_path):
+        """The cache alone moving on (external writer / crash between the two writes) invalidates the
+        index: the fallback parse answers with the NEW value, never the stale one and never {}."""
+        import agent.models_dev as md
+
+        cache_patch, index_patch, etag_patch = self._patch_paths(md, tmp_path)
+        with cache_patch, index_patch, etag_patch:
+            md._save_disk_cache(json.loads(json.dumps(SAMPLE_REGISTRY)))
+            md._index_slices.clear()
+            md._index_signature.clear()
+            md._index_checked.clear()
+            md._models_dev_cache = {}
+
+            updated = json.loads(json.dumps(SAMPLE_REGISTRY))
+            updated["anthropic"]["models"]["claude-opus-4-6"]["limit"]["context"] = 123456
+            md.atomic_json_write(tmp_path / "models_dev_cache.json", updated, indent=None, separators=(",", ":"))
+            md._index_slices.clear()
+            md._index_signature.clear()
+            md._index_checked.clear()
+
+            assert md._load_index_provider("anthropic") is None
+            assert lookup_models_dev_context("anthropic", "claude-opus-4-6") == 123456
+
+    def test_manifest_never_names_a_generation_its_slices_were_not_written_from(self, tmp_path):
+        """The interleaved-heal state: G1's slices offered against a live G2 cache must not produce a
+        manifest, so no reader can ever be served a generation the slices no longer describe."""
+        import agent.models_dev as md
+
+        cache_patch, index_patch, etag_patch = self._patch_paths(md, tmp_path)
+        with cache_patch, index_patch, etag_patch:
+            g1 = json.loads(json.dumps(SAMPLE_REGISTRY))
+            md.atomic_json_write(tmp_path / "models_dev_cache.json", g1, indent=None, separators=(",", ":"))
+            sig_g1 = md._cache_signature()
+
+            g2 = json.loads(json.dumps(SAMPLE_REGISTRY))
+            g2["anthropic"]["models"]["claude-opus-4-6"]["limit"]["context"] = 123456
+            md.atomic_json_write(tmp_path / "models_dev_cache.json", g2, indent=None, separators=(",", ":"))
+            md._index_slices.clear()
+            md._index_signature.clear()
+            md._index_checked.clear()
+            md._models_dev_cache = {}
+
+            assert md._write_index(g1, sig_g1) is False
+            assert not (tmp_path / "models_dev_index" / "_index.json").exists()
+            assert md._index_live_signature() is None
+            assert md._load_index_provider("anthropic") is None
+            assert lookup_models_dev_context("anthropic", "claude-opus-4-6") == 123456
