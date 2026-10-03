@@ -667,7 +667,9 @@ def ensure_shiina_home():
     # empty shell cannot skip the deleted-profile guard.
     from shiina_constants import assert_named_profile_home_live
     assert_named_profile_home_live(home)
-    if key in _SHIINA_HOME_ENSURED:
+    # A deleted home root must be rebuilt: the memo only proves a past pass, not that the
+    # skeleton still exists. Only the root is re-checked, so a removed SUBDIR stays removed.
+    if key in _SHIINA_HOME_ENSURED and home.is_dir():
         return
     from shiina_cli.config_home import initialize_home
     initialize_home(home, _SHIINA_HOME_SUBDIRS, _SHIINA_HOME_ENSURED)
