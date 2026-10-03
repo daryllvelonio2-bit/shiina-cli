@@ -1,17 +1,29 @@
-"""x-opencode-session rides on every OpenCode request, on every transport."""
+"""x-opencode-session rides on every OpenCode request, on every transport.
+
+The header value is the *derived* OpenCode SessionID for the conversation's session key,
+never the raw Shiina key: OpenCode's canonical SessionID shape is ``ses_`` + 12 lowercase-hex
++ 14 Base62 characters (30 total), and the Zen free tier rejects any other shape with
+``403 FreeTierError``. ``derive_opencode_session_id()`` hashes the session key into that shape,
+so the same conversation keeps one stable id across every transport and every turn.
+"""
 
 from __future__ import annotations
 
 import asyncio
+import re
 from types import SimpleNamespace
 
 import pytest
 
 from agent import auxiliary_client as aux
 from agent.chat_completion_helpers import build_api_kwargs
+from agent.opencode_affinity import derive_opencode_session_id
 from run_agent import AIAgent
 
 _MSGS = [{"role": "user", "content": "hi"}]
+
+# Canonical OpenCode SessionID: "ses_" + 12 lowercase-hex + 14 Base62 (30 chars).
+_CANONICAL_SESSION_ID_RE = re.compile(r"^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$")
 
 
 def _agent(provider, model, base_url, api_mode=None):
@@ -45,7 +57,8 @@ def test_main_turn_sends_stable_session_header_on_every_transport(provider, mode
     agent = _agent(provider, model, base_url, api_mode)
     first = build_api_kwargs(agent, _MSGS)["extra_headers"]["x-opencode-session"]
     second = build_api_kwargs(agent, _MSGS)["extra_headers"]["x-opencode-session"]
-    assert first == second == "sess-affinity-1"
+    assert first == second == derive_opencode_session_id("sess-affinity-1")
+    assert _CANONICAL_SESSION_ID_RE.match(first)  # OpenCode/Zen-valid, not the raw Shiina key
 
     other = _agent("openrouter", "anthropic/claude-sonnet-4.6", "https://openrouter.ai/api/v1")
     assert "x-opencode-session" not in (build_api_kwargs(other, _MSGS).get("extra_headers") or {})
@@ -57,7 +70,7 @@ def test_auxiliary_calls_share_the_main_turn_session_key():
     )
     try:
         kwargs = aux._build_call_kwargs("opencode-go", "glm-5", _MSGS, base_url="https://opencode.ai/zen/go/v1")
-        assert kwargs["extra_headers"]["x-opencode-session"] == "sess-affinity-1"
+        assert kwargs["extra_headers"]["x-opencode-session"] == derive_opencode_session_id("sess-affinity-1")
         other = aux._build_call_kwargs("openrouter", "x", _MSGS, base_url="https://openrouter.ai/api/v1")
         assert "x-opencode-session" not in (other.get("extra_headers") or {})
     finally:
@@ -117,7 +130,7 @@ def test_sync_out_of_turn_call_binds_the_explicit_main_runtime_session(monkeypat
 
     aux.call_llm(task="title_generation", main_runtime=_OPENCODE_RUNTIME, messages=_MSGS)
 
-    assert captured["extra_headers"]["x-opencode-session"] == "sess-affinity-1"
+    assert captured["extra_headers"]["x-opencode-session"] == derive_opencode_session_id("sess-affinity-1")
     assert aux._RUNTIME_MAIN_CONTEXT.get() is None  # the explicit binding does not leak past the call
 
 
@@ -128,7 +141,7 @@ def test_async_out_of_turn_call_binds_the_explicit_main_runtime_session(monkeypa
 
     asyncio.run(aux.async_call_llm(task="approval", main_runtime=_OPENCODE_RUNTIME, messages=_MSGS))
 
-    assert captured["extra_headers"]["x-opencode-session"] == "sess-affinity-1"
+    assert captured["extra_headers"]["x-opencode-session"] == derive_opencode_session_id("sess-affinity-1")
     assert aux._RUNTIME_MAIN_CONTEXT.get() is None
 
 
@@ -146,4 +159,4 @@ def test_tui_gateway_oneshot_runtime_snapshot_carries_the_session(monkeypatch, o
 
     aux.call_llm(task="title_generation", main_runtime=_main_runtime_from_agent(agent), messages=_MSGS)
 
-    assert captured["extra_headers"]["x-opencode-session"] == "sess-desktop-1"
+    assert captured["extra_headers"]["x-opencode-session"] == derive_opencode_session_id("sess-desktop-1")
