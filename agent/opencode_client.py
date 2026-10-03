@@ -62,6 +62,26 @@ def find_opencode_binary() -> Optional[str]:
     return None
 
 
+def _opencode_version() -> str:
+    binary = find_opencode_binary()
+    if not binary:
+        return "unknown"
+    try:
+        out = subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=5.0)
+        return ((out.stdout or out.stderr or "").strip().splitlines() or ["unknown"])[0]
+    except Exception:
+        return "unknown"
+
+
+def _format_tool_use(part: Dict[str, Any]) -> Optional[str]:
+    state = part.get("state") or {}
+    if state.get("status") != "completed":
+        return None
+    raw_input = json.dumps(state.get("input") or {}, ensure_ascii=False)[:500]
+    output = state.get("output")
+    return f"[tool: {part.get('tool') or 'tool'}] {raw_input}\n{output if isinstance(output, str) else ''}"
+
+
 def get_opencode_credentials() -> Dict[str, Any]:
     """Dynamically discover OpenCode credentials from local auth storage or environment."""
     candidates = [
@@ -216,6 +236,7 @@ class OpenCodeClient:
         full_text: List[str] = []
         full_reasoning: List[str] = []
         finish_reason = "stop"
+        saw_tool_use = False
         usage_tokens = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
         try:
@@ -246,6 +267,11 @@ class OpenCodeClient:
                         full_text.append(part.get("text", ""))
                     elif ev_type == "reasoning":
                         full_reasoning.append(part.get("text", ""))
+                    elif ev_type == "tool_use":
+                        tool_text = _format_tool_use(part)
+                        if tool_text is not None:
+                            saw_tool_use = True
+                            full_text.append(tool_text)
                     elif ev_type == "step_finish":
                         finish_reason = part.get("reason", "stop")
                         tokens = part.get("tokens", {})
@@ -262,6 +288,12 @@ class OpenCodeClient:
 
         content_str = "".join(full_text).strip()
         reasoning_str = "".join(full_reasoning).strip() or None
+
+        if finish_reason == "tool-calls" and not saw_tool_use:
+            raise RuntimeError(
+                f"opencode {_opencode_version()} returned tool-calls for {model} with no "
+                f"tool_use \u2014 refusing a hollow assistant turn."
+            )
 
         msg = SimpleNamespace(
             content=content_str,
@@ -284,6 +316,8 @@ class OpenCodeClient:
 
     def _stream_generator(self, cmd: List[str], model: str) -> Iterator[Any]:
         session_id = f"ses_{int(time.time() * 1000)}"
+        last_finish = "stop"
+        saw_output = False
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -312,8 +346,14 @@ class OpenCodeClient:
                         delta_text = part.get("text", "")
                     elif ev_type == "reasoning":
                         delta_reasoning = part.get("text", "")
+                    elif ev_type == "tool_use":
+                        delta_text = _format_tool_use(part)
                     elif ev_type == "step_finish":
                         finish_reason = part.get("reason", "stop")
+                        last_finish = finish_reason
+
+                    if delta_text is not None or delta_reasoning is not None:
+                        saw_output = True
 
                     if delta_text is not None or delta_reasoning is not None or finish_reason is not None:
                         delta = SimpleNamespace(
@@ -335,6 +375,11 @@ class OpenCodeClient:
                     continue
 
             proc.wait(timeout=5.0)
+            if last_finish == "tool-calls" and not saw_output:
+                raise RuntimeError(
+                    f"opencode {_opencode_version()} ended a stream with finish_reason='tool-calls' "
+                    f"for model {model} and yielded nothing \u2014 refusing a hollow assistant turn."
+                )
         except Exception:
             proc.kill()
             raise
