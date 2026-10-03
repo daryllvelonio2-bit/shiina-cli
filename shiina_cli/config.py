@@ -28,6 +28,9 @@ from shiina_cli.colors import Colors, color
 from shiina_cli import managed_scope
 from shiina_cli.default_soul import DEFAULT_SOUL_MD, is_legacy_template_soul
 from shiina_cli.secret_prompt import masked_secret_prompt
+# _sanitize_env_lines lives in env_loader (the dotenv layer's own normaliser) so that
+# _sanitize_env_file_if_needed no longer imports this facade on every existing .env at startup.
+from shiina_cli.env_loader import _sanitize_env_lines
 # Re-export from shiina_constants — canonical definition lives there.
 from shiina_constants import get_shiina_home, get_process_shiina_home  # noqa: F401
 from utils import atomic_replace, atomic_yaml_write, fast_safe_load, file_signature
@@ -2475,19 +2478,6 @@ def invalidate_env_cache() -> None:
     from agent.secret_scope import invalidate_env_file_cache
 
     invalidate_env_file_cache()
-
-
-def _sanitize_env_lines(lines: list) -> list:
-    """Normalize .env line endings/whitespace without changing assignment semantics.
-    Content after the first ``=`` is opaque value data: a known variable name embedded in a value
-    must never be reinterpreted as another assignment, so concatenated lines stay on one line."""
-    sanitized: list[str] = []
-    for line in lines:
-        raw = line.rstrip("\r\n")
-        stripped = raw.strip()
-        # Blank lines and comments are preserved verbatim.
-        sanitized.append((raw if not stripped or stripped.startswith("#") else stripped) + "\n")
-    return sanitized
 
 
 def sanitize_env_file() -> int:

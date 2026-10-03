@@ -302,17 +302,25 @@ def _load_dotenv_with_fallback(path: Path, *, override: bool, load_pass: int | N
     _sanitize_loaded_credentials()  # httpx encodes headers as ASCII
 
 
+def _sanitize_env_lines(lines: list) -> list:
+    """Normalize .env line endings/whitespace without changing assignment semantics.
+    Content after the first ``=`` is opaque value data: a known variable name embedded in a value
+    must never be reinterpreted as another assignment, so concatenated lines stay on one line."""
+    sanitized: list[str] = []
+    for line in lines:
+        raw = line.rstrip("\r\n")
+        stripped = raw.strip()
+        # Blank lines and comments are preserved verbatim.
+        sanitized.append((raw if not stripped or stripped.startswith("#") else stripped) + "\n")
+    return sanitized
+
+
 def _sanitize_env_file_if_needed(path: Path) -> None:
     """Pre-sanitize a .env file before python-dotenv reads it. Sniffs a leading BOM *before* any text
     decode: UTF-16 (Notepad "Unicode") is rewritten as clean UTF-8; UTF-32 is refused (left untouched) so
     we never fall through to the errors=replace corruption path."""
     if not path.exists():
         return
-    try:
-        from shiina_cli.config import _sanitize_env_lines
-    except ImportError:
-        return  # early bootstrap — config module not available yet
-
     try:
         raw = path.read_bytes()
     except Exception:
