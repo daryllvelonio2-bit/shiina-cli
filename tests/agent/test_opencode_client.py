@@ -114,6 +114,142 @@ class TestOpenCodeClient(unittest.TestCase):
         self.assertEqual(chunks[1].choices[0].delta.content, "Hello stream!")
         self.assertEqual(chunks[2].choices[0].finish_reason, "stop")
 
+    @patch("agent.opencode_client.subprocess.Popen")
+    @patch("agent.opencode_client.find_opencode_binary")
+    def test_client_execute_sync_parses_tool_use(self, mock_bin, mock_popen):
+        mock_bin.return_value = "/usr/bin/opencode"
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        tool_use = {
+            "type": "tool_use",
+            "part": {
+                "type": "tool",
+                "tool": "bash",
+                "state": {
+                    "status": "completed",
+                    "input": {"command": "echo TOOLCHECK_12345"},
+                    "output": "TOOLCHECK_12345\n",
+                },
+            },
+        }
+        json_output = "\n".join([
+            json.dumps({"type": "step_start", "sessionID": "ses_123"}),
+            json.dumps(tool_use),
+            json.dumps({"type": "step_finish", "part": {"reason": "tool-calls"}}),
+        ])
+        mock_proc.communicate.return_value = (json_output, "")
+        mock_popen.return_value = mock_proc
+
+        resp = OpenCodeClient().chat.completions.create(
+            messages=[{"role": "user", "content": "run it"}],
+            model="opencode/big-pickle",
+            stream=False,
+        )
+
+        content = resp.choices[0].message.content
+        self.assertTrue(content, "a completed tool_use must make the turn non-empty")
+        self.assertIn("bash", content)
+        self.assertIn("TOOLCHECK_12345", content)
+        self.assertEqual(resp.choices[0].finish_reason, "tool-calls")
+
+    @patch("agent.opencode_client._opencode_version")
+    @patch("agent.opencode_client.subprocess.Popen")
+    @patch("agent.opencode_client.find_opencode_binary")
+    def test_client_execute_sync_hollow_tool_calls_raises(self, mock_bin, mock_popen, mock_ver):
+        mock_ver.return_value = "9.9.9"
+        mock_bin.return_value = "/usr/bin/opencode"
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        json_output = "\n".join([
+            json.dumps({"type": "step_start", "sessionID": "ses_123"}),
+            json.dumps({"type": "step_finish", "part": {"reason": "tool-calls"}}),
+        ])
+        mock_proc.communicate.return_value = (json_output, "")
+        mock_popen.return_value = mock_proc
+
+        with self.assertRaises(RuntimeError) as ctx:
+            OpenCodeClient().chat.completions.create(
+                messages=[{"role": "user", "content": "run it"}],
+                model="opencode/big-pickle",
+                stream=False,
+            )
+        self.assertIn("big-pickle", str(ctx.exception))
+        self.assertIn("9.9.9", str(ctx.exception))
+
+    @patch("agent.opencode_client._opencode_version")
+    @patch("agent.opencode_client.subprocess.Popen")
+    @patch("agent.opencode_client.find_opencode_binary")
+    def test_client_execute_sync_tool_calls_never_lets_no_tool_use_through(self, mock_bin, mock_popen, mock_ver):
+        mock_ver.return_value = "9.9.9"
+        mock_bin.return_value = "/usr/bin/opencode"
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        json_output = "\n".join([
+            json.dumps({"type": "text", "part": {"text": "I will run the tool."}}),
+            json.dumps({"type": "step_finish", "part": {"reason": "tool-calls"}}),
+        ])
+        mock_proc.communicate.return_value = (json_output, "")
+        mock_popen.return_value = mock_proc
+
+        with self.assertRaises(RuntimeError):
+            OpenCodeClient().chat.completions.create(
+                messages=[{"role": "user", "content": "run it"}],
+                model="opencode/big-pickle",
+                stream=False,
+            )
+
+    @patch("agent.opencode_client.subprocess.Popen")
+    @patch("agent.opencode_client.find_opencode_binary")
+    def test_client_execute_stream_parses_tool_use(self, mock_bin, mock_popen):
+        mock_bin.return_value = "/usr/bin/opencode"
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.poll.return_value = 0
+        lines = [
+            json.dumps({"type": "tool_use", "part": {
+                "type": "tool",
+                "tool": "bash",
+                "state": {
+                    "status": "completed",
+                    "input": {"command": "echo TOOLCHECK_12345"},
+                    "output": "TOOLCHECK_12345\n",
+                },
+            }}) + "\n",
+            json.dumps({"type": "step_finish", "part": {"reason": "tool-calls"}}) + "\n",
+        ]
+        mock_proc.stdout = iter(lines)
+        mock_popen.return_value = mock_proc
+
+        chunks = list(OpenCodeClient().chat.completions.create(
+            messages=[{"role": "user", "content": "run it"}],
+            model="opencode/big-pickle",
+            stream=True,
+        ))
+
+        contents = "".join(c.choices[0].delta.content or "" for c in chunks)
+        self.assertIn("TOOLCHECK_12345", contents)
+
+    @patch("agent.opencode_client._opencode_version")
+    @patch("agent.opencode_client.subprocess.Popen")
+    @patch("agent.opencode_client.find_opencode_binary")
+    def test_client_execute_stream_hollow_tool_calls_raises(self, mock_bin, mock_popen, mock_ver):
+        mock_ver.return_value = "9.9.9"
+        mock_bin.return_value = "/usr/bin/opencode"
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.poll.return_value = 0
+        mock_proc.stdout = iter([
+            json.dumps({"type": "step_finish", "part": {"reason": "tool-calls"}}) + "\n",
+        ])
+        mock_popen.return_value = mock_proc
+
+        with self.assertRaises(RuntimeError):
+            list(OpenCodeClient().chat.completions.create(
+                messages=[{"role": "user", "content": "run it"}],
+                model="opencode/big-pickle",
+                stream=True,
+            ))
+
 
 if __name__ == "__main__":
     unittest.main()
