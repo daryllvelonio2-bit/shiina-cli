@@ -29,7 +29,7 @@
 // parent is a default row Box, so bare siblings render side-by-side.
 
 import { Box } from '@shiina/ink'
-import { memo, useRef } from 'react'
+import { memo, useRef, type ReactNode } from 'react'
 
 import type { Theme } from '../theme.js'
 
@@ -132,6 +132,53 @@ export const findStableBoundary = (text: string) => {
   return state.settledLen > 0 ? state.settledLen : -1
 }
 
+// The frozen settled prefix behind a memo boundary. `blocks` is append-only
+// and mutated in place, so its reference is stable across appends; `count` is
+// the ONLY prop that changes, and only when a new block commits. An append
+// that settles nothing therefore leaves this whole subtree untouched, and one
+// that settles a single block renders ONLY the block that just arrived — the
+// already-settled <Md> elements are reused by identity, so React never even
+// re-creates (let alone re-renders) the frozen prefix.
+const SettledBlocks = memo(function SettledBlocks({
+  blocks,
+  cols,
+  compact,
+  count,
+  t
+}: SettledBlocksProps) {
+  const cacheRef = useRef<{ cols?: number; compact?: boolean; count: number; nodes: ReactNode[]; t: Theme }>({
+    cols,
+    compact,
+    count: 0,
+    nodes: [],
+    t
+  })
+
+  const cache = cacheRef.current
+
+  // Render options or a reset changed → every settled <Md> must be rebuilt.
+  if (cache.t !== t || cache.cols !== cols || cache.compact !== compact || cache.count > count) {
+    cache.nodes = []
+    cache.count = 0
+    cache.t = t
+    cache.cols = cols
+    cache.compact = compact
+  }
+
+  if (count > cache.count) {
+    for (let i = cache.count; i < count; i++) {
+      cache.nodes.push(<Md cols={cols} compact={compact} key={i} t={t} text={blocks[i]!} />)
+    }
+
+    // New array identity so React reconciles the added child; the reused
+    // element objects let the frozen prefix skip re-render entirely.
+    cache.nodes = [...cache.nodes]
+    cache.count = count
+  }
+
+  return <>{cache.nodes}</>
+})
+
 export const StreamingMd = memo(function StreamingMd({ cols, compact, t, text }: StreamingMdProps) {
   const scanRef = useRef<StreamScanState>(createScanState())
 
@@ -149,14 +196,26 @@ export const StreamingMd = memo(function StreamingMd({ cols, compact, t, text }:
 
   return (
     <Box flexDirection="column">
-      {state.blocks.map((block, i) => (
-        <Md cols={cols} compact={compact} key={i} t={t} text={block} />
-      ))}
+      <SettledBlocks
+        blocks={state.blocks}
+        cols={cols}
+        compact={compact}
+        count={state.blocks.length}
+        t={t}
+      />
 
       {tail ? <Md cols={cols} compact={compact} t={t} text={tail} /> : null}
     </Box>
   )
 })
+
+interface SettledBlocksProps {
+  blocks: string[]
+  cols?: number
+  compact?: boolean
+  count: number
+  t: Theme
+}
 
 interface StreamingMdProps {
   cols?: number
