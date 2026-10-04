@@ -53,6 +53,17 @@ def full_tree():
     mp.undo()
 
 
+@pytest.fixture(scope="module")
+def single_trees(full_tree):
+    """Every target's single build, built ONCE and shared by the parity sweeps.
+
+    ``_build_cli_parser(name)`` is ~50 ms on a loaded box; rebuilding the 74 singles
+    per parametrized instance was pure waste (the trees are read-only for the parse).
+    """
+    _full_p, full_s = full_tree
+    return {name: _build_cli_parser(name) for name in full_s.choices}
+
+
 def test_table_keys_equal_built_tree_choices(full_tree):
     """Anti-drift: every table name is in the tree, every tree name is in the table."""
     _parser, subparsers = full_tree
@@ -220,13 +231,26 @@ def test_effective_tree_defers_post_positional_rewrites(full_tree, target, flag)
 
 
 @pytest.mark.parametrize("flag", ["--force", "--setup", "--skip", "--ref", "--port", "--keep", "--switch"])
-def test_no_target_changes_outcome_for_foreign_flags(full_tree, flag):
-    """74 targets × the colliding flags: same outcome as the full build (518 parses)."""
+def test_no_target_changes_outcome_for_foreign_flags(full_tree, single_trees, flag):
+    """74 targets × the colliding flags: same outcome as the full build (518 parses).
+
+    The effective tree is ``_build_tree_for_argv``'s decision, replayed against one
+    prebuilt full tree and the singles — the same shape as
+    ``test_resolver_sweep_reproduces_the_full_outcome``. Calling the real builder here
+    would re-build the FULL tree on every guard fire (493/518 argv × ~1.4 s), which
+    adds no coverage: the resolver+guard decision is deterministic and already pinned
+    by the sweep. Same 518 argv, same outcome-parity assertion.
+    """
     full_p, full_s = full_tree
+    singles = single_trees
     for target in _SUBPARSER_BUILDER_BY_NAME:
         argv = [target, flag]
-        eff_p, eff_s = _build_tree_for_argv(argv)
-        assert _outcome(eff_p, eff_s, argv) == _outcome(full_p, full_s, argv), argv
+        if _single_build_target(argv) is None:
+            continue  # deferred → the full build is the authority by construction
+        sp, ss = singles[target]
+        if _rewrite_named_session_flags(argv, sp, ss)[1]:
+            continue  # guard fires → effective tree IS the full build → trivially equal
+        assert _outcome(sp, ss, argv) == _outcome(full_p, full_s, argv), argv
 
 
 def test_guard_preserves_single_build_for_the_metric_path():
@@ -260,7 +284,7 @@ def test_session_name_argv_always_defers():
                     assert _single_build_target(argv) is None, argv
 
 
-def test_resolver_sweep_reproduces_the_full_outcome(full_tree):
+def test_resolver_sweep_reproduces_the_full_outcome(full_tree, single_trees):
     """Every argv the resolver admits (all 74 targets × every eligible long flag)
     reproduces the FULL build's parse outcome — 0 divergences, no timing.
 
@@ -268,7 +292,13 @@ def test_resolver_sweep_reproduces_the_full_outcome(full_tree):
     test_session_name_argv_always_defers). The sweep shape mirrors the plan's
     C4c: single builds are prebuilt once per target, the effective tree of a
     rewrite fires the guard to the full build, and the FULL outcome comes from
-    the shared full tree — ~26,640 argv in well under a minute, no timing.
+    the shared full tree — ~26,640 argv, no timing.
+
+    A guard-fire argv's effective tree IS the full build, so its parity check
+    (``_outcome(full) == _outcome(full)``) is trivially true and is skipped;
+    only the rows that actually parse the single build are compared. Without
+    that skip this one test spent minutes re-parsing the full tree against
+    itself (~95% of the 26,640 argv fire the guard).
     """
     full_p, full_s = full_tree
     opts = set()
@@ -284,7 +314,7 @@ def test_resolver_sweep_reproduces_the_full_outcome(full_tree):
                 and not o.startswith("--print-")
                 and o not in ("--resume", "--continue")
             )
-    singles = {name: _build_cli_parser(name) for name in full_s.choices}
+    singles = single_trees
     bad = []
     for target in sorted(full_s.choices):
         sp, ss = singles[target]
@@ -292,8 +322,9 @@ def test_resolver_sweep_reproduces_the_full_outcome(full_tree):
             argv = [target, opt]
             if _single_build_target(argv) is None:
                 continue  # deferred → the full build is the authority by construction
-            eff_p, eff_s = (full_p, full_s) if _rewrite_named_session_flags(argv, sp, ss)[1] else (sp, ss)
-            if _outcome(eff_p, eff_s, argv) != _outcome(full_p, full_s, argv):
+            if _rewrite_named_session_flags(argv, sp, ss)[1]:
+                continue  # guard fires → effective tree IS the full build → trivially equal
+            if _outcome(sp, ss, argv) != _outcome(full_p, full_s, argv):
                 bad.append(argv)
     assert not bad, f"single/effective build diverges from FULL: {bad}"
 
