@@ -627,8 +627,13 @@ def reap_orphaned_worker_children(conn: sqlite3.Connection, *, min_age_seconds: 
     An observed six-process leak pegged ~2.5 cores and suppressed fleet throughput for over an hour.
 
     Safety: a process is only signalled when its command line names a worktree whose task is
-    ``done``/``archived`` (so live work is never touched), its parent is not a running worker, and it
-    has been alive for at least a minute (so a freshly spawned sibling is never caught mid-flight).
+    ``done``/``archived``, its parent is not a running worker, and it is at least a minute old (so a
+    sibling still spawning is never caught mid-flight).
+
+    Deliberately NOT broadened to "any orphaned pytest": that was tried and it reaps a machine's other
+    detached pytest workers too, including the very suite that exercises ``dispatch_once`` (observed: 3
+    self-inflicted failures, suite 12.8s -> 312s). Only worktree-scoped, finished-task children are safe
+    to kill from a dispatcher.
     POSIX-only; a no-op where ``/proc`` is absent.
     """
     if not os.path.isdir("/proc"):
