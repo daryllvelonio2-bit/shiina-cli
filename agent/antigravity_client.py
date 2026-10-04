@@ -44,10 +44,22 @@ CODE_ASSIST_ENDPOINT = "https://daily-cloudcode-pa.googleapis.com/v1internal:str
 MODELS_ENDPOINT = "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels"
 GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token"
 
+# Cloud Code Assist is one host serving method-suffixed paths (``/v1internal:<method>``). The
+# provider's base_url is the HOST, so the client composes the method path onto it — a profile or
+# pool entry carrying the bare host must not silently POST to ``/``.
+STREAM_PATH = "/v1internal:streamGenerateContent?alt=sse"
+MODELS_PATH = "/v1internal:fetchAvailableModels"
+
 AGY_CLIENT_ID = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
 AGY_CLIENT_SECRET = "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"
 DEFAULT_USER_AGENT = "antigravity/1.2.7"
 DEFAULT_TIMEOUT_SECONDS = 300.0
+# Provider-level base URL (the Cloud Code Assist host), stored on the native pool entry so the
+# runtime resolves the same endpoint from the credential rather than a hardcoded literal.
+DEFAULT_BASE_URL = CODE_ASSIST_ENDPOINT.split("/v1internal")[0]
+# Keyring location the Antigravity CLI writes its own session to.
+KEYRING_SERVICE = "gemini"
+KEYRING_ACCOUNT = "antigravity"
 
 AGY_MODEL_ALIASES = {
     "agy-opus": "claude-opus-4-6-thinking",
@@ -86,6 +98,41 @@ AGY_MODEL_ALIASES = {
 }
 
 
+def _code_assist_host(base_url: Any) -> str:
+    """Normalize an accepted base_url to the Cloud Code Assist host root.
+
+    Accepts the bare host, the host with a trailing slash, or a full ``/v1internal:...`` endpoint —
+    the client then composes the method path itself, so every credential/configuration spelling
+    reaches the same place.
+    """
+    raw = str(base_url or "").strip().rstrip("/")
+    if not raw.startswith(("http://", "https://")):
+        return DEFAULT_BASE_URL
+    marker = raw.find("/v1internal")
+    if marker != -1:
+        raw = raw[:marker]
+    return raw.rstrip("/") or DEFAULT_BASE_URL
+
+
+def _extract_model_ids(data: Any) -> list[str]:
+    """Model ids out of a ``fetchAvailableModels`` payload (dict-of-models or list-of-objects)."""
+    if not isinstance(data, dict):
+        return []
+    raw = data.get("models")
+    ids: list[str] = []
+    if isinstance(raw, dict):
+        ids = [str(k) for k in raw]
+    elif isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, str):
+                ids.append(item)
+            elif isinstance(item, dict):
+                model_id = item.get("modelId") or item.get("id") or item.get("name")
+                if model_id:
+                    ids.append(str(model_id))
+    return [model_id for model_id in ids if model_id]
+
+
 def resolve_agy_model(raw_model: str) -> str:
     """Resolve user/Shiina model names and aliases to Code Assist model names."""
     cleaned = (raw_model or "").strip()
@@ -113,15 +160,16 @@ class GoogleOAuthTokenManager:
     ) -> None:
         """``persist=False`` binds the manager to a CALLER-SUPPLIED credential.
 
-        Needed for multi-account pools: ``_save_to_auth_json`` writes the single active
-        ``providers.antigravity`` slot, so a refresh of a non-active account must not be
-        persisted over it. ``expiry=inf`` means "trust the supplied token until a 401 forces
+        Needed for multi-account pools: persisting writes the single active
+        ``credential_pool.antigravity`` entry, so a refresh of a non-active account must not
+        be persisted over it. ``expiry=inf`` means "trust the supplied token until a 401 forces
         a refresh" — the caller has no expiry to hand over.
         """
         self._access_token = access_token or None
         self._refresh_token = refresh_token or None
         self._expiry: float = float("inf") if access_token else 0.0
         self._email: Optional[str] = None
+        self._source: str = "unknown"
         self._lock = threading.Lock()
         self._persist = persist
         if not (access_token or refresh_token):
@@ -173,6 +221,10 @@ class GoogleOAuthTokenManager:
                 logger.debug("Failed querying tokeninfo for email: %s", e)
         return None
 
+    # ── Discovery ────────────────────────────────────────────────────────────────────────────
+    # Order mirrors the Antigravity CLI itself: an explicit env override, then the signed-in
+    # session it wrote to the OS keyring, then Shiina's own native credential store.
+
     def _load_initial_tokens(self) -> None:
         # 1. Environment variables
         env_token = (
@@ -190,117 +242,176 @@ class GoogleOAuthTokenManager:
                 or os.getenv("GOOGLE_REFRESH_TOKEN")
             )
             self._expiry = time.time() + 3600
+            self._source = "env"
             return
 
-        # 2. Linux SecretService (service: gemini, username: antigravity)
-        try:
-            import secretstorage
+        # 2. OS keyring (service: gemini, account: antigravity)
+        token_info = self._read_keyring_token()
+        if token_info and self._apply_token_info(token_info, "keyring"):
+            return
 
-            bus = secretstorage.dbus_init()
-            collection = secretstorage.get_default_collection(bus)
-            items = list(collection.search_items({"service": "gemini"}))
-            if not items:
-                items = [item for item in collection.get_all_items() if item.get_attributes().get("service") == "gemini"]
-            for item in items:
-                raw = json.loads(item.get_secret().decode("utf-8"))
-                token_info = raw.get("token", {})
-                self._access_token = token_info.get("access_token")
-                self._refresh_token = token_info.get("refresh_token")
-                self._extract_account_metadata(raw)
-                expiry_str = token_info.get("expiry")
-                if expiry_str:
-                    try:
-                        dt = datetime.fromisoformat(expiry_str)
-                        self._expiry = dt.timestamp()
-                    except Exception:
-                        self._expiry = time.time() + 1800
-                logger.debug("Loaded Antigravity OAuth tokens from SecretService.")
-                return
-        except Exception as exc:
-            logger.debug("Failed to read from SecretService via library: %s", exc)
+        # 3. Native credential store: auth.json ``credential_pool.antigravity``
+        token_info = self._read_native_pool_token()
+        if token_info and self._apply_token_info(token_info, "credential_pool"):
+            return
 
-        # 2b. Linux secret-tool fallback (when secretstorage/dbus python package is missing in venv)
-        if sys.platform.startswith("linux") and shutil.which("secret-tool"):
+        # 4. Legacy ``providers.antigravity`` block (pre-native-store installs)
+        token_info = self._read_legacy_auth_json_token()
+        if token_info:
+            self._apply_token_info(token_info, "auth.json")
+
+    def _apply_token_info(self, token_info: Dict[str, Any], source: str) -> bool:
+        """Adopt one decoded token blob. Returns True when an access or refresh token was found."""
+        access = token_info.get("access_token")
+        refresh = token_info.get("refresh_token")
+        if not access and not refresh:
+            return False
+        if access:
+            self._access_token = str(access)
+        if refresh:
+            self._refresh_token = str(refresh)
+        expiry = token_info.get("expiry")
+        if isinstance(expiry, (int, float)):
+            self._expiry = float(expiry)
+        elif isinstance(expiry, str) and expiry.strip():
             try:
-                proc = subprocess.run(
-                    ["secret-tool", "lookup", "service", "gemini", "username", "antigravity"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                )
-                if proc.returncode == 0 and proc.stdout.strip():
-                    raw = json.loads(proc.stdout.strip())
-                    token_info = raw.get("token", raw) if isinstance(raw, dict) else {}
-                    if token_info.get("access_token"):
-                        self._access_token = token_info["access_token"]
-                        self._refresh_token = token_info.get("refresh_token")
-                        self._extract_account_metadata(raw)
-                        expiry_str = token_info.get("expiry")
-                        if expiry_str:
-                            try:
-                                dt = datetime.fromisoformat(expiry_str)
-                                self._expiry = dt.timestamp()
-                            except Exception:
-                                self._expiry = time.time() + 1800
-                        logger.debug("Loaded Antigravity OAuth tokens via secret-tool.")
-                        return
-            except Exception as exc:
-                logger.debug("Failed to read from secret-tool: %s", exc)
+                self._expiry = datetime.fromisoformat(expiry).timestamp()
+            except Exception:
+                self._expiry = time.time() + 1800
+        else:
+            self._expiry = time.time() + 1800
+        self._source = source
+        logger.debug("Loaded Antigravity OAuth tokens from %s.", source)
+        return True
 
-        # 3. macOS Keychain (service: gemini)
-        if sys.platform == "darwin":
+    def _read_keyring_token(self) -> Optional[Dict[str, Any]]:
+        """The Antigravity session from the OS keyring, via the first backend that answers.
+
+        Layered deliberately: ``secretstorage`` (Linux) and ``keyring`` are optional extras, and
+        neither is guaranteed on a given install — the platform CLIs (``secret-tool`` on Linux,
+        ``security`` on macOS) read the same item with no Python dependency at all. Every backend
+        is best-effort; a missing binding must not cost us the signed-in session.
+        """
+        for backend in (
+            self._keyring_via_secretstorage,
+            self._keyring_via_keyring_module,
+            self._keyring_via_security_cli,
+            self._keyring_via_secret_tool,
+        ):
             try:
-                proc = subprocess.run(
-                    ["security", "find-generic-password", "-s", "gemini", "-w"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                )
-                if proc.returncode == 0 and proc.stdout.strip():
-                    raw = json.loads(proc.stdout.strip())
-                    token_info = raw.get("token", raw) if isinstance(raw, dict) else {}
-                    if token_info.get("access_token"):
-                        self._access_token = token_info["access_token"]
-                        self._refresh_token = token_info.get("refresh_token")
-                        logger.debug("Loaded Antigravity OAuth tokens from macOS Keychain.")
-                        return
+                info = backend()
             except Exception as exc:
-                logger.debug("Failed to read from macOS Keychain: %s", exc)
+                logger.debug("Keyring backend %s unavailable: %s", backend.__name__, exc)
+                continue
+            if isinstance(info, dict) and info.get("access_token"):
+                return info
+        return None
 
-        # 4. Generic keyring library fallback (cross-platform)
+    @staticmethod
+    def _decode_keyring_secret(raw: Any) -> Optional[Dict[str, Any]]:
+        """Unwrap the ``{"token": {...}}`` envelope the Antigravity CLI stores."""
+        if isinstance(raw, (bytes, bytearray)):
+            raw = raw.decode("utf-8", errors="replace")
+        if not isinstance(raw, str) or not raw.strip():
+            return None
         try:
-            import keyring
-            for username in ("antigravity", "gemini", ""):
-                sec = keyring.get_password("gemini", username)
-                if sec:
-                    raw = json.loads(sec)
-                    token_info = raw.get("token", raw) if isinstance(raw, dict) else {}
-                    if token_info.get("access_token"):
-                        self._access_token = token_info["access_token"]
-                        self._refresh_token = token_info.get("refresh_token")
-                        logger.debug("Loaded Antigravity OAuth tokens from keyring.")
-                        return
-        except Exception as exc:
-            logger.debug("Failed to read from keyring: %s", exc)
+            blob = json.loads(raw)
+        except Exception:
+            return None
+        info = blob.get("token") if isinstance(blob, dict) else None
+        return info if isinstance(info, dict) else None
 
-        # 5. <shiina_home>/auth.json
+    def _keyring_via_secretstorage(self) -> Optional[Dict[str, Any]]:
+        import secretstorage
+
+        bus = secretstorage.dbus_init()
+        collection = secretstorage.get_default_collection(bus)
+        items = list(collection.search_items({"service": KEYRING_SERVICE}))
+        if not items:
+            items = [
+                item for item in collection.get_all_items()
+                if item.get_attributes().get("service") == KEYRING_SERVICE
+            ]
+        for item in items:
+            account = item.get_attributes().get("username") or item.get_attributes().get("account")
+            if account and account != KEYRING_ACCOUNT:
+                continue
+            info = self._decode_keyring_secret(item.get_secret())
+            if info and info.get("access_token"):
+                return info
+        return None
+
+    def _keyring_via_keyring_module(self) -> Optional[Dict[str, Any]]:
+        import keyring
+
+        raw = keyring.get_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
+        if raw is None:
+            get_credential = getattr(keyring, "get_credential", None)
+            credential = get_credential(KEYRING_SERVICE, None) if callable(get_credential) else None
+            raw = getattr(credential, "password", None)
+        return self._decode_keyring_secret(raw)
+
+    def _keyring_via_security_cli(self) -> Optional[Dict[str, Any]]:
+        if sys.platform != "darwin":
+            return None
+        proc = subprocess.run(
+            ["security", "find-generic-password", "-s", KEYRING_SERVICE, "-a", KEYRING_ACCOUNT, "-w"],
+            capture_output=True, text=True, timeout=10)
+        if proc.returncode != 0:
+            return None
+        return self._decode_keyring_secret(proc.stdout.strip())
+
+    def _keyring_via_secret_tool(self) -> Optional[Dict[str, Any]]:
+        """``secret-tool search`` still prints a secret stored with a non-textual content type,
+        which ``secret-tool lookup`` refuses — hence search + parse rather than lookup."""
+        if not shutil.which("secret-tool"):
+            return None
+        proc = subprocess.run(
+            ["secret-tool", "search", "--all", "service", KEYRING_SERVICE, "username", KEYRING_ACCOUNT],
+            capture_output=True, text=True, timeout=10)
+        if proc.returncode != 0:
+            return None
+        for line in proc.stdout.splitlines():
+            if line.startswith("secret = "):
+                info = self._decode_keyring_secret(line[len("secret = "):].strip())
+                if info and info.get("access_token"):
+                    return info
+        return None
+
+    def _read_native_pool_token(self) -> Optional[Dict[str, Any]]:
+        """The ``credential_pool.antigravity`` slice of Shiina's auth store."""
         try:
-            from shiina_constants import get_shiina_home
+            from shiina_cli.auth import read_credential_pool
 
-            auth_file = get_shiina_home() / "auth.json"
-            if auth_file.exists():
-                with open(auth_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                providers = data.get("providers", {})
-                agy_state = providers.get("antigravity", {})
-                if agy_state.get("access_token"):
-                    self._access_token = agy_state["access_token"]
-                    self._refresh_token = agy_state.get("refresh_token")
-                    self._expiry = float(agy_state.get("expires_at", 0))
-                    logger.debug("Loaded Antigravity OAuth tokens from auth.json.")
-                    return
+            for entry in read_credential_pool("antigravity"):
+                if isinstance(entry, dict) and (entry.get("access_token") or entry.get("refresh_token")):
+                    return entry
         except Exception as exc:
-            logger.debug("Failed to read from auth.json: %s", exc)
+            logger.debug("Failed to read credential_pool.antigravity: %s", exc)
+        return None
+
+    def _read_legacy_auth_json_token(self) -> Optional[Dict[str, Any]]:
+        try:
+            auth_file = Path.home() / ".shiina" / "auth.json"
+            if not auth_file.exists():
+                return None
+            with open(auth_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            state = ((data.get("providers") or {}).get("antigravity")) or {}
+            if isinstance(state, dict) and (state.get("access_token") or state.get("refresh_token")):
+                return {"access_token": state.get("access_token"),
+                        "refresh_token": state.get("refresh_token"),
+                        "expiry": state.get("expires_at")}
+        except Exception as exc:
+            logger.debug("Failed to read legacy providers.antigravity from auth.json: %s", exc)
+        return None
+
+    def source_label(self) -> str:
+        """Where the active session came from (``keyring`` / ``credential_pool`` / ``env``)."""
+        return self._source
+
+    def expiry_iso(self) -> Optional[str]:
+        return datetime.fromtimestamp(self._expiry).isoformat() if self._expiry else None
 
     def get_access_token(self, force_refresh: bool = False) -> str:
         """Get a valid bearer access token, refreshing automatically if expired."""
@@ -347,33 +458,41 @@ class GoogleOAuthTokenManager:
                 self._expiry = time.time() + expires_in
                 logger.info("Successfully refreshed Google Antigravity OAuth access token.")
                 if self._persist:
-                    self._save_to_auth_json()
+                    self._persist_refreshed_token()
         except urllib.error.HTTPError as e:
             err_msg = e.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"Failed to refresh Google Antigravity token: HTTP {e.code} - {err_msg}") from e
 
-    def _save_to_auth_json(self) -> None:
+    def _persist_refreshed_token(self) -> None:
+        """Write the refreshed token back to Shiina's native ``credential_pool.antigravity``.
+
+        The pool entry is the authoritative record: `shiina auth list` reads it, the runtime
+        ladder prefers it over re-reading the keyring, and it survives an `agy` sign-out.
+        """
+        if not self._access_token:
+            return
         try:
-            from shiina_constants import get_shiina_home
-            from utils import atomic_json_write
+            from shiina_cli.auth import read_credential_pool, write_credential_pool
 
-            auth_file = get_shiina_home() / "auth.json"
-            if auth_file.exists():
-                with open(auth_file, "r", encoding="utf-8") as f:
-                    store = json.load(f)
-            else:
-                store = {"version": 1, "providers": {}}
-
-            store.setdefault("providers", {})["antigravity"] = {
-                "access_token": self._access_token,
-                "refresh_token": self._refresh_token,
-                "expires_at": self._expiry,
-                "token_type": "Bearer",
-                "auth_type": "oauth_external",
+            entry = next((e for e in read_credential_pool("antigravity") if isinstance(e, dict)), None)
+            entry = dict(entry) if entry else {
+                "id": uuid.uuid4().hex[:6], "label": "antigravity", "priority": 0,
             }
-            atomic_json_write(auth_file, store, mode=0o600)
+            entry.update({
+                "auth_type": "oauth",
+                "source": "manual",
+                "access_token": self._access_token,
+                "base_url": entry.get("base_url") or DEFAULT_BASE_URL,
+                "last_refresh": datetime.now().isoformat(),
+            })
+            if self._refresh_token:
+                entry["refresh_token"] = self._refresh_token
+            if self._expiry:
+                entry["expires_at"] = datetime.fromtimestamp(self._expiry).isoformat()
+            write_credential_pool("antigravity", [entry])
+            logger.debug("Persisted refreshed Antigravity token to credential_pool.antigravity.")
         except Exception as e:
-            logger.debug("Could not persist refreshed token to auth.json: %s", e)
+            logger.debug("Could not persist refreshed Antigravity token: %s", e)
 
 
 _DEFAULT_TOKEN_MANAGER: Optional[GoogleOAuthTokenManager] = None
@@ -492,10 +611,8 @@ class AntigravityClient:
     ) -> None:
         self.token_manager = token_manager or get_default_token_manager()
         self.api_key = api_key or "antigravity"
-        if not base_url or not str(base_url).startswith(("http://", "https://")):
-            self.base_url = CODE_ASSIST_ENDPOINT
-        else:
-            self.base_url = base_url
+        self.api_base = _code_assist_host(base_url)
+        self.base_url = self.api_base + STREAM_PATH
         self.project = project or DEFAULT_PROJECT
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create_chat_completion))
         self._http_client = httpx.Client(timeout=DEFAULT_TIMEOUT_SECONDS)
@@ -504,6 +621,32 @@ class AntigravityClient:
     def close(self) -> None:
         self.is_closed = True
         self._http_client.close()
+
+    def list_models(self, *, timeout: float = 15.0) -> list[str]:
+        """Model ids this account can use, via Cloud Code Assist ``fetchAvailableModels``.
+
+        Returns an empty list on any failure so the caller falls back to the curated catalog —
+        model listing must never be the thing that blocks a session.
+        """
+        try:
+            token = self.token_manager.get_access_token()
+        except Exception as exc:
+            logger.debug("No Antigravity token for model listing: %s", exc)
+            return []
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "User-Agent": DEFAULT_USER_AGENT,
+        }
+        try:
+            resp = self._http_client.post(
+                self.api_base + MODELS_PATH, headers=headers, json={"project": self.project}, timeout=timeout)
+            resp.raise_for_status()
+            data = resp.json() or {}
+        except Exception as exc:
+            logger.debug("fetchAvailableModels failed: %s", exc)
+            return []
+        return _extract_model_ids(data)
 
     def _build_request_payload(
         self,

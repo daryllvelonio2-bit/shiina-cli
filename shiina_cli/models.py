@@ -1448,7 +1448,8 @@ _OPENCODE_FREE_EXCLUDED_MODELS = frozenset({"ox-alpha-free", "deepseek-v4-flash-
 
 
 def _profile_live_catalog(normalized: str) -> Optional[list[str]]:
-    """Generic live fetch for any provider registered in providers/ with ``auth_type="api_key"``.
+    """Generic live fetch for any provider registered in providers/ with ``auth_type="api_key"``
+    or ``"external_process"`` (copilot-acp, kiro, a plugin-registered ACP provider).
 
     Live results are merged with the curated list so models the live endpoint omits still appear:
     curated-first by default so the newest curated models lead when the live API lags;
@@ -1459,10 +1460,18 @@ def _profile_live_catalog(normalized: str) -> Optional[list[str]]:
     from providers import get_provider_profile
 
     profile = get_provider_profile(normalized)
-    if not (profile and profile.auth_type == "api_key" and profile.base_url):
+    if not (profile and profile.auth_type in ("api_key", "external_process") and profile.base_url):
         return None
-    api_key, base_url = _api_key_credentials(normalized)
-    live = profile.fetch_models(api_key=api_key, base_url=base_url or profile.base_url or None) if api_key else None
+    if profile.auth_type == "external_process":
+        # No credential to pass: the spawned subprocess owns its own auth, so fetch_models()
+        # probes the CLI directly (a failure falls through to fallback_models below).
+        try:
+            live = profile.fetch_models()
+        except Exception:
+            live = None
+    else:
+        api_key, base_url = _api_key_credentials(normalized)
+        live = profile.fetch_models(api_key=api_key, base_url=base_url or profile.base_url or None) if api_key else None
     if live and normalized in _LIVE_FIRST_PICKER_PROVIDERS:
         # The relay still LISTS delisted ids it no longer serves; the keyed Zen/Go picker is
         # live-first, so it filters them out here (#111749).

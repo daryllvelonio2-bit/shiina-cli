@@ -350,3 +350,48 @@ Test: `tests/agent/test_account_usage_fetch.py::test_fetch_account_usage_antigra
 ## 9. Add more below
 
 <!-- Append new providers, bugs, and verification steps here. -->
+
+### 9.1 xKiro (hosted OpenAI-compatible API, key-authenticated)
+
+`xkiro` is NOT the local `kiro-cli` provider — it is a hosted multi-vendor API at
+`https://api.xkiro.com/v1` (Bearer token, OpenAI `chat_completions` wire). It was previously
+aliased to `kiro` in three places, which shadowed any key-authenticated use; those aliases are
+removed and `xkiro` now has its own profile.
+
+**Location / how:**
+- Profile: `plugins/model-providers/xkiro/__init__.py` (`auth_type="api_key"`,
+  `env_vars=("XKIRO_API_KEY",)`, `base_url="https://api.xkiro.com/v1"`). `fetch_models()` lists
+  live from `GET /v1/models` and falls back to the curated `XKIRO_MODELS`.
+- Secret: `XKIRO_API_KEY` in `$SHIINA_HOME/.env` (keys look like `sk-xt-...`).
+- Aliases: canonical `xkiro`; `x-kiro` / `xkiro-api` resolve to it
+  (`shiina_cli/providers.py` `_ALIAS_GROUPS`, `shiina_cli/auth.py` alias map).
+  `kiro` keeps only `kiro-cli` / `kiro-ai` / `kiro-dev`.
+
+**Data needed:** one API key. Free tier is 1,000,000 tokens/day and needs no plan; `access_tier`
+in the catalog marks `free` vs `paid` vs `premium`. Premium/prepaid models return HTTP 403
+("requires an active paid plan or real deposited balance") while the wallet is $0.00 — that is
+expected billing state, not a broken key.
+
+**Verify:**
+
+```bash
+.venv/bin/python - <<'PY'
+import os, httpx
+from pathlib import Path
+for line in Path(os.path.expanduser("~/.shiina/.env")).read_text().splitlines():
+    if line.strip() and not line.startswith("#") and "=" in line:
+        k, v = line.split("=", 1); os.environ.setdefault(k.strip(), v.strip())
+from shiina_cli.runtime_provider import resolve_runtime_provider
+rt = resolve_runtime_provider(requested="xkiro")
+r = httpx.post(f"{rt['base_url'].rstrip('/')}/chat/completions",
+               headers={"Authorization": f"Bearer {rt['api_key']}"},
+               json={"model": "qwen/qwen3.7-flash:free",
+                     "messages": [{"role": "user", "content": "say OK"}], "max_tokens": 5},
+               timeout=60.0)
+print(r.status_code, r.json()["choices"][0]["message"]["content"])
+PY
+```
+
+Expect `200 OK`. `GET /v1/usage` returns the account, daily free-token balance and wallet; it is
+already wired as an account-usage source (`agent/account_usage.py::_fetch_xkiro_account_usage`,
+keyed `"xkiro"` / `"custom:xkiro"`).

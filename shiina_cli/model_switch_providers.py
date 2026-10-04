@@ -924,6 +924,17 @@ def _lap_canonical_rows(b: _PickerBuild) -> None:
                 continue
         has_creds = has_creds or _auth_store_has_provider(cp.slug) or _pool_usable(cp.slug) or (
             _is_aws_sdk(cp_config) and _has_aws_sdk_creds_for_listing(cp.slug, b.current_provider))
+        # External-process / zero-key providers (opencode-acp, freebuff, kiro, mistral)
+        if not has_creds and cp_config is not None and (cp_config.auth_type in ("external_process", "api_key")):
+            if cp_config.auth_type == "external_process":
+                try:
+                    from shiina_cli.auth import get_auth_status
+                    _ext_status = get_auth_status(cp.slug) or {}
+                    has_creds = bool(_ext_status.get("logged_in") or _ext_status.get("configured"))
+                except Exception:
+                    pass
+            else:
+                has_creds = True  # direct API key providers are always picker-eligible
         if not has_creds:
             continue
         if _is_aws_sdk(cp_config):

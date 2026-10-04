@@ -84,7 +84,7 @@ class OpenCodeZenProfile(ProviderProfile):
 
 
 opencode_zen = OpenCodeZenProfile(
-    name="opencode-zen", aliases=("opencode", "opencode_zen", "zen"), env_vars=("OPENCODE_ZEN_API_KEY",),
+    name="opencode-zen", aliases=("opencode_zen", "zen"), env_vars=("OPENCODE_ZEN_API_KEY",),
     base_url="https://opencode.ai/zen/v1", default_headers=dict(_ATTRIBUTION_HEADERS),
     default_aux_model="gemini-3-flash",
 )

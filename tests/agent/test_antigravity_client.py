@@ -131,5 +131,77 @@ class TestAntigravityClient(unittest.TestCase):
         self.assertEqual(usage_chunks[0].usage.total_tokens, 27)
 
 
+class TestAntigravityCredentialStore(unittest.TestCase):
+    """The token manager must treat Shiina's credential pool as a first-class source/sink."""
+
+    def _manager_with(self, pool_entries):
+        from agent.antigravity_client import GoogleOAuthTokenManager
+
+        with patch("shiina_cli.auth.read_credential_pool", return_value=pool_entries), \
+             patch.object(GoogleOAuthTokenManager, "_read_keyring_token", return_value=None), \
+             patch.object(GoogleOAuthTokenManager, "_read_legacy_auth_json_token", return_value=None), \
+             patch.dict("os.environ", {}, clear=True):
+            return GoogleOAuthTokenManager()
+
+    def test_reads_tokens_from_the_native_credential_pool(self):
+        manager = self._manager_with([
+            {"id": "abc123", "label": "antigravity", "auth_type": "oauth",
+             "access_token": "ya29.pool-token", "refresh_token": "1//pool-refresh",
+             "expires_at": "2030-01-01T00:00:00+00:00", "base_url": "https://daily-cloudcode-pa.googleapis.com"},
+        ])
+        self.assertEqual(manager.source_label(), "credential_pool")
+        self.assertEqual(manager.get_access_token(), "ya29.pool-token")
+
+    def test_env_token_wins_over_the_pool(self):
+        from agent.antigravity_client import GoogleOAuthTokenManager
+
+        with patch("shiina_cli.auth.read_credential_pool", return_value=[{"access_token": "pool"}]), \
+             patch.object(GoogleOAuthTokenManager, "_read_keyring_token", return_value=None), \
+             patch.dict("os.environ", {"ANTIGRAVITY_ACCESS_TOKEN": "env-token"}):
+            manager = GoogleOAuthTokenManager()
+        self.assertEqual(manager.source_label(), "env")
+        self.assertEqual(manager.get_access_token(), "env-token")
+
+    def test_empty_pool_leaves_a_bare_access_token_usable(self):
+        from agent.antigravity_client import GoogleOAuthTokenManager
+
+        with patch("shiina_cli.auth.read_credential_pool", return_value=[]), \
+             patch.object(GoogleOAuthTokenManager, "_read_keyring_token", return_value=None), \
+             patch.object(GoogleOAuthTokenManager, "_read_legacy_auth_json_token", return_value=None), \
+             patch.dict("os.environ", {}, clear=True):
+            manager = GoogleOAuthTokenManager()
+            self.assertEqual(manager.source_label(), "unknown")
+            self.assertIsNone(manager.expiry_iso())
+            # No env token, no keyring session, no pool entry -> a structured failure, not a 401.
+            with self.assertRaises(RuntimeError):
+                manager.get_access_token()
+
+    def test_refreshed_token_is_written_to_the_credential_pool(self):
+        manager = self._manager_with([
+            {"id": "abc123", "label": "antigravity", "priority": 0, "refresh_token": "1//r"},
+        ])
+        written = {}
+        with patch("shiina_cli.auth.read_credential_pool", return_value=[{"id": "abc123", "label": "antigravity"}]), \
+             patch("shiina_cli.auth.write_credential_pool",
+                   side_effect=lambda provider, entries, **kw: written.update({provider: entries})):
+            manager._access_token = "ya29.new"
+            manager._refresh_token = "1//r"
+            manager._persist_refreshed_token()
+        entries = written["antigravity"]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["id"], "abc123")
+        self.assertEqual(entries[0]["access_token"], "ya29.new")
+        self.assertEqual(entries[0]["auth_type"], "oauth")
+        self.assertEqual(entries[0]["base_url"], "https://daily-cloudcode-pa.googleapis.com")
+
+    def test_extract_model_ids_handles_both_payload_shapes(self):
+        from agent.antigravity_client import _extract_model_ids
+
+        self.assertEqual(_extract_model_ids({"models": {"a": {}, "b": {}}}), ["a", "b"])
+        self.assertEqual(_extract_model_ids({"models": [{"modelId": "x"}, {"id": "y"}, "z"]}), ["x", "y", "z"])
+        self.assertEqual(_extract_model_ids({}), [])
+        self.assertEqual(_extract_model_ids(None), [])
+
+
 if __name__ == "__main__":
     unittest.main()

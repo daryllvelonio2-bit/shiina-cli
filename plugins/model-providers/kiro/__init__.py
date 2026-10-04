@@ -63,7 +63,7 @@ class KiroProfile(ProviderProfile):
 
 kiro = KiroProfile(
     name="kiro",
-    aliases=("kiro-cli", "kiro-ai", "kiro-dev", "xkiro"),
+    aliases=("kiro-cli", "kiro-ai", "kiro-dev"),
     api_mode="chat_completions",
     env_vars=(),
     base_url="kiro://local",

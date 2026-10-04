@@ -87,6 +87,9 @@ from shiina_cli.auth_qwen import (  # noqa: F401  re-exported
     _qwen_access_token_is_expiring, _qwen_cli_auth_path, _read_qwen_cli_tokens,
     _refresh_qwen_cli_tokens, _save_qwen_cli_tokens, get_qwen_auth_status,
     resolve_qwen_runtime_credentials)
+from shiina_cli.auth_antigravity import (  # noqa: F401  re-exported
+    get_antigravity_auth_status, refresh_antigravity_credentials,
+    resolve_antigravity_runtime_credentials)
 from shiina_cli.auth_constants import (  # noqa: F401  re-exported
     _decode_jwt_claims, AUTH_STORE_VERSION, AUTH_LOCK_TIMEOUT_SECONDS, DEFAULT_NOUS_PORTAL_URL,
     DEFAULT_NOUS_INFERENCE_URL, DEFAULT_NOUS_CLIENT_ID, NOUS_BILLING_MANAGE_SCOPE,
@@ -95,6 +98,7 @@ from shiina_cli.auth_constants import (  # noqa: F401  re-exported
     DEFAULT_XAI_OAUTH_BASE_URL, MINIMAX_OAUTH_CLIENT_ID, MINIMAX_OAUTH_SCOPE,
     MINIMAX_OAUTH_GLOBAL_BASE, MINIMAX_OAUTH_CN_BASE, MINIMAX_OAUTH_GLOBAL_INFERENCE,
     MINIMAX_OAUTH_CN_INFERENCE, MINIMAX_OAUTH_REFRESH_SKEW_SECONDS, DEFAULT_QWEN_BASE_URL,
+    DEFAULT_ANTIGRAVITY_BASE_URL, DEFAULT_ANTIGRAVITY_MODEL,
     DEFAULT_GITHUB_MODELS_BASE_URL, DEFAULT_COPILOT_ACP_BASE_URL, DEFAULT_OLLAMA_CLOUD_BASE_URL,
     DEFAULT_ACTUAL_BASE_URL, DEFAULT_ACTUAL_LOCAL_BASE_URL, STEPFUN_STEP_PLAN_INTL_BASE_URL,
     STEPFUN_STEP_PLAN_CN_BASE_URL, CODEX_OAUTH_CLIENT_ID, CODEX_OAUTH_TOKEN_URL,
@@ -181,6 +185,11 @@ _REGISTRY_ROWS: Tuple[Any, ...] = (
         "xai-oauth", "xAI Grok OAuth (SuperGrok / Premium+)", "oauth_external",
         inference_base_url=DEFAULT_XAI_OAUTH_BASE_URL),
     ProviderConfig("qwen-oauth", "Qwen OAuth", "oauth_external", inference_base_url=DEFAULT_QWEN_BASE_URL),
+    # Antigravity has no API key: the credential is the signed-in Google/Antigravity session,
+    # discovered from the OS keyring or the native credential_pool.antigravity store and sent as
+    # a bearer token to Cloud Code Assist. See shiina_cli/auth_antigravity.py.
+    ProviderConfig("antigravity", "Google Antigravity", "oauth_external",
+                   inference_base_url=DEFAULT_ANTIGRAVITY_BASE_URL),
     ("lmstudio", "LM Studio", "http://127.0.0.1:1234/v1", ("LM_API_KEY",), "LM_BASE_URL"),
     ("copilot", "GitHub Copilot", DEFAULT_GITHUB_MODELS_BASE_URL,
      ("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"), "COPILOT_API_BASE_URL"),
@@ -1288,8 +1297,10 @@ _PROVIDER_ALIASES: Dict[str, str] = {
     "github": "copilot", "github-copilot": "copilot",
     "github-models": "copilot", "github-model": "copilot",
     "github-copilot-acp": "copilot-acp", "copilot-acp-agent": "copilot-acp",
+    "codex": "openai-codex", "openai_codex": "openai-codex",
+    "xkiro": "xkiro", "x-kiro": "xkiro", "kiro-cli": "kiro", "kiro_cli": "kiro",
     "aigateway": "ai-gateway", "vercel": "ai-gateway", "vercel-ai-gateway": "ai-gateway",
-    "opencode": "opencode-zen", "zen": "opencode-zen",
+    "opencode": "opencode-acp", "opencode-acp": "opencode-acp", "opencode-cli": "opencode-acp", "zen": "opencode-zen",
     "qwen-portal": "qwen-oauth", "qwen-cli": "qwen-oauth", "qwen-oauth": "qwen-oauth",
     "hf": "huggingface", "hugging-face": "huggingface", "huggingface-hub": "huggingface",
     "mimo": "xiaomi", "xiaomi-mimo": "xiaomi",
@@ -1802,6 +1813,10 @@ OAUTH_PROVIDER_FLOWS: Dict[str, OAuthProviderFlow] = {
         "qwen-oauth", "resolve_qwen_runtime_credentials", "get_qwen_auth_status"),
     "minimax-oauth": OAuthProviderFlow(
         "minimax-oauth", "resolve_minimax_oauth_runtime_credentials", "get_minimax_oauth_auth_status"),
+    "antigravity": OAuthProviderFlow(
+        "antigravity", "resolve_antigravity_runtime_credentials", "get_antigravity_auth_status",
+        terminal_refresh_codes=_OAUTH_GRANT_DEAD_CODES | {"antigravity_auth_missing"},
+        logout_from_config=True),
 }
 
 
