@@ -378,12 +378,35 @@ def _poll_worker_exit(pid: int, started_at: Optional[int] = None) -> bool:
     return False
 
 
-def _sigkill(kill, pid: int) -> bool:
-    """Best-effort SIGKILL; True when the signal was delivered."""
+def _signal_worker(pid: int, sig: int, kill, *, signal_fn=None) -> bool:
+    """Signal the worker's whole process GROUP when the pid can be proven to lead one.
+
+    Workers are spawned with ``start_new_session=True`` (see the ``Popen`` call below), so a
+    worker pid is its own process-group leader and everything it starts — pytest/xdist runs,
+    node builds — lives in that same group. Signalling only the leader orphans those children:
+    they survive the kill, keep spinning, and burn CPU for the rest of the session. An observed
+    leak of six orphaned pytest processes had been pegging ~2.5 cores and suppressing
+    throughput for over an hour before anyone noticed.
+
+    Falls back to a leader-only kill when the pid is not a group leader, and never takes the
+    group path when a test ``signal_fn`` was injected, so the hook stays deterministic.
+    """
+    if signal_fn is None and hasattr(os, "killpg") and hasattr(os, "getpgid"):
+        try:
+            if os.getpgid(pid) == pid:
+                os.killpg(pid, sig)
+                return True
+        except (ProcessLookupError, OSError):
+            pass
+    kill(pid, sig)
+    return True
+
+
+def _sigkill(kill, pid: int, *, signal_fn=None) -> bool:
+    """Best-effort SIGKILL of the worker and its children; True when the signal was delivered."""
     try:
         # signal.SIGKILL doesn't exist on Windows; SIGTERM maps to TerminateProcess.
-        kill(int(pid), getattr(signal, "SIGKILL", signal.SIGTERM))
-        return True
+        return _signal_worker(pid, getattr(signal, "SIGKILL", signal.SIGTERM), kill, signal_fn=signal_fn)
     except (ProcessLookupError, OSError):
         return False
 
@@ -429,7 +452,7 @@ def _terminate_reclaimed_worker(
 
     info["termination_attempted"] = True
     try:
-        kill(int(pid), signal.SIGTERM)
+        _signal_worker(int(pid), signal.SIGTERM, kill, signal_fn=signal_fn)
     except ProcessLookupError:
         # Already gone = successful termination. Leaving terminated=False would
         # make the reclaim guard misread a dead worker as alive and defer forever.
@@ -642,11 +665,11 @@ def enforce_max_runtime(conn: sqlite3.Connection, *, signal_fn=None) -> list[str
         kill = _kill_fn(signal_fn)
         if kill is not None and not (_kb._pid_alive(pid) and _pid_recycled(pid, started_at)):
             with contextlib.suppress(ProcessLookupError, OSError):
-                kill(pid, signal.SIGTERM)
+                _signal_worker(pid, signal.SIGTERM, kill, signal_fn=signal_fn)
             # Short polling wait — no time.sleep on the write txn.
             _poll_worker_exit(pid, started_at)
             if _worker_alive(pid, started_at):
-                killed = _sigkill(kill, pid)
+                killed = _sigkill(kill, pid, signal_fn=signal_fn)
 
         error = f"elapsed {int(elapsed)}s > limit {limit}s"
         with _kb.write_txn(conn):
