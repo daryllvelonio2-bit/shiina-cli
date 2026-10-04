@@ -1,6 +1,7 @@
 """Configuration management for Shiina Agent: config.yaml / .env loading, saving,
 validation, migration, and the ``shiina config`` command."""
 
+import contextvars
 import copy
 import difflib
 import json
@@ -16,10 +17,11 @@ import tempfile
 import threading
 import time
 import unicodedata
+from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple, Set
+from typing import Dict, Any, Iterator, Optional, List, Tuple, Set
 
 import yaml
 
@@ -2029,6 +2031,9 @@ def atomic_config_write(config_path: Path, data: Any, **kwargs: Any) -> None:
 
 _CONFIG_GENERATION: int = 0
 _FAST_READONLY_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+# (generation, readonly_cfg) captured by turn_config_snapshot(); out-of-scope default None.
+_TURN_CONFIG_SNAPSHOT: contextvars.ContextVar[Optional[Tuple[int, Dict[str, Any]]]] = (
+    contextvars.ContextVar("_TURN_CONFIG_SNAPSHOT", default=None))
 
 
 def get_config_generation() -> int:
@@ -2044,6 +2049,24 @@ def bump_config_generation() -> int:
     return _CONFIG_GENERATION
 
 
+@contextmanager
+def turn_config_snapshot() -> Iterator[Dict[str, Any]]:
+    """Scope in which ``load_config_readonly()`` returns one stable object for the whole turn.
+
+    Readers that run once per tool call (tool_search, approval) would otherwise re-validate the
+    file+env signature on every call; the 0.25 s ``_FAST_READONLY_CACHE`` does not cover a turn,
+    so each falls through to ``_load_config_impl``. Inside this scope they share the object loaded
+    here instead. ``save_config()`` (or any other ``bump_config_generation()``) re-arms the loader:
+    the next readonly read falls through to a fresh load. No-op if the caller never reads.
+    """
+    snapshot = _load_config_impl(want_deepcopy=False)
+    token = _TURN_CONFIG_SNAPSHOT.set((get_config_generation(), snapshot))
+    try:
+        yield snapshot
+    finally:
+        _TURN_CONFIG_SNAPSHOT.reset(token)
+
+
 def load_config() -> Dict[str, Any]:
     """Load the merged configuration (DEFAULT_CONFIG + config.yaml + managed scope, env-expanded).
     Cached on the file signature; returns a deepcopy since most call sites mutate the result.
@@ -2054,7 +2077,11 @@ def load_config() -> Dict[str, Any]:
 def load_config_readonly() -> Dict[str, Any]:
     """``load_config()`` without the defensive deepcopy (~half of the 265us cache-hit cost).
     **Mutating the returned dict (or any nested structure) corrupts the in-process cache for
-    every subsequent caller** — only for code paths that never write to the result."""
+    every subsequent caller** — only for code paths that never write to the result. Inside a
+    ``turn_config_snapshot()`` scope returns the snapshot object (identity-stable for the turn)."""
+    snapshot = _TURN_CONFIG_SNAPSHOT.get()
+    if snapshot is not None and snapshot[0] == _CONFIG_GENERATION:
+        return snapshot[1]
     now = time.monotonic()
     config_path_str = str(get_config_path())
     fast = _FAST_READONLY_CACHE.get(config_path_str)
