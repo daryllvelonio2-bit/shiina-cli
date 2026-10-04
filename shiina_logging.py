@@ -303,7 +303,7 @@ class _ManagedRotatingFileHandler(RotatingFileHandler):
     """
 
     def __init__(self, *args, **kwargs):
-        from shiina_cli.config import is_managed
+        from shiina_cli.managed_mode import is_managed
         self._managed = is_managed()
         self._unavailable_reported = False
         super().__init__(*args, **kwargs)
@@ -724,21 +724,23 @@ def _add_rotating_handler(
 
 
 def _read_logging_config():
-    """Best-effort read of ``logging.*`` from config.yaml."""
+    """Best-effort read of ``logging.*`` from config.yaml (raw user file + managed overlay).
+
+    Reads the file directly rather than through ``shiina_cli.config``/``config_effective`` so a
+    bare ``import shiina_logging`` (and the handler construction inside ``setup_logging``) never
+    pulls the ~400 ms config facade. The managed overlay still lets an administrator pin
+    ``logging.*``; it only reaches for config's helpers when a managed scope actually exists.
+    """
     try:
-        # Prefer the shared effective-config cache (managed overlay included, so an administrator
-        # can pin logging.*) so this reuses shiina_cli.main's early parse (one config.yaml parse
-        # per process); fall back to a direct parse for bare shiina_logging consumers.
-        try:
-            from shiina_cli.config_effective import load_user_config_effective
-            cfg = load_user_config_effective(get_config_path())
-        except Exception:
-            from utils import fast_safe_load
-            config_path = get_config_path()
-            cfg = {}
-            if config_path.exists():
-                with open(config_path, "r", encoding="utf-8") as f:
-                    cfg = fast_safe_load(f) or {}
+        from utils import fast_safe_load
+        from shiina_cli.managed_scope import apply_managed_overlay
+
+        config_path = get_config_path()
+        cfg = {}
+        if config_path.exists():
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg = fast_safe_load(f) or {}
+        cfg = apply_managed_overlay(cfg)
         if not cfg:
             return (None, None, None)
         log_cfg = cfg.get("logging", {})
