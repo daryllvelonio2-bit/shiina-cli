@@ -713,32 +713,51 @@ from datetime import datetime
 
 from shiina_cli import __version__, __release_date__
 
-from shiina_cli.model_setup_flows import (
-    _model_flow_openrouter,
-    _model_flow_nous,
-    _model_flow_openai_codex,
-    _model_flow_xai_oauth,
-    _model_flow_qwen_oauth,
-    _model_flow_minimax_oauth,
-    _model_flow_custom,
-    _model_flow_azure_foundry,
-    _model_flow_named_custom,
-    _model_flow_copilot,
-    _model_flow_copilot_acp,
-    _model_flow_antigravity,
-    _model_flow_kiro,
-    _model_flow_freebuff,
-    _model_flow_opencode,
-    _model_flow_qoder,
-    _model_flow_kimi,
-    _model_flow_stepfun,
-    _model_flow_bedrock,
-    _model_flow_vertex,
-    _model_flow_api_key_provider,
-    _model_flow_anthropic,
-    _model_flow_moa,
-    _model_flow_ai_gateway,
+# _model_flow_* picker flows: imported on first use, not at module import
+# (the whole model_setup_flows family costs ~40-95 ms of every `shiina`
+# start; only the interactive model pickers run them).
+_MODEL_FLOW_NAMES: tuple[str, ...] = (
+    "_model_flow_openrouter",
+    "_model_flow_nous",
+    "_model_flow_openai_codex",
+    "_model_flow_xai_oauth",
+    "_model_flow_qwen_oauth",
+    "_model_flow_minimax_oauth",
+    "_model_flow_custom",
+    "_model_flow_azure_foundry",
+    "_model_flow_named_custom",
+    "_model_flow_copilot",
+    "_model_flow_copilot_acp",
+    "_model_flow_antigravity",
+    "_model_flow_kiro",
+    "_model_flow_freebuff",
+    "_model_flow_opencode",
+    "_model_flow_qoder",
+    "_model_flow_kimi",
+    "_model_flow_stepfun",
+    "_model_flow_bedrock",
+    "_model_flow_vertex",
+    "_model_flow_api_key_provider",
+    "_model_flow_anthropic",
+    "_model_flow_moa",
+    "_model_flow_ai_gateway",
 )
+
+
+def _ensure_model_flows():
+    """Import the picker flows once and publish them as module globals.
+
+    ``setdefault`` (never ``globals()[name] = ...``) so a test's monkeypatch
+    on ``shiina_cli.main._model_flow_*`` is not clobbered; the lambdas in
+    ``_PROVIDER_MODEL_FLOWS`` resolve the names at call time.
+    """
+    import importlib
+
+    module = importlib.import_module("shiina_cli.model_setup_flows")
+    for name in _MODEL_FLOW_NAMES:
+        globals().setdefault(name, getattr(module, name))
+
+
 logger = logging.getLogger(__name__)
 from shiina_cli.main_agent_cmds import (
     cmd_acp,
@@ -2056,6 +2075,7 @@ def select_provider_and_model(args=None):
     provider picker, credential prompting, model selection, and config
     persistence.
     """
+    _ensure_model_flows()
     from shiina_cli.config import load_config
 
     config = load_config()
@@ -2176,7 +2196,10 @@ _FROZEN_ATTR_SOURCES: dict[str, str] = {
 
 
 def __getattr__(name):
-    """Resolve the frozen updater surface on first read (see _FROZEN_UPDATER_SURFACE)."""
+    """Resolve the frozen updater surface / picker flows on first read."""
+    if name in _MODEL_FLOW_NAMES:
+        _ensure_model_flows()
+        return globals()[name]
     module = _FROZEN_ATTR_SOURCES.get(name)
     if module is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
