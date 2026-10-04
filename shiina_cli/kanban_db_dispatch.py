@@ -111,6 +111,7 @@ class DispatchResult:
     """``running`` cards requeued by :func:`reconcile_orphaned_running` (broken
     claim bookkeeping, dead/gone worker)."""
     reaped_terminal_workers: list[str] = field(default_factory=list)
+    reaped_test_children: list[int] = field(default_factory=list)
     """Task ids whose worker outlived its closed run and was terminated by
     :func:`reap_terminal_workers`."""
     spawned: list[tuple[str, str, str]] = field(default_factory=list)
@@ -614,6 +615,78 @@ def heartbeat_worker(
             run_id=run_id,
         )
     return True
+
+
+def reap_orphaned_worker_children(conn: sqlite3.Connection, *, min_age_seconds: int = 60) -> list[int]:
+    """SIGTERM test/build processes left behind by workers whose task no longer runs.
+
+    A group kill (``_signal_worker``) is not enough on its own: ``scripts/run_tests.sh`` spawns each
+    test file in a fresh ``python -m pytest`` with ``start_new_session=True`` — deliberately detached
+    so it is invisible to the outer pytest's process tree — so those children leave the worker's
+    process group and survive it. A leaked pytest then spins at ~40% CPU for the rest of the session.
+    An observed six-process leak pegged ~2.5 cores and suppressed fleet throughput for over an hour.
+
+    Safety: a process is only signalled when its command line names a worktree whose task is
+    ``done``/``archived`` (so live work is never touched), its parent is not a running worker, and it
+    has been alive for at least a minute (so a freshly spawned sibling is never caught mid-flight).
+    POSIX-only; a no-op where ``/proc`` is absent.
+    """
+    if not os.path.isdir("/proc"):
+        return []
+
+    def _info(pid: int) -> tuple[int, str]:
+        try:
+            with open(f"/proc/{pid}/stat", "rb") as fh:
+                # split after the LAST ')' — the comm field can contain spaces and parens
+                rest = fh.read().rsplit(b")", 1)[1].split()
+            with open(f"/proc/{pid}/cmdline", "rb") as fh:
+                cmd = fh.read().decode("utf8", "replace").replace("\0", " ").strip()
+            return int(rest[1]), cmd
+        except (OSError, IndexError, ValueError):
+            return -1, ""
+
+    finished = {
+        row[0]
+        for row in conn.execute("SELECT id FROM tasks WHERE status IN ('done', 'archived')")
+    }
+    if not finished:
+        return []
+
+    pids: list[int] = []
+    try:
+        entries = os.listdir("/proc")
+    except OSError:
+        return []
+    live_workers = set()
+    for name in entries:
+        if not name.isdigit():
+            continue
+        _, cmd = _info(int(name))
+        if "kanban task" in cmd:
+            live_workers.add(int(name))
+
+    now = time.time()
+    for name in entries:
+        if not name.isdigit():
+            continue
+        pid = int(name)
+        ppid, cmd = _info(pid)
+        if "pytest" not in cmd or ppid in live_workers:
+            continue
+        match = re.search(r"\.worktrees/(t_[0-9a-f]+)", cmd)
+        if not match or match.group(1) not in finished:
+            continue
+        try:
+            if now - os.path.getmtime(f"/proc/{pid}") < min_age_seconds:
+                continue  # too young to judge: may be a live sibling still starting up
+        except OSError:
+            continue
+        try:
+            os.kill(pid, signal.SIGTERM)
+            pids.append(pid)
+        except OSError:
+            continue
+    return pids
 
 
 def enforce_max_runtime(conn: sqlite3.Connection, *, signal_fn=None) -> list[str]:
@@ -2054,6 +2127,9 @@ def _run_reclaim_phase(
     result.auto_blocked.extend(getattr(detect_crashed_workers, "_last_auto_blocked", []))
     result.rate_limited.extend(getattr(detect_crashed_workers, "_last_rate_limited", []))
     result.timed_out = enforce_max_runtime(conn)
+    # Tests detach into their own session (scripts/run_tests.sh), so a killed worker's children
+    # outlive the group signal; sweep the ones whose task is already finished.
+    result.reaped_test_children = reap_orphaned_worker_children(conn)
     result.promoted = _kb.recompute_ready(conn, failure_limit=failure_limit)
 
 

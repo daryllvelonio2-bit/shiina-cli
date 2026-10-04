@@ -22,6 +22,7 @@ Inspired by openai/symphony's tracker reconciliation (Apache-2.0), idea-level.
 from __future__ import annotations
 
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -178,3 +179,82 @@ class TestDispatchOnceReconciles:
         assert conn.execute(
             "SELECT status FROM tasks WHERE id=?", (tid,)
         ).fetchone()["status"] == "running"
+
+
+class TestReapOrphanedWorkerChildren:
+    """Tests: ``reap_orphaned_worker_children`` — orphaned test PROCESSES.
+
+    Distinct from card reconciliation above. ``scripts/run_tests.sh`` runs each test file in a
+    fresh ``python -m pytest`` with ``start_new_session=True``, deliberately detached so it is
+    invisible to the outer pytest's tree; such a child therefore survives a group kill of its
+    worker and can spin at ~40% CPU for the rest of the session. The sweep reaps those, and only
+    those.
+    """
+
+    @staticmethod
+    def _spawn(fake_cmdline):
+        """A detached process whose /proc cmdline carries ``fake_cmdline``."""
+        return subprocess.Popen(
+            ["bash", "-c", f'exec -a "{fake_cmdline}" sleep 300'],
+            start_new_session=True,
+        )
+
+    @staticmethod
+    def _alive(pid):
+        """True only while the process is actually running (Z and gone both count as dead)."""
+        try:
+            with open(f"/proc/{pid}/stat") as fh:
+                return fh.read().rsplit(")", 1)[1].split()[0] not in ("Z", "X")
+        except FileNotFoundError:
+            return False
+
+    def test_orphan_of_finished_task_is_reaped(self, conn):
+        tid = kb.create_task(conn, title="finished", assignee="w")
+        conn.execute("UPDATE tasks SET status='done' WHERE id=?", (tid,))
+        conn.commit()
+        p = self._spawn(f"pytest /tmp/reapcheck/.worktrees/{tid}/tests/test_x.py")
+        try:
+            time.sleep(1.5)
+            reaped = kbd.reap_orphaned_worker_children(conn, min_age_seconds=0)
+            assert p.pid in reaped
+            time.sleep(1.5)
+            assert not self._alive(p.pid)
+        finally:
+            p.kill()
+
+    def test_pytest_of_running_task_is_preserved(self, conn):
+        """Live work must never be killed: the task is still running."""
+        tid = kb.create_task(conn, title="live", assignee="w")
+        conn.execute("UPDATE tasks SET status='running' WHERE id=?", (tid,))
+        conn.commit()
+        p = self._spawn(f"pytest /tmp/reapcheck/.worktrees/{tid}/tests/test_y.py")
+        try:
+            time.sleep(1.5)
+            assert p.pid not in kbd.reap_orphaned_worker_children(conn, min_age_seconds=0)
+            assert self._alive(p.pid)
+        finally:
+            p.kill()
+
+    def test_unrelated_process_is_untouched(self, conn):
+        tid = kb.create_task(conn, title="finished", assignee="w")
+        conn.execute("UPDATE tasks SET status='done' WHERE id=?", (tid,))
+        conn.commit()
+        p = subprocess.Popen(["sleep", "300"])
+        try:
+            time.sleep(1.5)
+            assert p.pid not in kbd.reap_orphaned_worker_children(conn, min_age_seconds=0)
+            assert self._alive(p.pid)
+        finally:
+            p.kill()
+
+    def test_age_guard_spares_a_young_orphan(self, conn):
+        """A just-spawned sibling may belong to a worker mid-spawn; leave it alone."""
+        tid = kb.create_task(conn, title="finished", assignee="w")
+        conn.execute("UPDATE tasks SET status='done' WHERE id=?", (tid,))
+        conn.commit()
+        p = self._spawn(f"pytest /tmp/reapcheck/.worktrees/{tid}/tests/test_z.py")
+        try:
+            assert kbd.reap_orphaned_worker_children(conn, min_age_seconds=9999) == []
+            assert self._alive(p.pid)
+        finally:
+            p.kill()
