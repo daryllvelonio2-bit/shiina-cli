@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from shiina_cli.config import clear_model_endpoint_credentials
 from shiina_cli.model_setup_flows_common import _HTTP, _ask, _commit_model_config, _load_config_model_section, _say
 
 
@@ -151,7 +150,7 @@ def _model_flow_azure_foundry(config, current_model=""):
     (``AZURE_FOUNDRY_API_KEY``) or Microsoft Entra ID (keyless RBAC via ``azure-identity``; the
     ``Azure AI User`` role covers both transports). Detection: ``/anthropic`` URL suffix → Anthropic;
     ``GET <base>/models`` → OpenAI-style + picker; Anthropic Messages probe; manual entry."""
-    from shiina_cli.config import get_env_value, save_env_value
+    from shiina_cli.config import clear_model_endpoint_credentials, get_env_value, save_env_value
     from shiina_cli import azure_detect
 
     cur = _azure_current(config)
