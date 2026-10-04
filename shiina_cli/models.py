@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from typing import TypeGuard
 
 from shiina_cli import __version__ as _SHIINA_VERSION
+from shiina_cli.provider_identity import normalize_provider
 from shiina_cli.urllib_security import open_credentialed_url
 from shiina_cli.models_catalog_static import (
     CANONICAL_PROVIDERS,
@@ -1102,13 +1103,6 @@ def _find_openrouter_slug(model_name: str) -> Optional[str]:
         next((mid for mid in ids if name_lower == mid.lower()), None)
         or next((mid for mid in ids if "/" in mid and name_lower == mid.split("/", 1)[1].lower()), None)
     )
-
-
-def normalize_provider(provider: Optional[str]) -> str:
-    """Normalize provider aliases to canonical ids. ``"auto"`` passes through — use
-    ``shiina_cli.auth.resolve_provider()`` to resolve it from credentials."""
-    normalized = (provider or "openrouter").strip().lower()
-    return _PROVIDER_ALIASES.get(normalized, normalized)
 
 
 def provider_label(provider: Optional[str]) -> str:
