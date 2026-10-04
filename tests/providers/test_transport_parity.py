@@ -182,4 +182,6 @@ class TestCustomOllamaParity:
             base_url="https://api.mistral.ai/v1",
         )
         assert kw.get("extra_body", {}).get("think") is None
-        assert kw.get("reasoning_effort") == "none"
+        # mistral.ai base_url: the custom profile's is_mistral guard omits the
+        # whole reasoning block, so no top-level reasoning_effort is emitted.
+        assert kw.get("reasoning_effort") is None
