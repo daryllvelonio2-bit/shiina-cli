@@ -13,7 +13,6 @@ import subprocess
 from urllib.parse import urlparse
 
 from shiina_cli.cli_output import line_input
-from shiina_cli.config import clear_model_endpoint_credentials
 
 _HTTP = ("http://", "https://")
 
@@ -97,6 +96,7 @@ def _persist_model(selected: str, provider: str, *, base_url: str | None = None,
     ``base_url`` then ``api_mode`` (that order is the config.yaml key order) → scrub inline
     endpoint credentials (``clear_creds``; ``drop_api_mode`` also pops ``api_mode``) →
     *finish(cfg, model)* for extra sections → save + deactivate OAuth provider."""
+    from shiina_cli.config import clear_model_endpoint_credentials
     cfg, model = _begin_model_config(selected, provider)
     if base_url is not None:
         model["base_url"] = base_url

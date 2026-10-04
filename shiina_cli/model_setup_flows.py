@@ -12,7 +12,6 @@ import contextlib
 import argparse
 import os
 
-from shiina_cli.config import clear_model_endpoint_credentials
 from shiina_cli.model_setup_flows_common import (
     _HTTP, _activate_provider_model, _ask, _commit_model_config, _curses_choice,
     _ensure_dict_section, _ensure_flow_api_key, _finish_model,
@@ -104,6 +103,7 @@ def _model_flow_moa(config, current_model=""):
     """Mixture of Agents virtual provider: pick a preset (list always shown, even with one entry),
     persist it, print the breakdown. No credential step — presets reference configured providers."""
     from shiina_cli.auth import _save_model_choice
+    from shiina_cli.config import clear_model_endpoint_credentials
     from shiina_cli.moa_config import normalize_moa_config
     moa = normalize_moa_config(config.get("moa") if isinstance(config, dict) else {})
     presets = moa.get("presets") or {}
@@ -246,7 +246,8 @@ def _nous_persist_selection(selected: str, creds: dict) -> dict:
     config (the caller's may carry stale custom-provider fields) and clear a conflicting
     OPENAI_BASE_URL / OPENAI_API_KEY. Returns the saved config."""
     from shiina_cli.auth import _save_model_choice, _update_config_for_provider
-    from shiina_cli.config import get_env_value, load_config, save_config, save_env_value
+    from shiina_cli.config import (
+        clear_model_endpoint_credentials, get_env_value, load_config, save_config, save_env_value)
     _save_model_choice(selected)
     inference_url = creds.get("base_url", "")
     _update_config_for_provider("nous", inference_url)
