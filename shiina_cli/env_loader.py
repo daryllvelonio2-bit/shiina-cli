@@ -477,6 +477,12 @@ def _reapply_terminal_config_bridge(home_path: Path) -> None:
     try:
         if Path(home_path).resolve() != _process_shiina_home().resolve():
             return
+        # Without a config.yaml there is nothing to re-assert: the bridge only overrides a stale .env
+        # with the file's explicit terminal.* keys. Skipping the import keeps the config facade out of
+        # `import shiina_cli.main` on a config-less home; the terminal tool's own
+        # `_ensure_terminal_env_bridged` backfills defaults on first use.
+        if not (Path(home_path) / "config.yaml").exists():
+            return
         from shiina_cli.config import apply_terminal_config_to_env
 
         apply_terminal_config_to_env(env=None)
