@@ -141,7 +141,7 @@ describe('MessageLine', () => {
     expect(renderedLine).toContain('Ψ > Okay')
   })
 
-  it('keeps historical thinking blocks collapsed by default', () => {
+  it('renders nothing for a historical thinking block until details are asked for', () => {
     const stdout = new PassThrough()
     const stdin = new PassThrough()
     const stderr = new PassThrough()
@@ -154,28 +154,56 @@ describe('MessageLine', () => {
       output += chunk.toString()
     })
 
-    const instance = renderSync(
+    const trail = { kind: 'trail', role: 'system', text: '', thinking: 'step one\nstep two' } as const
+    const instance = renderSync(React.createElement(MessageLine, { cols: 80, msg: trail, t: DEFAULT_THEME }), {
+      patchConsole: false,
+      stderr: stderr as NodeJS.WriteStream,
+      stdin: stdin as NodeJS.ReadStream,
+      stdout: stdout as NodeJS.WriteStream
+    })
+
+    instance.unmount()
+    instance.cleanup()
+
+    // A finished turn shows its answer, not its work: no chevron row either.
+    const rendered = stripAnsi(output)
+
+    expect(rendered).not.toContain('Thinking')
+    expect(rendered).not.toContain('step one')
+    expect(rendered).not.toContain('step two')
+
+    // Asking for details brings the row back, still collapsed.
+    let asked = ''
+    const askedOut = new PassThrough()
+
+    Object.assign(askedOut, { columns: 80, isTTY: false, rows: 24 })
+    askedOut.on('data', chunk => {
+      asked += chunk.toString()
+    })
+
+    const shown = renderSync(
       React.createElement(MessageLine, {
         cols: 80,
-        msg: { kind: 'trail', role: 'system', text: '', thinking: 'step one\nstep two' },
+        detailsMode: 'collapsed',
+        detailsModeCommandOverride: true,
+        msg: trail,
         t: DEFAULT_THEME
       }),
       {
         patchConsole: false,
         stderr: stderr as NodeJS.WriteStream,
         stdin: stdin as NodeJS.ReadStream,
-        stdout: stdout as NodeJS.WriteStream
+        stdout: askedOut as NodeJS.WriteStream
       }
     )
 
-    instance.unmount()
-    instance.cleanup()
+    shown.unmount()
+    shown.cleanup()
 
-    const rendered = stripAnsi(output)
+    const askedRendered = stripAnsi(asked)
 
-    expect(rendered).toContain('Thinking')
-    expect(rendered).not.toContain('step one')
-    expect(rendered).not.toContain('step two')
+    expect(askedRendered).toContain('Thinking')
+    expect(askedRendered).not.toContain('step one')
   })
 
   it('keeps live thinking blocks expanded while streaming', () => {

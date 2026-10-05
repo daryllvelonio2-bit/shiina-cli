@@ -626,20 +626,17 @@ function SubagentAccordion({
 // ── Thinking ─────────────────────────────────────────────────────────
 
 /** Window a chain of thought for display: at most `maxLines` rows and at most
- *  `THINKING_TRAIL_MAX_CHARS` characters. Lines alone do not bound height — one
- *  logical line can wrap into a wall — and characters alone do not bound rows,
- *  so both are applied. Pure so the window is testable without a renderer. */
-export const capThinkingLines = (
-  allLines: string[],
-  maxLines?: number,
-  live = false
-): { hidden: number; lines: string[] } => {
+ *  `THINKING_TRAIL_MAX_CHARS` characters, always ending at the newest text — the
+ *  window slides, old lines unrender as new ones arrive, like `tail -f` for
+ *  reasoning. Lines alone do not bound height (one logical line can wrap into a
+ *  wall) and characters alone do not bound rows, so both are applied. Pure so
+ *  the window is testable without a renderer. */
+export const capThinkingLines = (allLines: string[], maxLines?: number): { hidden: number; lines: string[] } => {
   if (!maxLines) {
     return { hidden: 0, lines: allLines }
   }
 
-  const start = allLines.length <= maxLines ? 0 : live ? allLines.length - maxLines : 0
-  const windowed = allLines.slice(start, start + maxLines)
+  const windowed = allLines.slice(-maxLines)
   const hidden = Math.max(0, allLines.length - windowed.length)
 
   let budget = THINKING_TRAIL_MAX_CHARS
@@ -654,7 +651,9 @@ export const capThinkingLines = (
 
       budget -= room
 
-      return room < line.length ? `${line.slice(0, Math.max(0, room - 1)).trimEnd()}…` : line
+      // A line too long for the budget keeps its END — the newest text is what
+      // the window is for — with a leading marker for the clipped head.
+      return room < line.length ? `…${line.slice(line.length - Math.max(0, room - 1))}` : line
     })
     .filter((line): line is string => line !== null)
 
@@ -664,7 +663,6 @@ export const capThinkingLines = (
 export const Thinking = memo(function Thinking({
   active = false,
   branch = 'last',
-  live = false,
   maxLines,
   mode = 'truncated',
   rails = [],
@@ -674,9 +672,7 @@ export const Thinking = memo(function Thinking({
 }: {
   active?: boolean
   branch?: TreeBranch
-  /** This trail is the turn currently running: show the newest lines. */
-  live?: boolean
-  /** Cap on rendered lines (undefined = render everything). */
+  /** Cap on rendered lines; the window always ends at the newest line. */
   maxLines?: number
   mode?: ThinkingMode
   rails?: TreeRails
@@ -692,7 +688,7 @@ export const Thinking = memo(function Thinking({
 
   const allLines = useMemo(() => preview.split('\n').map(line => line.replace(/\t/g, '  ')), [preview])
 
-  const { hidden, lines } = useMemo(() => capThinkingLines(allLines, maxLines, live), [allLines, live, maxLines])
+  const { hidden, lines } = useMemo(() => capThinkingLines(allLines, maxLines), [allLines, maxLines])
 
   if (!preview && !active) {
     return null
@@ -706,23 +702,23 @@ export const Thinking = memo(function Thinking({
         {preview ? (
           mode === 'full' ? (
             <>
+              {hidden > 0 ? (
+                <Text color={t.color.muted} dim wrap="truncate-end">
+                  {`… +${hidden} earlier line${hidden === 1 ? '' : 's'}`}
+                </Text>
+              ) : null}
               {lines.map((line, index) => {
                 const isStatus = isThinkingStatusLine(line)
 
                 return (
                   <Text color={isStatus ? greenColor : t.color.thinking} dim={!isStatus} key={index} wrap="wrap-trim">
                     {line || ' '}
-                    {index === lines.length - 1 && hidden === 0 ? (
+                    {index === lines.length - 1 ? (
                       <StreamCursor color={t.color.thinking} streaming={streaming} visible={active} />
                     ) : null}
                   </Text>
                 )
               })}
-              {hidden > 0 ? (
-                <Text color={t.color.muted} dim wrap="truncate-end">
-                  {`… +${hidden} more line${hidden === 1 ? '' : 's'}`}
-                </Text>
-              ) : null}
             </>
           ) : (
             <Text color={isThinkingStatusLine(preview) ? greenColor : t.color.thinking} dim={!isThinkingStatusLine(preview)} wrap="truncate-end">
@@ -1196,7 +1192,6 @@ export const ToolTrail = memo(function ToolTrail({
         <Thinking
           active={reasoningActive}
           branch="last"
-          live={busy}
           maxLines={thinkingMaxLines}
           mode="full"
           rails={rails}

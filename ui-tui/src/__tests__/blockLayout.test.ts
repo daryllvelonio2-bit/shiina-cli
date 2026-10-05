@@ -73,9 +73,16 @@ describe('blockRenders', () => {
     expect(blockRenders(model, { detailsMode: 'hidden', commandOverride: true })).toBe(true)
   })
 
-  it('renders a content-bearing trail unless every section is hidden', () => {
-    expect(blockRenders(trail, { detailsMode: 'collapsed' })).toBe(true)
-    expect(blockRenders(trail, { detailsMode: 'expanded' })).toBe(true)
+  it('suppresses a settled trail unless details were asked for', () => {
+    // The default: the answer stands alone, the work behind it is invisible.
+    expect(blockRenders(trail, { detailsMode: 'collapsed' })).toBe(false)
+    expect(blockRenders(trail, { detailsMode: 'expanded' })).toBe(false)
+    // The live turn is the one place a trail is meant to be visible.
+    expect(blockRenders(trail, { detailsMode: 'collapsed', live: true })).toBe(true)
+    expect(blockRenders(trail, { detailsMode: 'expanded', live: true })).toBe(true)
+    // An explicit request brings it back: config or /details.
+    expect(blockRenders(trail, { detailsMode: 'collapsed', commandOverride: true })).toBe(true)
+    expect(blockRenders(trail, { detailsMode: 'collapsed', sections: { thinking: 'collapsed' } })).toBe(true)
     // /details hidden routes through commandOverride, which hides every section.
     expect(blockRenders(trail, { detailsMode: 'hidden', commandOverride: true })).toBe(false)
   })
@@ -83,7 +90,7 @@ describe('blockRenders', () => {
   it('does not render a content-less trail (e.g. finalDetails with only a token tally)', () => {
     const tally: Msg = { role: 'system', kind: 'trail', text: '', toolTokens: 40 }
 
-    expect(blockRenders(tally, { detailsMode: 'expanded' })).toBe(false)
+    expect(blockRenders(tally, { commandOverride: true, detailsMode: 'expanded' })).toBe(false)
   })
 
   it('keeps todo trails visible even when details are hidden', () => {
@@ -93,7 +100,7 @@ describe('blockRenders', () => {
 
 describe('prevRenderedMsg', () => {
   const hiddenCtx = { commandOverride: true, detailsMode: 'hidden' as const }
-  const shownCtx = { detailsMode: 'collapsed' as const }
+  const shownCtx = { commandOverride: true, detailsMode: 'collapsed' as const }
 
   const rows: Msg[] = [
     { role: 'user', text: 'q' }, // 0

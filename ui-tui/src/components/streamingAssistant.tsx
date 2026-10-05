@@ -62,7 +62,7 @@ export const StreamingAssistant = memo(function StreamingAssistant({
     blocks.push({ key: 'pending-tools', msg: { kind: 'trail', role: 'system', text: '', tools: streamPendingTools } })
   }
 
-  const detailsCtx = { commandOverride: detailsModeCommandOverride, detailsMode, sections }
+  const detailsCtx = { commandOverride: detailsModeCommandOverride, detailsMode, live: true, sections }
   let prev = prevMsg
 
   return (

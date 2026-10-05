@@ -4,7 +4,7 @@ import { memo, useState } from 'react'
 
 import { TERMUX_TUI_MODE } from '../config/env.js'
 import { LONG_MSG } from '../config/limits.js'
-import { hasLeadGap } from '../domain/blockLayout.js'
+import { hasLeadGap, trailSuppressed } from '../domain/blockLayout.js'
 import { splitComposerHighlights } from '../domain/composerHighlights.js'
 import { sectionMode } from '../domain/details.js'
 import { userDisplay } from '../domain/messages.js'
@@ -80,6 +80,17 @@ export const MessageLine = memo(function MessageLine({
   // Collapse toggle for long system messages
   const systemIsLong = msg.role === 'system' && msg.text.length > SYSTEM_COLLAPSE_CHARS
   const [systemOpen, setSystemOpen] = useState(false)
+
+  // A finished turn shows its answer, not its work: unless details were asked
+  // for (config or /details), its trail paints nothing — no chevron rows either,
+  // which is what left one or two dead header lines under every past message.
+  // The live turn renders through StreamingAssistant and is exempt.
+  if (
+    msg.kind === 'trail' &&
+    trailSuppressed({ commandOverride: detailsModeCommandOverride, detailsMode, live: liveDetails, sections })
+  ) {
+    return null
+  }
 
   if (msg.kind === 'trail' && msg.todos?.length) {
     return (

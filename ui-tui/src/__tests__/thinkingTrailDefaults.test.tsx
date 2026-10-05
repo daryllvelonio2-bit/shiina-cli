@@ -89,19 +89,32 @@ describe('a settled trail stays closed', () => {
 })
 
 describe('reasoning is a window, not a wall', () => {
-  it('caps a settled chain of thought and says how much is left', async () => {
-    const trail = render(<Thinking live={false} maxLines={5} mode="full" reasoning={COT} t={DEFAULT_THEME} />)
+  it('shows the newest lines and counts the older ones', async () => {
+    const trail = render(<Thinking maxLines={5} mode="full" reasoning={COT} t={DEFAULT_THEME} />)
 
     await flush()
 
     const out = trail.text()
 
-    expect(out).toContain('reasoning line 1')
-    expect(out).toContain('reasoning line 5')
-    expect(out).not.toContain('reasoning line 6')
-    expect(out).toContain('+7 more lines')
+    expect(out).toContain('reasoning line 12')
+    expect(out).toContain('reasoning line 8')
+    expect(out).not.toContain('reasoning line 7')
+    expect(out).toContain('+7 earlier lines')
 
     trail.instance.unmount()
+  })
+
+  it('slides the window as new text arrives, dropping the oldest line', () => {
+    const grown = [...Array.from({ length: 12 }, (_, i) => `reasoning line ${i + 1}`), 'reasoning line 13']
+
+    expect(capThinkingLines(grown, THINKING_TRAIL_MAX_LINES).lines).toEqual([
+      'reasoning line 9',
+      'reasoning line 10',
+      'reasoning line 11',
+      'reasoning line 12',
+      'reasoning line 13'
+    ])
+    expect(capThinkingLines(grown, THINKING_TRAIL_MAX_LINES).hidden).toBe(8)
   })
 
   it('bounds a single-paragraph chain of thought by characters too', () => {
@@ -115,25 +128,10 @@ describe('reasoning is a window, not a wall', () => {
     expect(capThinkingLines(['short'], 5)).toEqual({ hidden: 0, lines: ['short'] })
   })
 
-  it('windows by count, taking the tail when live', () => {
+  it('windows by count, always ending at the newest line', () => {
     const many = Array.from({ length: 30 }, (_, i) => `l${i + 1}`)
 
-    expect(capThinkingLines(many, 5)).toEqual({ hidden: 25, lines: ['l1', 'l2', 'l3', 'l4', 'l5'] })
-    expect(capThinkingLines(many, 5, true)).toEqual({ hidden: 25, lines: ['l26', 'l27', 'l28', 'l29', 'l30'] })
-  })
-
-  it('shows the newest lines while the turn streams', async () => {
-    const trail = render(<Thinking live maxLines={5} mode="full" reasoning={COT} t={DEFAULT_THEME} />)
-
-    await flush()
-
-    const out = trail.text()
-
-    expect(out).toContain('reasoning line 12')
-    expect(out).toContain('reasoning line 8')
-    expect(out).not.toContain('reasoning line 7')
-
-    trail.instance.unmount()
+    expect(capThinkingLines(many, 5)).toEqual({ hidden: 25, lines: ['l26', 'l27', 'l28', 'l29', 'l30'] })
   })
 
   it('renders everything when no cap is set', async () => {
@@ -145,7 +143,7 @@ describe('reasoning is a window, not a wall', () => {
 
     expect(out).toContain('reasoning line 1')
     expect(out).toContain('reasoning line 12')
-    expect(out).not.toContain('more lines')
+    expect(out).not.toContain('earlier lines')
 
     trail.instance.unmount()
   })

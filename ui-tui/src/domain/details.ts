@@ -73,4 +73,12 @@ export const sectionMode = (
   commandOverride = false
 ): DetailsMode => sections?.[name] ?? (commandOverride ? global : (SECTION_DEFAULTS[name] ?? global))
 
+/** Whether the user asked for details explicitly — `display.sections.*` in
+ *  config or an in-session `/details <mode>` — rather than leaving the built-in
+ *  defaults in charge. A finished turn paints its trail only when this is true:
+ *  otherwise the answer stands alone and the work behind it is invisible until
+ *  someone asks for it. */
+export const detailsRequested = (sections?: SectionVisibility, commandOverride = false): boolean =>
+  !!commandOverride || Object.keys(sections ?? {}).length > 0
+
 export const nextDetailsMode = (m: DetailsMode): DetailsMode => MODES[(MODES.indexOf(m) + 1) % MODES.length]!
