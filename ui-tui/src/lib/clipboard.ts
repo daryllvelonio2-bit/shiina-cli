@@ -65,16 +65,6 @@ function readClipboardCommands(
   return attempts
 }
 
-/**
- * Read plain text from the system clipboard.
- *
- * Uses native platform tools in fallback order:
- * - macOS: pbpaste
- * - Windows: PowerShell Get-Clipboard -Raw
- * - WSL: powershell.exe Get-Clipboard -Raw
- * - Linux Wayland: wl-paste --type text
- * - Linux X11: xclip -selection clipboard -out
- */
 export async function readClipboardText(
   platform: NodeJS.Platform = process.platform,
   run: ClipboardRun = execFileAsync,
@@ -97,6 +87,38 @@ export async function readClipboardText(
       }
     } catch {
       // Fall through to the next clipboard backend.
+    }
+  }
+
+  if (platform === 'linux' && env.WAYLAND_DISPLAY) {
+    try {
+      const listRes = await run('cliphist', ['list'], {
+        encoding: 'utf8',
+        maxBuffer: CLIPBOARD_MAX_BUFFER,
+        windowsHide: true
+      })
+
+      if (typeof listRes.stdout === 'string') {
+        const textLine = listRes.stdout.split('\n').find(l => l && !l.includes('[[ binary data'))
+
+        if (textLine) {
+          const id = textLine.trim().split('\t')[0]
+
+          if (id) {
+            const decodeRes = await run('cliphist', ['decode', id], {
+              encoding: 'utf8',
+              maxBuffer: CLIPBOARD_MAX_BUFFER,
+              windowsHide: true
+            })
+
+            if (typeof decodeRes.stdout === 'string' && decodeRes.stdout) {
+              return decodeRes.stdout
+            }
+          }
+        }
+      }
+    } catch {
+      // cliphist missing or failed
     }
   }
 

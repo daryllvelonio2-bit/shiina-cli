@@ -321,8 +321,60 @@ _WL_MISSING = "wl-paste not installed — Wayland clipboard unavailable"
 
 
 def _wayland_has_image() -> bool:
-    return _probe(_WL_LIST_TYPES, 3, lambda r: r.returncode == 0 and any(
-        t.startswith("image/") for t in r.stdout.splitlines()), missing=_WL_MISSING)
+    if _probe(_WL_LIST_TYPES, 3, lambda r: r.returncode == 0 and any(
+        t.startswith("image/") for t in r.stdout.splitlines()), missing=_WL_MISSING):
+        return True
+    return _cliphist_has_image()
+
+
+def _cliphist_has_image() -> bool:
+    if not shutil.which("cliphist"):
+        return False
+    try:
+        r = subprocess.run(["cliphist", "list"], timeout=2, **_TEXT)
+        if r.returncode == 0:
+            return any(
+                "[[ binary data" in line and any(
+                    ext in line.lower() for ext in ("png", "jpg", "jpeg", "webp", "bmp", "gif", "image")
+                )
+                for line in r.stdout.splitlines()
+            )
+    except Exception:
+        pass
+    return False
+
+
+def _cliphist_save(dest: Path) -> bool:
+    if not shutil.which("cliphist"):
+        return False
+    try:
+        r = subprocess.run(["cliphist", "list"], timeout=3, **_TEXT)
+        if r.returncode != 0:
+            return False
+        for line in r.stdout.splitlines():
+            if "[[ binary data" in line and any(
+                ext in line.lower() for ext in ("png", "jpg", "jpeg", "webp", "bmp", "gif", "image")
+            ):
+                proc = subprocess.Popen(
+                    ["cliphist", "decode"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL
+                )
+                out, _ = proc.communicate(input=line.encode("utf-8"), timeout=5)
+                if proc.returncode == 0 and len(out) > 0:
+                    with open(dest, "wb") as f:
+                        f.write(out)
+                    if _is_png_file(dest) or (_convert_to_png(dest) and _is_png_file(dest)):
+                        return True
+                    if _nonempty(dest):
+                        return True
+                    dest.unlink(missing_ok=True)
+                break
+    except Exception as e:
+        logger.debug("cliphist image extraction failed: %s", e)
+        dest.unlink(missing_ok=True)
+    return False
 
 
 def _wayland_save(dest: Path) -> bool:
@@ -330,20 +382,19 @@ def _wayland_save(dest: Path) -> bool:
         types_r = subprocess.run(_WL_LIST_TYPES, timeout=3, **_TEXT)
         types = types_r.stdout.splitlines() if types_r.returncode == 0 else ()
         mime = next((m for m in _WAYLAND_MIME_PREFERENCE if m in types), None)  # PNG preferred
-        if not mime:
-            return False
-        # save_clipboard_image() promises a PNG. Wayland can offer JPEG/GIF/WebP/BMP payloads,
-        # so every non-PNG result is normalized (and re-verified) before reporting success.
-        if _pipe_to_file(["wl-paste", "--type", mime], dest) and (
-                mime == "image/png" or (_convert_to_png(dest) and _is_png_file(dest))):
-            return True
-        dest.unlink(missing_ok=True)
+        if mime:
+            # save_clipboard_image() promises a PNG. Wayland can offer JPEG/GIF/WebP/BMP payloads,
+            # so every non-PNG result is normalized (and re-verified) before reporting success.
+            if _pipe_to_file(["wl-paste", "--type", mime], dest) and (
+                    mime == "image/png" or (_convert_to_png(dest) and _is_png_file(dest))):
+                return True
+            dest.unlink(missing_ok=True)
     except FileNotFoundError:
         logger.debug(_WL_MISSING)
     except Exception as e:
         logger.debug("wl-paste clipboard extraction failed: %s", e)
         dest.unlink(missing_ok=True)
-    return False
+    return _cliphist_save(dest)
 
 
 def _convert_to_png(path: Path) -> bool:
