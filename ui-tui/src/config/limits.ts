@@ -19,6 +19,12 @@ export const VERBOSE_TRAIL_MAX_LINES = 12
 export const LONG_MSG = 300
 export const MAX_HISTORY = 800
 export const THINKING_COT_MAX = 160
+/** Lines of chain-of-thought a trail renders (the full text is behind
+ *  `/details thinking expanded`). Long CoT buries the answer it accompanies. */
+export const THINKING_TRAIL_MAX_LINES = 5
+/** Character budget for a capped trail. Lines alone do not bound height: a
+ *  single-paragraph CoT is one logical line that wraps into a wall. */
+export const THINKING_TRAIL_MAX_CHARS = 600
 
 // Rows per wheel event (pre-accel). 1 keeps Ink's DECSTBM fast path live
 // (each scroll < viewport-1) and produces smooth motion. wheelAccel.ts

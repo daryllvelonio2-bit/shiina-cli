@@ -287,7 +287,7 @@ export const MessageLine = memo(function MessageLine({
           <NoSelect flexShrink={0} fromLeftEdge width={gutterWidth}>
             <Text color={t.color.border}>└─ </Text>
           </NoSelect>
-          <Text color={t.color.muted} dim>
+          <Text bold color={t.color.accent}>
             Response
           </Text>
         </Box>
