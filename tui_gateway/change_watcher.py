@@ -26,7 +26,9 @@ def resolve_skin() -> dict:
             "light_colors": skin.light_colors, "dark_colors": skin.dark_colors,
             "branding": branding, "banner_logo": skin.banner_logo,
             "banner_hero": skin.banner_hero, "tool_prefix": skin.tool_prefix,
-            "help_header": (skin.branding or {}).get("help_header", "")}
+            "help_header": (skin.branding or {}).get("help_header", ""),
+            # Chrome design tokens for the TUI (`tui:` in the skin YAML).
+            "tui": getattr(skin, "tui", {}) or {}}
     except Exception:
         return {}
 

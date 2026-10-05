@@ -46,6 +46,10 @@ class SkinPayload(OpenPayload):
     banner_hero: str = ""
     tool_prefix: str = ""
     help_header: str = ""
+    # Chrome design tokens from the skin's `tui:` section (spacing, glyphs,
+    # borders, status-rule segment order). Producer-owned shape: the renderer
+    # validates each token, so this stays an open dict.
+    tui: dict = Field(default_factory=dict)
 
 
 class GatewayReadyPayload(Payload):

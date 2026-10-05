@@ -18,6 +18,7 @@ import { readFileSync, renameSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 
+import { resolveDesign } from '../design.js'
 import type { Theme } from '../theme.js'
 
 interface BootThemeFile {
@@ -67,6 +68,17 @@ export interface BootTheme {
   theme: Theme
 }
 
+/**
+ * A cache written before the design tokens existed carries colours + branding
+ * only. Replaying it as-is would leave `theme.design` undefined for frame one
+ * (every token read crashes), so backfill the defaults. `resolveDesign` also
+ * validates a design that IS present.
+ */
+export const normalizeBootTheme = (theme: Theme): Theme =>
+  theme.design && typeof theme.design === 'object'
+    ? theme
+    : { ...theme, design: resolveDesign((theme as { design?: unknown }).design) }
+
 /** Read the cached boot theme. Null on first launch / damage / test runs. */
 export function readBootTheme(): BootTheme | null {
   if (isTestRun()) {
@@ -83,7 +95,7 @@ export function readBootTheme(): BootTheme | null {
     return {
       background: typeof raw.background === 'string' ? raw.background : undefined,
       mode: raw.mode === 'light' || raw.mode === 'dark' ? raw.mode : undefined,
-      theme: raw.theme
+      theme: normalizeBootTheme(raw.theme)
     }
   } catch {
     return null

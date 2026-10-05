@@ -1,6 +1,7 @@
 import { contrastRatio, ensureContrast, mix, parseColor, relativeLuminance, toHex } from '@shiina/shared/color'
 import type { SkinBranding, SkinColors } from '@shiina/shared/skin'
 
+import { DEFAULT_DESIGN, type Design } from './design.js'
 import { desaturate, grayOf, liftForContrast } from './lib/color.js'
 
 export interface ThemeColors {
@@ -63,6 +64,12 @@ export interface ThemeBrand {
 export interface Theme {
   color: ThemeColors
   brand: ThemeBrand
+  /**
+   * Chrome design tokens (spacing, glyphs, borders, status-rule layout).
+   * Ships with the skin's `tui:` section so a restyle is a YAML edit; carried
+   * on the theme so components that already receive `t` need no new plumbing.
+   */
+  design: Design
   bannerLogo: string
   bannerHero: string
 }
@@ -418,17 +425,19 @@ export const LIGHT_SEEDS: ThemeSeeds = {
 }
 
 export const DARK_THEME: Theme = {
-  color: buildPalette(DARK_SEEDS, false),
-  brand: BRAND,
+  bannerHero: '',
   bannerLogo: '',
-  bannerHero: ''
+  brand: BRAND,
+  color: buildPalette(DARK_SEEDS, false),
+  design: DEFAULT_DESIGN
 }
 
 export const LIGHT_THEME: Theme = {
-  color: buildPalette(LIGHT_SEEDS, true),
-  brand: BRAND,
+  bannerHero: '',
   bannerLogo: '',
-  bannerHero: ''
+  brand: BRAND,
+  color: buildPalette(LIGHT_SEEDS, true),
+  design: DEFAULT_DESIGN
 }
 
 // ── Background-aware readability adaptation ─────────────────────────
@@ -843,7 +852,8 @@ export function fromSkin(
   bannerLogo = '',
   bannerHero = '',
   toolPrefix = '',
-  helpHeader = ''
+  helpHeader = '',
+  design: Design = DEFAULT_DESIGN
 ): Theme {
   // Polarity: the skin's own canvas when it authors one (see skinIsLight);
   // otherwise live host detection (not the module-load snapshot — by the time
@@ -963,7 +973,8 @@ export function fromSkin(
       },
 
       bannerLogo,
-      bannerHero
+      bannerHero,
+      design
     },
     process.env,
     isLight

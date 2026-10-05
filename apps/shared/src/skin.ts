@@ -107,4 +107,11 @@ export interface ShiinaSkin {
   banner_hero?: string
   tool_prefix?: string
   help_header?: string
+  /**
+   * Chrome design tokens (the skin YAML's `tui:` section): spacing density,
+   * glyph overrides, border style and the status rule's segment order.
+   * Resolved by the TUI's `design.ts`; ignored by surfaces that don't render
+   * the terminal chrome (desktop/dashboard pick what they need).
+   */
+  tui?: Record<string, unknown>
 }

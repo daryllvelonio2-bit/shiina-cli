@@ -28387,6 +28387,11 @@
             "default": "",
             "title": "Help Header",
             "type": "string"
+          },
+          "tui": {
+            "additionalProperties": true,
+            "title": "Tui",
+            "type": "object"
           }
         },
         "title": "SkinPayload",

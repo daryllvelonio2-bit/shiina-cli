@@ -2,7 +2,7 @@ import { Box, type ScrollBoxHandle, stringWidth, Text } from '@shiina/ink'
 import { compactNumber } from '@shiina/shared/format'
 import type { Usage } from '@shiina/shared/gateway-events'
 import { useStore } from '@nanostores/react'
-import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, type RefObject, Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import unicodeSpinners from 'unicode-animations'
 
 import { $delegationState } from '../app/delegationStore.js'
@@ -20,6 +20,7 @@ import type { Theme } from '../theme.js'
 import type { Msg } from '../types.js'
 
 import { scrollbarColors } from './overlayPrimitives.js'
+import { MAX_DURATION_WIDTH, resolveStatusSegments, type StatusSegmentCtx } from './statusSegments.js'
 
 const FACE_TICK_MS = 2500
 const HEART_COLORS = ['#ff5fa2', '#ff4d6d']
@@ -96,15 +97,6 @@ const indicatorFrameWidth = (style: IndicatorStyle): number => {
   // 'ascii' and 'unicode' are single-column glyphs.
   return 1
 }
-
-// Bounded width of the elapsed-time clock, derived from `fmtDuration` itself so
-// the reservation/budget stays consistent with what actually renders (it emits
-// a space between units, e.g. `59m 59s` / `99h 59m`). Durations beyond this
-// (100h+) are left to clip rather than reserving unbounded width.
-export const MAX_DURATION_WIDTH = Math.max(
-  stringWidth(fmtDuration(59 * 60_000 + 59_000)), // "59m 59s"
-  stringWidth(fmtDuration(99 * 3_600_000 + 59 * 60_000)) // "99h 59m"
-)
 
 // Display width to reserve for the busy indicator so its verb + elapsed-time
 // tail can't shove the model off-screen on narrow terminals. Style-aware:
@@ -212,10 +204,6 @@ function ctxBarColor(pct: number | undefined, t: Theme) {
   }
 
   return t.color.statusGood
-}
-
-function statusSessionCountLabel(count: number) {
-  return `${count} ${count === 1 ? 'session' : 'sessions'}`
 }
 
 // Colour the battery read-out by its (Python-computed) category. Inverted vs
@@ -394,50 +382,6 @@ function SpawnHud({ t }: { t: Theme }) {
   )
 }
 
-function SessionDuration({ startedAt }: { startedAt: number }) {
-  const [now, setNow] = useState(() => Date.now())
-  const isOccluded = useStore($isStatusRuleOccluded)
-
-  useEffect(() => {
-    // Paused only while an overlay actually covers the status rule — see
-    // FaceTicker.  The `setNow` below already re-seeds from the wall clock
-    // on every re-arm, so it doubles as the reveal catch-up.
-    if (isOccluded) {
-      return
-    }
-
-    setNow(Date.now())
-    const id = setInterval(() => setNow(Date.now()), 1000)
-
-    return () => clearInterval(id)
-  }, [isOccluded, startedAt])
-
-  return fmtDuration(now - startedAt)
-}
-
-function IdleSince({ endedAt }: { endedAt: number }) {
-  // Time since the last final agent response. Re-ticks every second like
-  // SessionDuration so the read-out stays live while the session idles.
-  const [now, setNow] = useState(() => Date.now())
-  const isOccluded = useStore($isStatusRuleOccluded)
-
-  useEffect(() => {
-    // Paused only while an overlay actually covers the status rule — see
-    // FaceTicker.  The `setNow` below re-seeds from the wall clock on reveal
-    // so the idle read-out is not frozen when the overlay closes.
-    if (isOccluded) {
-      return
-    }
-
-    setNow(Date.now())
-    const id = setInterval(() => setNow(Date.now()), 1000)
-
-    return () => clearInterval(id)
-  }, [endedAt, isOccluded])
-
-  return `✓ ${fmtDuration(now - endedAt)}`
-}
-
 const effortLabel = (effort?: string) => {
   const value = String(effort ?? '')
     .trim()
@@ -605,80 +549,53 @@ export function StatusRule({
     return false
   }
 
-  const sessionCountText = liveSessionCount > 0 ? statusSessionCountLabel(liveSessionCount) : ''
-  const compressions = typeof usage.compressions === 'number' ? usage.compressions : 0
-
-  // Dev-only readout (SHIINA_DEV_CREDITS). The server omits the key entirely unless the
-  // flag is on, so this segment self-hides for normal users. micros→cents is allowed money
-  // math (display formatting) — never parseFloat a *_usd. Signed: a mid-session top-up that
-  // raises remaining nets a negative Δ (honest).
-  const devCreditsText =
-    typeof usage.dev_credits_spent_micros === 'number'
-      ? `Δ ${(usage.dev_credits_spent_micros / 10000).toFixed(1)}¢`
-      : ''
-
-  // (usage bar + % now render pinned on the right — see usageRightText — so
-  // they no longer consume left tail budget here.)
-  const showDuration = segs.duration && ok('duration') && !!sessionStartedAt && fits(SEP + MAX_DURATION_WIDTH)
-
-  // Idle clock — time since the last final agent response. Hidden while busy
-  // (the FaceTicker's elapsed tail covers the live turn) and before the first
-  // turn completes. Shares the duration breakpoint and width reservation.
-  const showIdle =
-    segs.duration && !busy && lastTurnEndedAt != null && fits(SEP + stringWidth('✓ ') + MAX_DURATION_WIDTH)
-
-  const showCompressions =
-    segs.compressions && ok('compressions') && compressions > 0 && fits(SEP + stringWidth(`cmp ${compressions}`))
-
-  // Cache-hit % + rolling latency / tokens-per-sec — mirrored from the classic
-  // CLI bar (PR #98250). The server omits the keys when no data exists (zero
-  // cache reads, Codex app-server with no latency), so these self-hide.
-  const cacheHitText = typeof usage.cache_hit_pct === 'number' ? `◎ ${usage.cache_hit_pct}%` : ''
-  const showCacheHit = segs.cacheHit && ok('cache_hit') && !!cacheHitText && fits(SEP + stringWidth(cacheHitText))
-  const latencyText = typeof usage.avg_latency_s === 'number' ? `◷ ${usage.avg_latency_s.toFixed(1)}s` : ''
-  const showLatency = segs.latency && ok('latency') && !!latencyText && fits(SEP + stringWidth(latencyText))
-  const tpsText = typeof usage.avg_tps === 'number' ? `↑ ${Math.round(usage.avg_tps)} t/s` : ''
-  const showTps = segs.tps && ok('tps') && !!tpsText && fits(SEP + stringWidth(tpsText))
-
-  const showVoice = segs.voice && ok('voice') && !!voiceLabel && fits(SEP + stringWidth(voiceLabel))
-  const showSessionCount = !!sessionCountText && fits(SEP + stringWidth(sessionCountText))
-  const showBg = segs.bg && ok('bg_tasks') && bgCount > 0 && fits(SEP + stringWidth(`${bgCount} bg`))
-  const subagentCount = typeof usage.active_subagents === 'number' ? usage.active_subagents : 0
-
-  const showSubagents =
-    segs.subagents && ok('bg_subagents') && subagentCount > 0 && fits(SEP + stringWidth(`⛓ ${subagentCount}`))
-
-  // Parked-background reassurance: a top-level delegate_task runs in the
-  // background, so the turn ends (idle) while the subagent keeps working and its
-  // result re-enters as a fresh turn later. When idle with work still in flight,
-  // spell out that the agent resumes on its own — no spinner, nothing to poll.
-  // Width-budgeted like every tail segment, so it drops first on a tight
-  // terminal where ⛓ already carries the signal.
-  const resumeHintText =
-    subagentCount === 1 ? '↩ resumes when subagent finishes' : `↩ resumes when ${subagentCount} subagents finish`
-
-  const showResumeHint = !busy && subagentCount > 0 && fits(SEP + stringWidth(resumeHintText))
-  // Dev-gated readout (SHIINA_DEV_CREDITS), lowest priority,
-  // so it consumes tail budget LAST and drops first on a narrow terminal.
-  const showDevCredits = !!devCreditsText && fits(SEP + stringWidth(devCreditsText))
-
-  // Focus-view badge. Pinned (not tail-budgeted) on purpose: the whole point of
-  // the indicator is that the user can never be in reduced-output mode without
-  // seeing it, so it must not drop off a narrow terminal.
-  const showFocus = !!focusView
-
-  const handleSessionCountClick = (event: { stopImmediatePropagation?: () => void }) => {
-    event.stopImmediatePropagation?.()
-    onSessionCountClick?.()
+  // The tail is data, not branches: `statusSegments.tsx` owns each segment
+  // (text, colour, width charge, width-tier gate) and the skin's
+  // `tui.status_bar.segments` owns the order. This loop is only the budget —
+  // walk in order, charge each segment's columns, and drop whatever no longer
+  // fits. Array order is therefore drop priority too: the last entries yield
+  // first, so the pinned status/model/context read-outs are never crushed.
+  const segmentCtx: StatusSegmentCtx = {
+    bgCount,
+    busy,
+    focus: !!focusView,
+    lastTurnEndedAt,
+    liveSessionCount,
+    onSessionCountClick,
+    sessionStartedAt,
+    subagentCount: typeof usage.active_subagents === 'number' ? usage.active_subagents : 0,
+    t,
+    usage,
+    voiceLabel
   }
 
-  const sessionCountNode = onSessionCountClick ? (
-    <Box flexShrink={0} onClick={handleSessionCountClick}>
-      <Text color={t.color.accent}> │ {sessionCountText}</Text>
-    </Box>
-  ) : (
-    <Text color={t.color.muted}> │ {sessionCountText}</Text>
-  )
+  const tailSegments: ReactNode[] = []
+
+  for (const spec of resolveStatusSegments(t.design)) {
+    // Width tier (progressive disclosure) and the classic CLI bar's field gate
+    // are both declared by the segment, so a new segment cannot forget them.
+    if (spec.segsKey && !segs[spec.segsKey]) {
+      continue
+    }
+
+    if (spec.field && !ok(spec.field)) {
+      continue
+    }
+
+    const view = spec.build(segmentCtx)
+
+    if (!view) {
+      continue
+    }
+
+    // Focus view is pinned on purpose: the user must never be in reduced-output
+    // mode without seeing the badge, so it is not tail-budgeted.
+    if (!spec.pinned && !fits(SEP + view.reserve)) {
+      continue
+    }
+
+    tailSegments.push(<Fragment key={spec.id}>{view.node}</Fragment>)
+  }
 
   return (
     <Box height={1}>
@@ -731,95 +648,7 @@ export function StatusRule({
             {modelText}
           </Text>
         </Box>
-        {showFocus ? (
-          <Box flexDirection="row" flexShrink={0}>
-            <Text color={t.color.muted}>{' │ '}</Text>
-            <Text color={t.color.warn}>◉ focus</Text>
-          </Box>
-        ) : null}
-        {showDuration ? (
-          <Text color={t.color.muted} wrap="truncate-end">
-            {' │ '}
-            <SessionDuration startedAt={sessionStartedAt!} />
-          </Text>
-        ) : null}
-        {showIdle ? (
-          <Text color={t.color.muted} wrap="truncate-end">
-            {' │ '}
-            <IdleSince endedAt={lastTurnEndedAt!} />
-          </Text>
-        ) : null}
-        {showCompressions ? (
-          <Text color={t.color.muted} wrap="truncate-end">
-            {' │ '}
-            <Text color={compressions >= 10 ? t.color.error : compressions >= 5 ? t.color.warn : t.color.muted}>
-              cmp {compressions}
-            </Text>
-          </Text>
-        ) : null}
-        {showCacheHit ? (
-          <Text color={t.color.muted} wrap="truncate-end">
-            {' │ '}
-            <Text
-              color={
-                usage.cache_hit_pct! >= 70
-                  ? t.color.statusGood
-                  : usage.cache_hit_pct! >= 40
-                    ? t.color.statusWarn
-                    : t.color.muted
-              }
-            >
-              {cacheHitText}
-            </Text>
-          </Text>
-        ) : null}
-        {showLatency ? (
-          <Text color={t.color.muted} wrap="truncate-end">
-            {' │ '}
-            {latencyText}
-          </Text>
-        ) : null}
-        {showTps ? (
-          <Text color={t.color.muted} wrap="truncate-end">
-            {' │ '}
-            {tpsText}
-          </Text>
-        ) : null}
-        {showVoice ? (
-          <Text
-            color={
-              voiceLabel!.startsWith('●') ? t.color.error : voiceLabel!.startsWith('◉') ? t.color.warn : t.color.muted
-            }
-            wrap="truncate-end"
-          >
-            {' │ '}
-            {voiceLabel}
-          </Text>
-        ) : null}
-        {showSessionCount ? sessionCountNode : null}
-        {showBg ? (
-          <Text color={t.color.muted} wrap="truncate-end">
-            {' │ '}
-            {bgCount} bg
-          </Text>
-        ) : null}
-        {showSubagents ? (
-          <Text color={t.color.muted} wrap="truncate-end">
-            {' │ '}⛓ {subagentCount}
-          </Text>
-        ) : null}
-        {showResumeHint ? (
-          <Text color={t.color.muted} dim wrap="truncate-end">
-            {' │ '}
-            {resumeHintText}
-          </Text>
-        ) : null}
-        {showDevCredits ? (
-          <Text color={t.color.accent} wrap="truncate-end">
-            {' │ '}
-            {devCreditsText}
-          </Text>
-        ) : null}
+        {tailSegments}
         {/* SpawnHud isn't part of the tail budget (its width is dynamic), so it
             renders last — any overflow truncates the HUD itself rather than the
             budgeted segments before it. It self-hides when no delegation runs. */}

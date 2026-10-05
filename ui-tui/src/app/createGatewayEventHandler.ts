@@ -25,6 +25,7 @@ import { isPaintableHex, setTerminalBackground, setTerminalForeground } from '..
 import { formatAbandonedClarify, formatAbandonedClarifyBatch, formatToolCall } from '../lib/text.js'
 import { bootSeededPin, invalidateBootBackground, writeBootTheme } from '../lib/themeBoot.js'
 import { defaultThemeForCurrentBackground, fromSkin, skinIsLight, type Theme, themeToneHex } from '../theme.js'
+import { designEquals, resolveDesign } from '../design.js'
 import type { Msg, SessionInfo, SubagentProgress } from '../types.js'
 
 import { applyDelegationStatus, getDelegationState } from './delegationStore.js'
@@ -111,7 +112,10 @@ const themeForSkin = (s: GatewaySkin) => {
     s.banner_logo ?? '',
     s.banner_hero ?? '',
     s.tool_prefix ?? '',
-    s.help_header ?? ''
+    s.help_header ?? '',
+    // Chrome restyle rides the same payload as the colours: `tui:` in the skin
+    // YAML (spacing, glyphs, borders, status-rule segment order).
+    resolveDesign(s.tui)
   )
 }
 
@@ -168,7 +172,9 @@ const themesEqual = (a: Theme, b: Theme) => {
     a.brand.name === b.brand.name &&
     a.brand.prompt === b.brand.prompt &&
     a.bannerLogo === b.bannerLogo &&
-    a.bannerHero === b.bannerHero
+    a.bannerHero === b.bannerHero &&
+    // A glyph/segment-only skin edit must still repaint and persist.
+    designEquals(a.design, b.design)
   )
 }
 

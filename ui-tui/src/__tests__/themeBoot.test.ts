@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { type BootTheme, invalidateBootBackground, seedBootEnvironment } from '../lib/themeBoot.js'
-import { defaultTheme } from '../theme.js'
+import { DEFAULT_DESIGN } from '../design.js'
+import {
+  type BootTheme,
+  invalidateBootBackground,
+  normalizeBootTheme,
+  seedBootEnvironment
+} from '../lib/themeBoot.js'
+import { DEFAULT_THEME } from '../theme.js'
 
 // Review on #20379 (finding 2): the boot cache seeds the previous session's
 // background into SHIINA_TUI_BACKGROUND, which detectLightMode treats as a
@@ -11,7 +17,7 @@ import { defaultTheme } from '../theme.js'
 // fallback refuses to run while the slot is occupied). These tests cover
 // the seed/invalidate contract the gateway handler drives.
 
-const cache = (over: Partial<BootTheme> = {}): BootTheme => ({ theme: defaultTheme, ...over })
+const cache = (over: Partial<BootTheme> = {}): BootTheme => ({ theme: DEFAULT_THEME, ...over })
 
 describe('seedBootEnvironment', () => {
   it('seeds the cached background when no explicit signal outranks it', () => {
@@ -123,5 +129,18 @@ describe('invalidateBootBackground', () => {
 
     expect(invalidateBootBackground(env)).toBe(false)
     expect(env.SHIINA_TUI_BACKGROUND).toBe('#ffffff')
+  })
+})
+
+describe('normalizeBootTheme', () => {
+  it('backfills the design tokens on a cache written before them', () => {
+    // A theme cached by an older build: colours + branding, no `design`.
+    const legacy = { ...DEFAULT_THEME, design: undefined } as unknown as typeof DEFAULT_THEME
+
+    expect(normalizeBootTheme(legacy).design).toEqual(DEFAULT_DESIGN)
+  })
+
+  it('keeps a design the cache already carries', () => {
+    expect(normalizeBootTheme(DEFAULT_THEME).design).toBe(DEFAULT_THEME.design)
   })
 })

@@ -31,6 +31,11 @@ class SkinConfig:
     tool_emojis: Dict[str, str] = field(default_factory=dict)  # per-tool emoji overrides
     banner_logo: str = ""    # Rich-markup ASCII art logo (replaces SHIINA_AGENT_LOGO)
     banner_hero: str = ""    # Rich-markup hero art (replaces SHIINA_CADUCEUS)
+    # Terminal chrome design tokens for the TUI (`tui:` section): spacing density,
+    # glyph overrides, border style, status-rule segment order. Passed through
+    # verbatim — the renderer validates per token so a half-authored block still
+    # renders (see ui-tui `design.ts`).
+    tui: Dict[str, Any] = field(default_factory=dict)
 
     def get_color(self, key: str, fallback: str = "") -> str:
         return self.colors.get(key, fallback)
@@ -440,7 +445,7 @@ def _build_skin_config(data: Dict[str, Any], *, dynamic: bool = False) -> SkinCo
         spinner=merged("spinner"), branding=merged("branding"), dynamic=dynamic,
         tool_prefix=data.get("tool_prefix", default.get("tool_prefix", "┊")),
         tool_emojis=section("tool_emojis"), banner_logo=data.get("banner_logo", ""),
-        banner_hero=data.get("banner_hero", ""))
+        banner_hero=data.get("banner_hero", ""), tui=section("tui"))
 
 
 def list_skins() -> List[Dict[str, str]]:
