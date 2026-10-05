@@ -27,7 +27,10 @@ class NvidiaProviderProfile(ProviderProfile):
 nvidia = NvidiaProviderProfile(
     name="nvidia", aliases=("nvidia-nim", "nim", "build-nvidia", "nemotron"), env_vars=("NVIDIA_API_KEY",), display_name="NVIDIA NIM",
     description="NVIDIA NIM — accelerated inference", signup_url="https://build.nvidia.com/",
-    fallback_models=("nvidia/llama-3.1-nemotron-70b-instruct", "nvidia/llama-3.3-70b-instruct"),
+    # Verified against the live endpoint: the previous pair
+    # (llama-3.1-nemotron-70b-instruct / llama-3.3-70b-instruct) was retired and returned
+    # HTTP 404, so a failed live fetch cached a two-entry catalog of dead models.
+    fallback_models=("nvidia/nemotron-3-ultra-550b-a55b", "nvidia/nemotron-3-super-120b-a12b"),
     base_url="https://integrate.api.nvidia.com/v1", default_max_tokens=16384,
 )
 
