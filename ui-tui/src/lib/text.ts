@@ -75,15 +75,15 @@ export const pasteTokenLabel = (text: string, lineCount: number) => {
 }
 
 const SITUATIONAL_VERBS =
-  'reviewing|inspecting|verifying|examining|checking|cooking|admiring|fine-tuning|polishing|double-checking|reading|studying|analyzing|searching|gathering|digging|scouting|scanning|connecting|exploring|digesting|browsing|researching|looking|thinking|synthesizing|considering|deliberating|piecing|in the zone|locked in|working magic|brewing|letting|firing|putting'
+  'reviewing|inspecting|verifying|examining|checking|cooking|admiring|fine-tuning|polishing|double-checking|reading|studying|analyzing|searching|gathering|digging|scouting|scanning|connecting|exploring|digesting|browsing|researching|looking|thinking|overthinking|planning|debugging|diagnosing|troubleshooting|drafting|architecting|brainstorming|formulating|plotting|refining|figuring|hunting|untangling|pinpointing|mapping|testing|validating|confirming|ensuring|evaluating|synthesizing|considering|deliberating|piecing|in the zone|locked in|working magic|brewing|letting|firing|putting|simmering|whipping|channeling|crunching'
 
 const STATUS_LINE_RE = new RegExp(
-  `^\\s*(?:\\([^\\n)]*\\)\\S*\\s*)?(?:[A-Za-z0-9_.-]+[:\\s]+\\s*){0,3}(?:is\\s+)?(?:${SITUATIONAL_VERBS})\\b.*(?:\\.{2,3}|…)\\s*$`,
+  `^\\s*(?:\\([^\\n)]*\\)\\S*\\s*)?(?:[A-Za-z0-9_.-]+[:\\s]+\\s*){0,3}(?:is\\s+[a-z-]+|(?:${SITUATIONAL_VERBS}))\\b.*(?:\\.{2,3}|…)\\s*$`,
   'i'
 )
 
 const STATUS_JOINED_RE = new RegExp(
-  `((?:\\([^\\n)]*\\)\\S*\\s*)?(?:[A-Za-z0-9_.-]+[:\\s]+\\s*){0,3}(?:is\\s+)?(?:${SITUATIONAL_VERBS})\\b.*?(?:\\.{2,3}|…))\\s*([A-Za-z0-9])`,
+  `((?:\\([^\\n)]*\\)\\S*\\s*)?(?:[A-Za-z0-9_.-]+[:\\s]+\\s*){0,3}(?:is\\s+[a-z-]+|(?:${SITUATIONAL_VERBS}))\\b.*?(?:\\.{2,3}|…))\\s*([A-Za-z0-9])`,
   'gi'
 )
 

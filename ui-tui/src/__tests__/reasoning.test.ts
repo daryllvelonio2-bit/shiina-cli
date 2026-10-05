@@ -83,7 +83,10 @@ describe('cleanThinkingText', () => {
   it('identifies situational status lines correctly', () => {
     expect(isThinkingStatusLine('(*.”) shiina is reading through the files...')).toBe(true)
     expect(isThinkingStatusLine('(¬_¬) shiina is inspecting the diff...')).toBe(true)
+    expect(isThinkingStatusLine('(¬_¬) Shiina is checking compiler output...')).toBe(true)
     expect(isThinkingStatusLine('shiina is studying the codebase...')).toBe(true)
+    expect(isThinkingStatusLine('shiina is planning...')).toBe(true)
+    expect(isThinkingStatusLine('shiina is overthinking...')).toBe(true)
     expect(isThinkingStatusLine('I need to inspect the code to find the bug.')).toBe(false)
   })
 })
