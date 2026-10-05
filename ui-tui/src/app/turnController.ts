@@ -10,12 +10,14 @@ import {
 import type { SessionInterruptResponse } from '../gatewayTypes.js'
 import { appendToolShelfMessage, isToolShelfMessage } from '../lib/liveProgress.js'
 import { hasReasoningTag, splitReasoning } from '../lib/reasoning.js'
+import { adaptStreamDelay } from '../lib/streamGovernor.js'
 import {
-  boundedLiveRenderText,
   buildToolTrailLine,
   buildVerboseToolTrailLine,
   estimateTokensRough,
   isTransientTrailLine,
+  liveTailLabel,
+  liveTailWindow,
   sameToolTrailGroup,
   toolTrailLabel
 } from '../lib/text.js'
@@ -138,6 +140,10 @@ class TurnController {
   private reasoningTimer: Timer = null
   private streamTimer: Timer = null
   private streamDelay = STREAM_IDLE_BATCH_MS
+  /** Interaction floor the governor may not decay below (0 = none). */
+  private streamDelayClamp = 0
+  /** Wall time of the last stream commit (governor input). */
+  private lastStreamFireAt = 0
 
   // ── Credits notice machinery (Strategy B) ───────────────────────────
   //
@@ -151,14 +157,19 @@ class TurnController {
   private noticeIdSeq = 0
 
   boostStreamingForTyping() {
-    this.streamDelay = STREAM_TYPING_BATCH_MS
+    // User interaction sets a floor the governor may not decay below: a keystroke
+    // must not queue behind a 60 ms-old stream commit.
+    this.streamDelayClamp = STREAM_TYPING_BATCH_MS
+    this.streamDelay = Math.max(this.streamDelay, STREAM_TYPING_BATCH_MS)
   }
 
   boostStreamingForScroll() {
+    this.streamDelayClamp = STREAM_SCROLL_BATCH_MS
     this.streamDelay = Math.max(this.streamDelay, STREAM_SCROLL_BATCH_MS)
   }
 
   relaxStreaming() {
+    this.streamDelayClamp = 0
     this.streamDelay = STREAM_IDLE_BATCH_MS
   }
 
@@ -294,6 +305,9 @@ class TurnController {
       streamPendingTools: [],
       streamSegments: [],
       streaming: '',
+      streamingDropped: 0,
+      streamingLabel: '',
+      streamingRaw: '',
       subagents: [],
       tools: [],
       turnTrail: []
@@ -946,8 +960,38 @@ class TurnController {
       this.streamTimer = null
       const raw = this.bufRef.trimStart()
       const visible = hasReasoningTag(raw) ? splitReasoning(raw).text : raw
-      patchTurnState({ streaming: boundedLiveRenderText(visible) })
+      const window = liveTailWindow(visible)
+
+      patchTurnState({
+        streaming: liveTailLabel(window) ? `${liveTailLabel(window)}\n${window.text}` : window.text,
+        // The scanner needs the stream, not the window (see turnStore).
+        streamingDropped: window.dropped,
+        streamingLabel: liveTailLabel(window),
+        streamingRaw: visible
+      })
+      this.adaptStreamDelay()
     }, this.streamDelay)
+  }
+
+  /**
+   * Advance the streaming governor with the measured cycle time.
+   *
+   * `cycleMs` spans the previous delay AND the commit work it triggered, so a
+   * saturated loop (work > delay) shows up as a cycle longer than the delay and
+   * the governor backs off — the frame queue never builds up. See
+   * `lib/streamGovernor.ts`.
+   */
+  private adaptStreamDelay() {
+    const now = Date.now()
+    const cycleMs = this.lastStreamFireAt ? now - this.lastStreamFireAt : this.streamDelay
+
+    this.lastStreamFireAt = now
+    this.streamDelay = adaptStreamDelay(this.streamDelay, cycleMs, this.streamDelayFloor())
+  }
+
+  /** The floor for the current interaction mode (typing/scroll clamp, else base). */
+  private streamDelayFloor() {
+    return this.streamDelayClamp || STREAM_IDLE_BATCH_MS
   }
 
   hydrateStreamingText(text: string) {
@@ -955,7 +999,14 @@ class TurnController {
     this.bufRef = text
     const raw = this.bufRef.trimStart()
     const visible = hasReasoningTag(raw) ? splitReasoning(raw).text : raw
-    patchTurnState({ streaming: boundedLiveRenderText(visible) })
+    const window = liveTailWindow(visible)
+
+    patchTurnState({
+      streaming: window.text,
+      streamingDropped: window.dropped,
+      streamingLabel: liveTailLabel(window),
+      streamingRaw: visible
+    })
   }
 
   startMessage() {

@@ -118,10 +118,88 @@ export const thinkingPreview = (reasoning: string, mode: ThinkingMode, max: numb
   return !raw || mode === 'collapsed' ? '' : mode === 'full' ? raw : compactPreview(raw.replace(WS_RE, ' '), max)
 }
 
-export const boundedLiveRenderText = (
+/** The rendered tail window of a live reply, plus where it starts. */
+export interface LiveTail {
+  /** Absolute offset of `text` within the source — everything before it was
+   *  dropped from the render window (but the scanner still covers it). */
+  dropped: number
+  omittedChars: number
+  omittedLines: number
+  text: string
+}
+
+/**
+ * Bound a live reply to a render window (a tail), reporting the absolute offset
+ * of that window. The offset is what lets the incremental renderer keep scanning
+ * the untrimmed stream (see `StreamingMd`): a sliding window used to look like a
+ * brand-new document every delta and forced a full re-parse — ~130 ms per delta
+ * at the 16 KB cap, which is the long-reply stutter.
+ */
+export const liveTailWindow = (
   text: string,
   { maxChars = LIVE_RENDER_MAX_CHARS, maxLines = LIVE_RENDER_MAX_LINES } = {}
-) => boundedRenderText(text, 'showing live tail', { maxChars, maxLines })
+): LiveTail => {
+  if (text.length <= maxChars && text.split('\n', maxLines + 1).length <= maxLines) {
+    return { dropped: 0, omittedChars: 0, omittedLines: 0, text }
+  }
+
+  let start = 0
+  let idx = text.length
+
+  for (let seen = 0; seen < maxLines && idx > 0; seen++) {
+    idx = text.lastIndexOf('\n', idx - 1)
+    start = idx < 0 ? 0 : idx + 1
+
+    if (idx < 0) {
+      break
+    }
+  }
+
+  const lineStart = start
+
+  start = Math.max(lineStart, text.length - maxChars)
+
+  if (start > lineStart) {
+    const nextBreak = text.indexOf('\n', start)
+
+    if (nextBreak >= 0 && nextBreak < text.length - 1) {
+      start = nextBreak + 1
+    }
+  }
+
+  const tail = text.slice(start).trimStart()
+  // `text.length - tail.length` is exactly where the rendered tail begins: the
+  // line walk plus whatever `trimStart` removed.
+  const dropped = text.length - tail.length
+
+  return {
+    dropped,
+    omittedChars: dropped,
+    omittedLines: countNewlines(text, start),
+    text: tail
+  }
+}
+
+/** The "[showing live tail; omitted …]" marker, or '' when nothing was dropped. */
+export const liveTailLabel = (
+  { omittedChars, omittedLines }: Pick<LiveTail, 'omittedChars' | 'omittedLines'>,
+  labelPrefix = 'showing live tail'
+) =>
+  omittedChars <= 0
+    ? ''
+    : omittedLines > 0
+      ? `[${labelPrefix}; omitted ${compactNumber(omittedLines)} lines / ${compactNumber(omittedChars)} chars]`
+      : `[${labelPrefix}; omitted ${compactNumber(omittedChars)} chars]`
+
+export const boundedLiveRenderText = (
+  text: string,
+  opts: { maxChars?: number; maxLines?: number } = {}
+) => {
+  const window = liveTailWindow(text, opts)
+  const label = liveTailLabel(window)
+
+  return label ? `${label}\n${window.text}` : window.text
+}
 
 const boundedRenderText = (
   text: string,

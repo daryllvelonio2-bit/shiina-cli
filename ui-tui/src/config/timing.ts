@@ -2,6 +2,14 @@ export const STREAM_BATCH_MS = 16
 export const STREAM_IDLE_BATCH_MS = 16
 export const STREAM_SCROLL_BATCH_MS = 96
 export const STREAM_TYPING_BATCH_MS = 80
+/** Slack over the requested delay before a stream cycle counts as "the main
+ *  thread is behind" — the streaming governor backs off above it. Tight enough
+ *  that a commit costing more than its own delay is caught in the first cycle
+ *  (queue buildup is what reads as stutter), loose enough to ignore timer
+ *  granularity and a GC pause. */
+export const STREAM_LATE_MS = 8
+/** Ceiling the streaming governor backs off to (fewer, larger commits). */
+export const STREAM_MAX_BATCH_MS = 140
 export const TYPING_IDLE_MS = 250
 export const REASONING_PULSE_MS = 700
 
