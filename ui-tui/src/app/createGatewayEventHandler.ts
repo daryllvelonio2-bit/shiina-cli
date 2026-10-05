@@ -22,7 +22,7 @@ import { openExternalUrl } from '../lib/openExternalUrl.js'
 import { rpcErrorMessage } from '../lib/rpc.js'
 import { topLevelSubagents } from '../lib/subagentTree.js'
 import { isPaintableHex, setTerminalBackground, setTerminalForeground } from '../lib/terminalModes.js'
-import { formatAbandonedClarify, formatAbandonedClarifyBatch, formatToolCall } from '../lib/text.js'
+import { formatAbandonedClarify, formatAbandonedClarifyBatch, formatToolCall, isThinkingStatusLine } from '../lib/text.js'
 import { bootSeededPin, invalidateBootBackground, writeBootTheme } from '../lib/themeBoot.js'
 import { defaultThemeForCurrentBackground, fromSkin, skinIsLight, type Theme, themeToneHex } from '../theme.js'
 import { designEquals, resolveDesign } from '../design.js'
@@ -870,9 +870,9 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
 
           if (value) {
             const clean = value.trim()
-            if (clean) {
+            if (clean && !isThinkingStatusLine(clean)) {
               const prefix = turnController.reasoningText && !turnController.reasoningText.endsWith('\n') ? '\n\n' : ''
-              turnController.recordReasoningDelta(`${prefix}${clean}\n\n`)
+              turnController.recordReasoningDelta(`${prefix}${clean}`)
             }
           }
         }

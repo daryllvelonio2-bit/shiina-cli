@@ -78,12 +78,12 @@ const SITUATIONAL_VERBS =
   'reviewing|inspecting|verifying|examining|checking|cooking|admiring|fine-tuning|polishing|double-checking|reading|studying|analyzing|searching|gathering|digging|scouting|scanning|connecting|exploring|digesting|browsing|researching|looking|thinking|synthesizing|considering|deliberating|piecing|in the zone|locked in|working magic|brewing|letting|firing|putting'
 
 const STATUS_LINE_RE = new RegExp(
-  `^\\s*(?:\\([^\\n)]*\\)\\S*\\s*)?(?:[A-Za-z0-9_.-]+\\s+){0,3}is\\s+(?:${SITUATIONAL_VERBS})\\b.*(?:\\.{2,3}|…)\\s*$`,
+  `^\\s*(?:\\([^\\n)]*\\)\\S*\\s*)?(?:[A-Za-z0-9_.-]+[:\\s]+\\s*){0,3}(?:is\\s+)?(?:${SITUATIONAL_VERBS})\\b.*(?:\\.{2,3}|…)\\s*$`,
   'i'
 )
 
 const STATUS_JOINED_RE = new RegExp(
-  `((?:\\([^\\n)]*\\)\\S*\\s*)?(?:[A-Za-z0-9_.-]+\\s+){0,3}is\\s+(?:${SITUATIONAL_VERBS})\\b.*?(?:\\.{2,3}|…))\\s*([A-Za-z0-9])`,
+  `((?:\\([^\\n)]*\\)\\S*\\s*)?(?:[A-Za-z0-9_.-]+[:\\s]+\\s*){0,3}(?:is\\s+)?(?:${SITUATIONAL_VERBS})\\b.*?(?:\\.{2,3}|…))\\s*([A-Za-z0-9])`,
   'gi'
 )
 
@@ -97,7 +97,7 @@ export const cleanThinkingText = (reasoning: string) =>
     .replace(STATUS_JOINED_RE, '$1\n\n$2')
     .split('\n')
     .map(line => line.replace(THINKING_STATUS_CHUNK_RE, '').trim())
-    .filter(line => line && !THINKING_STATUS_RE.test(line.replace(/\.\.\.$/, '').trim()))
+    .filter(line => line && !THINKING_STATUS_RE.test(line.replace(/\.\.\.$/, '').trim()) && !isThinkingStatusLine(line))
     .join('\n')
     .replace(/([^\n])(?=\*\*[^*\n][^\n]*?\*\*)/g, '$1\n\n')
     .replace(/\n{3,}/g, '\n\n')

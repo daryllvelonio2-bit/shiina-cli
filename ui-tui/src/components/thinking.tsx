@@ -632,12 +632,14 @@ function SubagentAccordion({
  *  wall) and characters alone do not bound rows, so both are applied. Pure so
  *  the window is testable without a renderer. */
 export const capThinkingLines = (allLines: string[], maxLines?: number): { hidden: number; lines: string[] } => {
+  const filtered = allLines.filter(line => !isThinkingStatusLine(line))
+
   if (!maxLines) {
-    return { hidden: 0, lines: allLines }
+    return { hidden: 0, lines: filtered }
   }
 
-  const windowed = allLines.slice(-maxLines)
-  const hidden = Math.max(0, allLines.length - windowed.length)
+  const windowed = filtered.slice(-maxLines)
+  const hidden = Math.max(0, filtered.length - windowed.length)
 
   let budget = THINKING_TRAIL_MAX_CHARS
 
@@ -707,24 +709,20 @@ export const Thinking = memo(function Thinking({
                   {`… +${hidden} earlier line${hidden === 1 ? '' : 's'}`}
                 </Text>
               ) : null}
-              {lines.map((line, index) => {
-                const isStatus = isThinkingStatusLine(line)
-
-                return (
-                  <Text color={isStatus ? greenColor : t.color.thinking} dim={!isStatus} key={index} wrap="wrap-trim">
-                    {line || ' '}
-                    {index === lines.length - 1 ? (
-                      <StreamCursor color={t.color.thinking} streaming={streaming} visible={active} />
-                    ) : null}
-                  </Text>
-                )
-              })}
+              {lines.map((line, index) => (
+                <Text color={t.color.thinking} dim key={index} wrap="wrap-trim">
+                  {line || ' '}
+                  {index === lines.length - 1 ? (
+                    <StreamCursor color={t.color.thinking} streaming={streaming} visible={active} />
+                  ) : null}
+                </Text>
+              ))}
             </>
           ) : (
-            <Text color={isThinkingStatusLine(preview) ? greenColor : t.color.thinking} dim={!isThinkingStatusLine(preview)} wrap="truncate-end">
+            <Text color={t.color.thinking} dim wrap="truncate-end">
               {preview}
               <StreamCursor
-                color={isThinkingStatusLine(preview) ? greenColor : t.color.thinking}
+                color={t.color.thinking}
                 streaming={streaming}
                 visible={active}
               />

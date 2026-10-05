@@ -74,10 +74,10 @@ describe('cleanThinkingText', () => {
     ).toBe('**Resolving comments on GitHub**\nActual step\nnext step')
   })
 
-  it('separates joined situational status lines from actual thoughts', () => {
+  it('strips joined situational status lines from actual thoughts', () => {
     expect(
       cleanThinkingText('(*.”) shiina is reading through the files...I need to check the codebase')
-    ).toBe('(*.”) shiina is reading through the files...\nI need to check the codebase')
+    ).toBe('I need to check the codebase')
   })
 
   it('identifies situational status lines correctly', () => {
