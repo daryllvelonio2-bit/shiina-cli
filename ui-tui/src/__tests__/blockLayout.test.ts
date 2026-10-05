@@ -75,27 +75,11 @@ describe('blockRenders', () => {
     expect(blockRenders(model, { detailsMode: 'hidden', commandOverride: true })).toBe(true)
   })
 
-  it('suppresses settled diffs and tool results unless details were asked for', () => {
-    expect(blockRenders(diff, { detailsMode: 'collapsed' })).toBe(false)
-    expect(blockRenders(toolResult, { detailsMode: 'collapsed' })).toBe(false)
-    expect(blockRenders(diff, { detailsMode: 'collapsed', live: true })).toBe(true)
-    expect(blockRenders(toolResult, { detailsMode: 'collapsed', live: true })).toBe(true)
-    expect(blockRenders(diff, { detailsMode: 'collapsed', commandOverride: true })).toBe(true)
-    expect(blockRenders(toolResult, { detailsMode: 'collapsed', commandOverride: true })).toBe(true)
-  })
-
-  it('suppresses a settled trail unless details were asked for', () => {
-    // The default: the answer stands alone, the work behind it is invisible.
-    expect(blockRenders(trail, { detailsMode: 'collapsed' })).toBe(false)
-    expect(blockRenders(trail, { detailsMode: 'expanded' })).toBe(false)
-    // The live turn is the one place a trail is meant to be visible.
-    expect(blockRenders(trail, { detailsMode: 'collapsed', live: true })).toBe(true)
-    expect(blockRenders(trail, { detailsMode: 'expanded', live: true })).toBe(true)
-    // An explicit request brings it back: config or /details.
-    expect(blockRenders(trail, { detailsMode: 'collapsed', commandOverride: true })).toBe(true)
-    expect(blockRenders(trail, { detailsMode: 'collapsed', sections: { thinking: 'collapsed' } })).toBe(true)
-    // /details hidden routes through commandOverride, which hides every section.
-    expect(blockRenders(trail, { detailsMode: 'hidden', commandOverride: true })).toBe(false)
+  it('renders settled diffs, tool results, and trails so they stay in conversation collapsed', () => {
+    expect(blockRenders(diff, { detailsMode: 'collapsed' })).toBe(true)
+    expect(blockRenders(toolResult, { detailsMode: 'collapsed' })).toBe(true)
+    expect(blockRenders(trail, { detailsMode: 'collapsed' })).toBe(true)
+    expect(blockRenders(trail, { detailsMode: 'expanded' })).toBe(true)
   })
 
   it('does not render a content-less trail (e.g. finalDetails with only a token tally)', () => {

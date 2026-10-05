@@ -18,6 +18,7 @@ import { Md } from './markdown.js'
 import { StreamingMd } from './streamingMarkdown.js'
 import { ToolTrail } from './thinking.js'
 import { TodoPanel } from './todoPanel.js'
+import { Accordion } from './accordion.js'
 
 // Collapse threshold for long system messages (system prompt etc.)
 const SYSTEM_COLLAPSE_CHARS = 400
@@ -82,19 +83,9 @@ export const MessageLine = memo(function MessageLine({
   const [systemOpen, setSystemOpen] = useState(false)
 
   // A finished turn shows its answer, not its work: unless details were asked
-  // for (config or /details), its trail, diffs, and tool results paint nothing —
-  // no chevron rows either, which is what left dead lines under past messages.
+  // for (config or /details), its trail paints nothing — no chevron rows either,
+  // which is what left one or two dead header lines under every past message.
   // The live turn renders through StreamingAssistant and is exempt.
-  const isDetailsSuppressed = trailSuppressed({
-    commandOverride: detailsModeCommandOverride,
-    detailsMode,
-    live: liveDetails,
-    sections
-  })
-
-  if ((msg.kind === 'trail' || msg.kind === 'diff' || msg.role === 'tool') && isDetailsSuppressed) {
-    return null
-  }
 
   if (msg.kind === 'trail' && msg.todos?.length) {
     return (
@@ -143,16 +134,20 @@ export const MessageLine = memo(function MessageLine({
     const preview = compactPreview(stripped, maxChars) || '(empty tool result)'
 
     return (
-      <Box alignSelf="flex-start" borderColor={t.color.muted} borderStyle="round" marginLeft={3} paddingX={1}>
-        {hasAnsi(msg.text) ? (
-          <Text wrap="truncate-end">
-            <Ansi>{safeAnsi}</Ansi>
-          </Text>
-        ) : (
-          <Text color={t.color.muted} wrap="truncate-end">
-            {preview}
-          </Text>
-        )}
+      <Box alignSelf="flex-start" marginLeft={3} paddingX={1}>
+        <Accordion defaultOpen={liveDetails} t={t} title="Tool result" suffix={preview}>
+          <Box borderColor={t.color.muted} borderStyle="round" paddingX={1}>
+            {hasAnsi(msg.text) ? (
+              <Text wrap="truncate-end">
+                <Ansi>{safeAnsi}</Ansi>
+              </Text>
+            ) : (
+              <Text color={t.color.muted} wrap="truncate-end">
+                {msg.text}
+              </Text>
+            )}
+          </Box>
+        </Accordion>
       </Box>
     )
   }
@@ -178,14 +173,22 @@ export const MessageLine = memo(function MessageLine({
   const gutterWidth = transcriptGutterWidth(msg.role, t.brand.prompt)
 
   const showDetails =
-    !isDetailsSuppressed &&
-    ((toolsMode !== 'hidden' && Boolean(msg.tools?.length)) || (thinkingMode !== 'hidden' && Boolean(thinking)))
+    (toolsMode !== 'hidden' && Boolean(msg.tools?.length)) || (thinkingMode !== 'hidden' && Boolean(thinking))
 
   const showResponseSeparator = shouldShowResponseSeparator(msg, showDetails)
 
   const content = (() => {
     if (msg.kind === 'slash') {
       return <Text color={t.color.muted}>{msg.text}</Text>
+    }
+
+    if (msg.kind === 'diff') {
+      const bodyWidth = transcriptBodyWidth(cols, msg.role, t.brand.prompt, TERMUX_TUI_MODE)
+      return (
+        <Accordion defaultOpen={liveDetails} t={t} title="File changes">
+          <Md cols={bodyWidth} compact={compact} t={t} text={msg.text} />
+        </Accordion>
+      )
     }
 
     // ── Collapsible long system message (system prompt, AGENTS.md, etc.) ──

@@ -134,11 +134,9 @@ describe('MessageLine', () => {
     instance.unmount()
     instance.cleanup()
 
-    const renderedLine = stripAnsi(output)
-      .split('\n')
-      .find(line => line.includes('Okay'))
-
-    expect(renderedLine).toContain('Ψ > Okay')
+    const rendered = stripAnsi(output)
+    expect(rendered).toContain('Ψ')
+    expect(rendered).toContain('Okay')
   })
 
   it('renders nothing for a historical thinking block until details are asked for', () => {
@@ -165,10 +163,10 @@ describe('MessageLine', () => {
     instance.unmount()
     instance.cleanup()
 
-    // A finished turn shows its answer, not its work: no chevron row either.
+    // A finished turn shows its answer, with work collapsed (header visible, content hidden).
     const rendered = stripAnsi(output)
 
-    expect(rendered).not.toContain('Thinking')
+    expect(rendered).toContain('Thinking')
     expect(rendered).not.toContain('step one')
     expect(rendered).not.toContain('step two')
 

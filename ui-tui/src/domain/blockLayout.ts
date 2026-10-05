@@ -124,10 +124,6 @@ export const blockRenders = (
   msg: Pick<Msg, 'kind' | 'role' | 'thinking' | 'todos' | 'tools'>,
   ctx: DetailsCtx
 ): boolean => {
-  if ((msg.kind === 'trail' || msg.kind === 'diff' || msg.role === 'tool') && trailSuppressed(ctx)) {
-    return false
-  }
-
   if (msg.kind !== 'trail') {
     return true
   }
@@ -136,11 +132,15 @@ export const blockRenders = (
     return true
   }
 
+  if (trailAllHidden(ctx)) {
+    return false
+  }
+
   if (!(msg.tools?.length || msg.thinking?.trim())) {
     return false
   }
 
-  return !trailAllHidden(ctx)
+  return true
 }
 
 /**
