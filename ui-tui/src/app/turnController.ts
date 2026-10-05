@@ -633,10 +633,12 @@ class TurnController {
       return body === null || (!finalHasOwnDiffFence && !finalText.includes(body))
     })
 
-    const hasReasoningSegment =
-      this.reasoningSegmentIndex !== null || segments.some(msg => Boolean(msg.thinking?.trim()))
+    const segmentThinking = segments
+      .map(msg => msg.thinking?.trim())
+      .filter(Boolean)
+      .join('\n\n')
 
-    const finalThinking = hasReasoningSegment ? '' : savedReasoning.trim()
+    const finalThinking = [savedReasoning.trim(), segmentThinking].filter(Boolean).join('\n\n').trim()
 
     const finalDetails: Msg = {
       kind: 'trail',
