@@ -3,6 +3,7 @@ import type { Usage } from '@shiina/shared/gateway-events'
 import type { MutableRefObject, ReactNode, RefObject, SetStateAction } from 'react'
 
 import type { PasteEvent } from '../components/textInput.js'
+import type { LayoutId } from '../domain/layout.js'
 import type { GatewayClient } from '../gatewayClient.js'
 import type {
   BillingCardInfo,
@@ -334,6 +335,8 @@ export interface UiState {
   // persistent `◉ focus` status-bar badge; never affects request payloads.
   focusView: boolean
   info: null | SessionInfo
+  // `display.layout` — the structural layout (minimal | workbench | studio).
+  layout: LayoutId
   liveSessionCount: number
   inlineDiffs: boolean
   mouseTracking: MouseTrackingMode

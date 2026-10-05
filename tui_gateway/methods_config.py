@@ -217,6 +217,7 @@ _CONFIG_GETTERS = {
     "density": lambda params: {"value": "on" if bool(_display_raw().get("tui_compact", False)) else "off"},
     "theme": lambda params: {"value": _display_word("tui_theme", "auto", {"auto", "light", "dark"})},
     "statusbar": lambda params: {"value": _coerce_statusbar(_display_cfg().get("tui_statusbar", "top"))},
+    "layout": lambda params: {"value": _display_word("layout", "workbench", {"minimal", "workbench", "studio"})},
     "focus": lambda params: {"value": "on" if bool(_display_cfg().get("focus_view", False)) else "off",
                              "tool_progress": _load_tool_progress_mode()},
     "mouse": lambda params: {"value": _display_mouse_tracking(_load_cfg().get("display"))},

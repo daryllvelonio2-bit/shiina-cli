@@ -80,6 +80,9 @@ export interface ConfigDisplayConfig {
   /** Focus view (/focus) — display-only reduced-output mode. */
   focus_view?: boolean
   inline_diffs?: boolean
+  /** Structural layout: minimal | workbench | studio. Runtime-validated by
+   *  domain/layout.ts — an unknown word resolves to the default. */
+  layout?: string
   mouse_tracking?: boolean | null | number | string
   sections?: Record<string, string>
   show_cost?: boolean

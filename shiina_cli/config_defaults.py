@@ -759,6 +759,13 @@ DEFAULT_CONFIG = {
     "display": {
         "compact": False,
         "tui_compact": True,
+        # Structural TUI layout: "minimal" (transcript + prompt, no widget
+        # chrome) | "workbench" (single column — every instrument wraps the
+        # composer; the long-standing look) | "studio" (a reserved right column
+        # holds the live agents board + todo list beside the transcript).
+        # Switch live with `/layout`. Unknown values fall back to workbench
+        # rather than blanking the UI; renderer mirror: ui-tui/src/domain/layout.ts.
+        "layout": "workbench",
         "personality": "",
         "resume_display": "full",
         # Recap tuning for /resume and startup resume.
