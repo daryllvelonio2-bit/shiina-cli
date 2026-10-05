@@ -157,10 +157,11 @@ _ALIBABA_TOKEN_PLAN_MODELS = [
     "qwen3.8-max-0902", "qwen3.7-max", "qwen3.7-plus", "qwen3.6-plus", "qwen3.6-flash", "deepseek-v4-pro",
     "deepseek-v4-flash", "deepseek-v3.2", "kimi-k2.7-code", "kimi-k2.6", "kimi-k2.5", "glm-5.2", "glm-5.1", "glm-5",
 ]
-_XAI_MODELS = _xai_curated_models()
 
 # Curated per-provider lists. ``-cn`` twins share the international catalog on a domestic endpoint.
-_PROVIDER_MODELS: dict[str, list[str]] = {
+# The three disk-derived entries (openai-codex, xai-oauth, xai) are placeholders: provider_models()
+# fills them on first use — see the note there.
+_PROVIDER_MODELS_BASE: dict[str, list[str]] = {
     "moa": ["default"],
     "nous": [mid for mid, _ in OPENROUTER_MODELS if mid not in _OPENROUTER_ONLY and not mid.endswith(":free")],
     # Used by /model counts and provider_model_ids fallback when /v1/models is unavailable.
@@ -170,8 +171,8 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "gpt-5.6-luna-pro", "gpt-5.5", "gpt-5.5-pro", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano",
         "gpt-5-mini", "gpt-5.3-codex", "gpt-4.1", "gpt-4o", "gpt-4o-mini",
     ],
-    "openai-codex": _codex_curated_models(),
-    "xai-oauth": list(_XAI_MODELS),
+    "openai-codex": [],  # filled by provider_models()
+    "xai-oauth": [],  # filled by provider_models()
     "copilot-acp": ["copilot-acp"],
     "copilot": _OPENAI_CHAT_MODELS + [
         "claude-sonnet-4.6", "claude-sonnet-5", "claude-sonnet-4", "claude-sonnet-4.5", "claude-haiku-4.5",
@@ -185,7 +186,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "glm-5.3", "glm-5.3-flash", "glm-5.2", "glm-5.1", "glm-5", "glm-5v-turbo", "glm-5-turbo",
         "glm-4.7", "glm-4.5", "glm-4.5-flash",
     ],
-    "xai": list(_XAI_MODELS),
+    "xai": [],  # filled by provider_models()
     # Nemotron flagships, then third-party agentic models hosted on build.nvidia.com.
     "nvidia": [
         "nvidia/nemotron-3-ultra-550b-a55b", "nvidia/nemotron-3-super-120b-a12b",
@@ -367,6 +368,34 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "opencode/space-bunny-free",
     ],
 }
+
+
+# ``_PROVIDER_MODELS`` is deliberately NOT a module global: it is materialized on first access
+# (PEP 562 ``__getattr__`` below) instead of at import. Building its xAI/Codex entries eagerly
+# pulled ``agent.models_dev`` (→ ``requests``, ~0.35 s) and ``agent.model_metadata``
+# (→ ``shiina_cli.config``, ~0.4 s) into this module — documented "data only, no network" — on
+# every `shiina` start that never opens a model picker. Identical values, just later.
+def provider_models() -> dict[str, list[str]]:
+    """The curated per-provider catalog, disk-derived xAI/Codex entries included.
+
+    Materializes once and mutates ``_PROVIDER_MODELS_BASE`` in place, so every holder of the
+    returned dict keeps seeing the same object on later reads.
+    """
+    models = globals().get("_PROVIDER_MODELS")
+    if models is None:
+        models = _PROVIDER_MODELS_BASE
+        xai = _xai_curated_models()
+        models["openai-codex"] = _codex_curated_models()
+        models["xai-oauth"] = list(xai)
+        models["xai"] = list(xai)
+        globals()["_PROVIDER_MODELS"] = models
+    return models
+
+
+def __getattr__(name: str):  # PEP 562
+    if name == "_PROVIDER_MODELS":
+        return provider_models()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # ---------------------------------------------------------------------------

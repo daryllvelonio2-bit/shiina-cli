@@ -272,6 +272,62 @@ def _config_default_interface_early() -> str:
     return value
 
 
+# Raw config.yaml for the pre-import safety bridges (redaction / IPv4). Cached: several early
+# callers would otherwise re-parse the same file.
+_EARLY_EFFECTIVE_CACHE: "list | None" = None
+
+
+def _has_env_template(node) -> bool:
+    """True when *node* contains a ``${VAR}`` reference — only config_effective can expand those."""
+    if isinstance(node, str):
+        return "${" in node
+    if isinstance(node, dict):
+        return any(_has_env_template(value) for value in node.values())
+    if isinstance(node, list):
+        return any(_has_env_template(item) for item in node)
+    return False
+
+
+def _config_early_effective() -> dict:
+    """Effective user config for the early bridges, WITHOUT importing shiina_cli.config.
+
+    ``config_effective.load_user_config_effective`` is the canonical loader (managed overlay +
+    ``${VAR}`` expansion), but importing it drags ``shiina_cli.config`` — and through it urllib,
+    the provider registry and the plugin tables — into every command's startup (~0.45 s) for two
+    booleans. Read the raw YAML directly and defer to the canonical loader only when its extra
+    semantics actually apply: a ``${...}`` template under ``security``/``network``, or a real
+    managed scope that may pin those keys.
+    """
+    global _EARLY_EFFECTIVE_CACHE
+    if _EARLY_EFFECTIVE_CACHE is not None:
+        return _EARLY_EFFECTIVE_CACHE[0]
+    raw: dict = {}
+    try:
+        cfg_path = get_shiina_home() / "config.yaml"
+        if cfg_path.exists():
+            from shiina_cli import managed_scope
+
+            if managed_scope.load_managed_config():
+                from shiina_cli.config_effective import load_user_config_effective
+
+                raw = load_user_config_effective(cfg_path)
+            else:
+                import yaml as _yaml_early
+
+                with open(cfg_path, encoding="utf-8") as _f:
+                    loaded = _yaml_early.load(
+                        _f, Loader=getattr(_yaml_early, "CSafeLoader", None) or _yaml_early.SafeLoader)
+                raw = loaded if isinstance(loaded, dict) else {}
+                if _has_env_template(raw.get("security")) or _has_env_template(raw.get("network")):
+                    from shiina_cli.config_effective import load_user_config_effective
+
+                    raw = load_user_config_effective(cfg_path)
+    except Exception:
+        raw = {}  # best-effort — the bridges fall back to their defaults
+    _EARLY_EFFECTIVE_CACHE = [raw]
+    return raw
+
+
 def _wants_tui_early(argv: "list[str] | None" = None) -> bool:
     """Earliest TUI decision, usable before argparse/config imports.
 
@@ -652,7 +708,9 @@ from shiina_cli.env_loader import load_shiina_dotenv
 # ``update`` must not resolve external secret sources (Windows self-lock via cryptography, slow
 # helpers inside the import probe) — ``_early_recovery._should_skip_external_secret_sources``
 # owns that argv check for every dotenv load in the process. See #73381.
-load_shiina_dotenv(project_env=PROJECT_ROOT / ".env")
+# The terminal.* → env bridge is deferred to main(): it imports shiina_cli.config (~0.4 s) and
+# nothing between here and main() reads TERMINAL_*. See env_loader._reapply_terminal_config_bridge.
+load_shiina_dotenv(project_env=PROJECT_ROOT / ".env", reapply_terminal_bridge=False)
 
 # Bridge security.redact_secrets → SHIINA_REDACT_SECRETS BEFORE shiina_logging
 # imports agent.redact, which snapshots the flag exactly once at import. A
@@ -660,25 +718,21 @@ load_shiina_dotenv(project_env=PROJECT_ROOT / ".env")
 # is read from the same parse to avoid a second full load_config() (~17ms).
 _FORCE_IPV4_EARLY = False
 try:
-    # The effective-config cache (shared raw parse with read_raw_config()) means this SAME parse
-    # serves shiina_logging, shiina_time and later raw reads: 3-4 config.yaml parses become one.
-    # Managed overlay included: administrator-pinned redact_secrets / force_ipv4 win here too.
-    _cfg_path = get_shiina_home() / "config.yaml"
-    if _cfg_path.exists():
-        from shiina_cli.config_effective import load_user_config_effective as _load_effective_early
-
-        _early_cfg_raw = _load_effective_early(_cfg_path)
-        if "SHIINA_REDACT_SECRETS" not in os.environ:
-            _early_sec_cfg = _early_cfg_raw.get("security", {})
-            if isinstance(_early_sec_cfg, dict):
-                _early_redact = _early_sec_cfg.get("redact_secrets")
-                if _early_redact is not None:
-                    os.environ["SHIINA_REDACT_SECRETS"] = str(_early_redact).lower()
-        _early_net_cfg = _early_cfg_raw.get("network", {})
-        if isinstance(_early_net_cfg, dict) and _early_net_cfg.get("force_ipv4"):
-            _FORCE_IPV4_EARLY = True
-        del _early_cfg_raw
-    del _cfg_path
+    # Two booleans is all this block needs, so read config.yaml through the minimal early loader
+    # instead of importing shiina_cli.config_effective → shiina_cli.config (~0.45 s of urllib +
+    # provider/plugin tables per command). The managed overlay and ``${VAR}`` semantics still
+    # apply — _config_early_effective defers to the canonical loader when either is in play.
+    _early_cfg_raw = _config_early_effective()
+    if "SHIINA_REDACT_SECRETS" not in os.environ:
+        _early_sec_cfg = _early_cfg_raw.get("security", {})
+        if isinstance(_early_sec_cfg, dict):
+            _early_redact = _early_sec_cfg.get("redact_secrets")
+            if _early_redact is not None:
+                os.environ["SHIINA_REDACT_SECRETS"] = str(_early_redact).lower()
+    _early_net_cfg = _early_cfg_raw.get("network", {})
+    if isinstance(_early_net_cfg, dict) and _early_net_cfg.get("force_ipv4"):
+        _FORCE_IPV4_EARLY = True
+    del _early_cfg_raw
 except Exception:
     pass  # best-effort — redaction stays at default (enabled) on config errors
 
@@ -3668,6 +3722,15 @@ def main():
     _set_process_title()
     _warn_if_unsupervised_pid1()
     _advertise_agent_env()
+
+    # The module-level dotenv load skipped this (it imports shiina_cli.config, ~0.4 s, and must not
+    # sit in `import shiina_cli.main`). Run it here, still ahead of every reader of TERMINAL_*.
+    try:
+        from shiina_cli.env_loader import _reapply_terminal_config_bridge
+
+        _reapply_terminal_config_bridge(get_shiina_home())
+    except Exception:
+        pass
 
     # Force UTF-8 stdio on Windows before anything prints.  No-op elsewhere.
     try:

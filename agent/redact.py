@@ -17,6 +17,56 @@ from agent.file_safety import _BLOCKED_PROJECT_ENV_BASENAMES as _ENV_FILE_BASENA
 
 logger = logging.getLogger(__name__)
 
+# The stdlib compiler, aliased so the module-level ``= _LazyPattern(...)`` rewrites below stay
+# unambiguous (nothing here compiles eagerly).
+_compile = re.compile
+
+
+class _LazyPattern:
+    """A ``re.Pattern`` that compiles itself on first use.
+
+    ``agent.redact`` sits on the import path of every ``shiina`` start (``shiina_logging`` installs
+    the redacting formatter) and the ~30 module-level ``re.compile`` calls cost ~80 ms of it, for a
+    redactor most runs never invoke. The pattern sources, flags and match order are untouched — only
+    the compilation is deferred. Compilation is lock-guarded (redaction runs from many threads) with
+    an unlocked fast path once the pattern exists.
+    """
+
+    def __init__(self, source: str, flags: int = 0):
+        self._source = source
+        self._flags = flags
+        self._compiled: "re.Pattern[str] | None" = None
+        self._lock = threading.Lock()
+
+    @property
+    def pattern(self) -> str:
+        return self._source
+
+    @property
+    def flags(self) -> int:
+        return self._flags
+
+    def _re(self) -> "re.Pattern[str]":
+        compiled = self._compiled
+        if compiled is not None:
+            return compiled
+        with self._lock:
+            if self._compiled is None:
+                self._compiled = _compile(self._source, self._flags)
+            return self._compiled
+
+    def __getattr__(self, name):
+        if name.startswith("_"):
+            # Never forward private/dunder probes (__deepcopy__, __getstate__, ...) — recursing
+            # through _re() would loop on a half-initialized instance.
+            raise AttributeError(name)
+        # Every re.Pattern method (sub/subn/search/match/fullmatch/split/findall/finditer) forwards.
+        return getattr(self._re(), name)
+
+    def __repr__(self) -> str:
+        return f"<lazy re.Pattern {self._source!r}>"
+
+
 # ---------------------------------------------------------------------------
 # Vault-value redaction registry (profile-scoped, bounded)
 # ---------------------------------------------------------------------------
@@ -205,13 +255,13 @@ _PREFIX_PATTERNS = [
 # ``token=``, ``KEYBOARD=``, ``PASSAGE=``) do not match — those are handled by the config/form/URL paths,
 # and a bare ``password=…`` in a form body must not be swallowed greedily by ``\S+``. See #77484.
 _SECRET_ENV_NAMES = r"(?:API_?KEY|KEY|TOKEN|SECRET|PASSWORD|PASSWD|PASS|PW|CREDENTIAL|AUTH)"
-_ENV_ASSIGN_RE = re.compile(rf"([A-Z0-9_]{{0,50}}{_SECRET_ENV_NAMES}[A-Z0-9_]{{0,50}})\s*=\s*(['\"]?)(\S+)\2")
+_ENV_ASSIGN_RE = _LazyPattern(rf"([A-Z0-9_]{{0,50}}{_SECRET_ENV_NAMES}[A-Z0-9_]{{0,50}})\s*=\s*(['\"]?)(\S+)\2")
 # Lowercase env names: only underscore-boundary forms (``openai_key=``) — NOT
 # bare ``password=``/``token=``, which appear in prose, URLs, and form bodies.
 # The lookbehind anchors each attempt to the start of an identifier run; without
 # it re.sub retries the greedy prefix at every byte of a long opaque payload.
 # See #77484.
-_ENV_ASSIGN_LOWER_RE = re.compile(
+_ENV_ASSIGN_LOWER_RE = _LazyPattern(
     rf"(?<![a-z0-9_])([a-z0-9_]+(?:_|^)(?:key|pass|pw|token|secret|password|passwd|credential|auth)(?=[^a-z0-9_]|$))\s*=\s*(['\"]?)(\S+)\2",
     re.IGNORECASE,
 )
@@ -237,17 +287,17 @@ _SECRET_CFG_NAMES = r"(?:api[ _.\-]?key|token|secret|passwd|password|credential|
 _LINE_NUMBER_GUTTER = r"(?:[0-9]+(?:[|:\-]|\t)[ \t]*)?"
 _CFG_VALUE = r"(['\"]?)([^\s&]+?)\2(?=[\s&]|$)"
 # Linear pre-gate for the _CFG_*_RE subs: no secret keyword => neither can match.
-_CFG_SECRET_WORD_RE = re.compile(_SECRET_CFG_NAMES, re.IGNORECASE)
+_CFG_SECRET_WORD_RE = _LazyPattern(_SECRET_CFG_NAMES, re.IGNORECASE)
 
 # Programmatic env lookups (``os.getenv(...)``, ``process.env.X``, ``$ENV{X}``)
 # as the VALUE of a KEY=... match name a variable; they are not a leaked secret.
-_ENV_LOOKUP_VALUE_RE = re.compile(r"^(?:os\.(?:getenv|environ)|process\.env|\$ENV\{)")
+_ENV_LOOKUP_VALUE_RE = _LazyPattern(r"^(?:os\.(?:getenv|environ)|process\.env|\$ENV\{)")
 # Namespaced key: the secret word may sit anywhere in a dotted path.
 # NOTE(perf): possessive quantifiers (nested ``(?:[...]+\.)+`` backtracked
 # exponentially); the ``*`` runs bordering {_SECRET_CFG_NAMES} must stay
 # backtrackable (``app.api.key=``). The lookbehind anchors each attempt to a key
 # run start so re.sub is not quadratic; the match set is unchanged.
-_CFG_DOTTED_RE = re.compile(
+_CFG_DOTTED_RE = _LazyPattern(
     rf"(?<![A-Za-z0-9_.\-])"
     rf"([A-Za-z0-9_\-]++\.[A-Za-z0-9_.\-]*{_SECRET_CFG_NAMES}[A-Za-z0-9_.\-]*+"
     rf"|[A-Za-z0-9_.\-]*{_SECRET_CFG_NAMES}[A-Za-z0-9_.\-]*\.[A-Za-z0-9_.\-]++)"
@@ -259,7 +309,7 @@ _CFG_DOTTED_RE = re.compile(
 # ``read_file`` emits ``5|      ADS_API_TOKEN: …``, ``grep -n`` emits ``6:      ADS_API_TOKEN: …``
 # and ``cat -n`` emits ``     7\tADS_API_TOKEN: …``. Anchored at ``^`` without it, none of those
 # matched, so the rendered read of a secret-bearing file leaked what the raw text masked.
-_CFG_ANCHORED_RE = re.compile(
+_CFG_ANCHORED_RE = _LazyPattern(
     rf"(^[ \t]*{_LINE_NUMBER_GUTTER}(?:export[ \t]+)?[A-Za-z0-9_\-]*{_SECRET_CFG_NAMES}[A-Za-z0-9_\-]*)={_CFG_VALUE}",
     re.IGNORECASE | re.MULTILINE,
 )
@@ -272,7 +322,7 @@ _CFG_ANCHORED_RE = re.compile(
 # NOTE(perf): possessive where the successor is disjoint; the leading class
 # stays backtrackable (see _CFG_DOTTED_RE).
 _YAML_CFG_NAMES = r"(?:api[ _.\-]?key|token|secret|passwd|password|credential)"
-_YAML_ASSIGN_RE = re.compile(
+_YAML_ASSIGN_RE = _LazyPattern(
     rf"(^[ \t]*+{_LINE_NUMBER_GUTTER}[A-Za-z0-9_.\-]*{_YAML_CFG_NAMES}[A-Za-z0-9_.\-]*+)(:[ \t]*+)(?!['\"])([^\s&]++)",
     re.IGNORECASE | re.MULTILINE,
 )
@@ -293,7 +343,7 @@ _YAML_ASSIGN_RE = re.compile(
 # Embedded occurrences inside a larger word (``secretary``, ``tokenizer``, ``authored``, ``credentialing``)
 # no longer match. ALL-CAPS keys keep the legacy embedded matching (``MYTOKEN=…``) — an all-caps key is
 # almost never prose, the same rationale as _ENV_ASSIGN_RE.
-_KEY_KEYWORD_RE = re.compile(
+_KEY_KEYWORD_RE = _LazyPattern(
     r"(?:api|auth|access|refresh|session|secret)[ _.\\-]?(?:key|token)"
     r"|token|secret|passwd|password|pass|pw|credential|auth|key",
     re.IGNORECASE,
@@ -303,7 +353,7 @@ _KEY_KEYWORD_RE = re.compile(
 # human-readable. Bare ``token`` / ``key`` are intentionally absent: they also
 # describe model limits, tensor names, and cache keys, so those assignments
 # are gated on value shape (_looks_like_opaque_credential).
-_STRONG_KEY_KEYWORD_RE = re.compile(
+_STRONG_KEY_KEYWORD_RE = _LazyPattern(
     r"(?:api|auth|access|refresh|session|id|bearer)[ _.\\-]?(?:key|token)"
     r"|key[ _.\\-]?material|secret|passwd|password|pass|pw|credential|auth|bearer",
     re.IGNORECASE,
@@ -311,7 +361,7 @@ _STRONG_KEY_KEYWORD_RE = re.compile(
 # Password-class keys mask any literal value; for other keys a value that starts like ``$HOME/...``,
 # ``/usr/...`` or ``~/...`` references a variable or a path, not a credential, even under a strong key
 # (``SSH_AUTH_SOCK=$HOME/.ssh/agent.sock``, ``DOCKER_AUTH_CONFIG=/home/u/.docker``).
-_PASSWORD_KEY_RE = re.compile(r"passwd|password|pass|pw", re.IGNORECASE)
+_PASSWORD_KEY_RE = _LazyPattern(r"passwd|password|pass|pw", re.IGNORECASE)
 # Anchored on both ends: the whole value must be a ``$VAR``/``${VAR}`` reference, a ``~/``
 # path, or an absolute path — not merely a string whose FIRST character is one of those.
 # A 40-char AWS secret key starts with '/' ~1 in 64 times and argon2/bcrypt digests always
@@ -322,12 +372,12 @@ _PASSWORD_KEY_RE = re.compile(r"passwd|password|pass|pw", re.IGNORECASE)
 # A leading ``$(`` is a command substitution (``SSH_AUTH_SOCK=$(gpgconf --list-dirs
 # agent-ssh-socket)``): the value token stops at whitespace, so only ``$(gpgconf`` is seen.
 _SHELL_VAR_REF = r"\$(?:\{[A-Za-z_]\w*[^}]*\}|[A-Za-z_]\w*)"
-_PATH_OR_VAR_VALUE_RE = re.compile(rf"^(?:{_SHELL_VAR_REF}|\$\(|~|/)(?:[\w./:-]|{_SHELL_VAR_REF})*$")
+_PATH_OR_VAR_VALUE_RE = _LazyPattern(rf"^(?:{_SHELL_VAR_REF}|\$\(|~|/)(?:[\w./:-]|{_SHELL_VAR_REF})*$")
 # ``$VAR`` / ``$(cmd`` are unambiguous references. A ``/``- or ``~``-led value is a path only
 # while every segment reads like one: a 16+ char segment mixing case and digits with no ``.``
 # (``/wJalrXUtnFEMIK7MDENG/bPxRf…``) is a secret that happens to start with a path character,
 # whereas ``/home/u/.docker`` / ``~/.ssh/id_rsa`` / ``S.gpg-agent.ssh`` never clear that bar.
-_OPAQUE_PATH_SEGMENT_RE = re.compile(r"(?=[^.]*[a-z])(?=[^.]*[A-Z])(?=[^.]*[0-9])[^.]{16,}")
+_OPAQUE_PATH_SEGMENT_RE = _LazyPattern(r"(?=[^.]*[a-z])(?=[^.]*[A-Z])(?=[^.]*[0-9])[^.]{16,}")
 
 
 def _is_word_start(s: str, i: int) -> bool:
@@ -408,7 +458,7 @@ def _should_redact_assignment(key: str, value: str, *, check_keyword: bool) -> b
 
 # JSON field patterns: "apiKey": "value", "token": "value", etc.
 _JSON_KEY_NAMES = r"(?:api_?[Kk]ey|token|secret|password|access_token|refresh_token|auth_token|bearer|secret_value|raw_secret|secret_input|key_material)"
-_JSON_FIELD_RE = re.compile(rf'("{_JSON_KEY_NAMES}")\s*:\s*"([^"]+)"', re.IGNORECASE)
+_JSON_FIELD_RE = _LazyPattern(rf'("{_JSON_KEY_NAMES}")\s*:\s*"([^"]+)"', re.IGNORECASE)
 
 # Python ``repr`` uses single-quoted mapping fields, so opaque credentials in
 # tracebacks and pytest failure introspection bypass the double-quoted JSON rule
@@ -459,7 +509,7 @@ _PYTHON_REPR_CREDENTIAL_SUFFIXES = (
     "credential",
     "credentials",
 )
-_PYTHON_REPR_FIELD_RE = re.compile(
+_PYTHON_REPR_FIELD_RE = _LazyPattern(
     r"'(?P<key>[A-Za-z_][A-Za-z0-9_]*)'(?P<sep>\s*:\s*)"
     r"(?:"
     r"(?P<single_prefix>[bB]?)'(?P<single_value>(?:\\.|[^'\\])+)'"
@@ -470,8 +520,8 @@ _PYTHON_REPR_FIELD_RE = re.compile(
 # Terminal/process output normally uses ``code_file=True`` to preserve source.
 # Add repr masking only to high-confidence diagnostic lines: pytest assertion
 # introspection (``E       ...``) and final Python exception lines.
-_PYTEST_DIAGNOSTIC_LINE_RE = re.compile(r"^(?P<prefix>[ \t]*E[ \t]{2,})(?P<body>.*)$")
-_PYTHON_EXCEPTION_LINE_RE = re.compile(
+_PYTEST_DIAGNOSTIC_LINE_RE = _LazyPattern(r"^(?P<prefix>[ \t]*E[ \t]{2,})(?P<body>.*)$")
+_PYTHON_EXCEPTION_LINE_RE = _LazyPattern(
     r"^(?P<prefix>(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*"
     r"(?:Error|Exception|Warning):[ \t]*)(?P<body>.*)$"
 )
@@ -480,17 +530,17 @@ _PYTHON_EXCEPTION_LINE_RE = re.compile(
 # name and scheme word preserved. The credential class excludes quotes: pulling
 # a closing quote into the mask turns value corruption into SYNTAX corruption
 # (unterminated quote → shell EOF / SyntaxError).
-_AUTH_HEADER_RE = re.compile(r"((?:Proxy-)?Authorization:\s*)([A-Za-z][\w.+-]*\s+)?([^\s\"']+)", re.IGNORECASE)
+_AUTH_HEADER_RE = _LazyPattern(r"((?:Proxy-)?Authorization:\s*)([A-Za-z][\w.+-]*\s+)?([^\s\"']+)", re.IGNORECASE)
 
 # API-key style headers (single opaque value, no scheme word): non-vendor-prefix
 # values would otherwise leak when a curl command is echoed into tool output.
 _SECRET_HEADER_NAMES = r"(?:x-api-key|x-goog-api-key|api-key|apikey|x-api-token|x-auth-token|x-access-token)"
-_SECRET_HEADER_RE = re.compile(rf"({_SECRET_HEADER_NAMES}\s*:\s*)(\S+)", re.IGNORECASE)
+_SECRET_HEADER_RE = _LazyPattern(rf"({_SECRET_HEADER_NAMES}\s*:\s*)(\S+)", re.IGNORECASE)
 
 # Telegram bot tokens: [bot]<digits>:<token>, token >= 30 chars.
-_TELEGRAM_RE = re.compile(r"(bot)?(\d{8,}):([-A-Za-z0-9_]{30,})")
+_TELEGRAM_RE = _LazyPattern(r"(bot)?(\d{8,}):([-A-Za-z0-9_]{30,})")
 
-_PRIVATE_KEY_RE = re.compile(r"-----BEGIN[A-Z ]*PRIVATE KEY-----[\s\S]*?-----END[A-Z ]*PRIVATE KEY-----")
+_PRIVATE_KEY_RE = _LazyPattern(r"-----BEGIN[A-Z ]*PRIVATE KEY-----[\s\S]*?-----END[A-Z ]*PRIVATE KEY-----")
 
 # Database connection strings: protocol://user:PASSWORD@host. The userinfo and
 # password groups forbid whitespace so a match can never span a line break (a
@@ -500,7 +550,7 @@ _PRIVATE_KEY_RE = re.compile(r"-----BEGIN[A-Z ]*PRIVATE KEY-----[\s\S]*?-----END
 # greedy [^@]+ would scan past the end of a code line to the next stray "@" (e.g. a Python decorator),
 # swallowing intervening lines and corrupting tool OUTPUT for any source containing a postgresql:// f-string
 # template. See issue #33801.
-_DB_CONNSTR_RE = re.compile(
+_DB_CONNSTR_RE = _LazyPattern(
     r"((?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp)://[^:\s]+:)([^@\s]+)(@)",
     re.IGNORECASE,
 )
@@ -516,7 +566,7 @@ _DB_CONNSTR_RE = re.compile(
 # ``user:pass@`` is deliberately left to pass through (commit "pass web URLs through unchanged", #34029) and
 # is NOT matched here — the token class forbids ``:``. DB schemes are handled by _DB_CONNSTR_RE above and
 # excluded here. Guards against false positives:
-_URL_BARE_TOKEN_RE = re.compile(
+_URL_BARE_TOKEN_RE = _LazyPattern(
     r"((?:https?|wss?|git|ssh|ftp|ftps|sftp)://)"  # scheme
     r"([^\s:@/]{8,})"                               # bare token (no colon/slash/@), 8+ chars
     r"(@[^\s]+)",                                   # @host...
@@ -524,33 +574,33 @@ _URL_BARE_TOKEN_RE = re.compile(
 )
 
 # JWTs always start with "eyJ" (base64 "{"); 1-, 2- and 3-part forms.
-_JWT_RE = re.compile(r"eyJ[A-Za-z0-9_-]{10,}(?:\.[A-Za-z0-9_=-]{4,}){0,2}")
+_JWT_RE = _LazyPattern(r"eyJ[A-Za-z0-9_-]{10,}(?:\.[A-Za-z0-9_=-]{4,}){0,2}")
 
 # E.164 phone numbers, 7-15 digits; the lookahead rejects hex strings / identifiers.
-_SIGNAL_PHONE_RE = re.compile(r"(\+[1-9]\d{6,14})(?![A-Za-z0-9])")
+_SIGNAL_PHONE_RE = _LazyPattern(r"(\+[1-9]\d{6,14})(?![A-Za-z0-9])")
 
 # CDP-URL path: web URLs with a query string / with ``user:password@`` userinfo
 # (DB protocols are covered by _DB_CONNSTR_RE).
-_URL_WITH_QUERY_RE = re.compile(r"(https?|wss?|ftp)://([^\s/?#]+)([^\s?#]*)\?([^\s#]+)(#\S*)?")
-_URL_USERINFO_RE = re.compile(r"(https?|wss?|ftp)://([^/\s:@]+):([^/\s@]+)@")
+_URL_WITH_QUERY_RE = _LazyPattern(r"(https?|wss?|ftp)://([^\s/?#]+)([^\s?#]*)\?([^\s#]+)(#\S*)?")
+_URL_USERINFO_RE = _LazyPattern(r"(https?|wss?|ftp)://([^/\s:@]+):([^/\s@]+)@")
 
 # Strict provider-egress URL redaction: delimiters stay in capture groups so the
 # query/fragment layout is preserved byte-for-byte; the key is decoded
 # separately for classification. Values stop at ``&``/``;`` (both valid).
-_STRICT_URL_PARAM_RE = re.compile(r"([?#&;])([A-Za-z0-9_.~+%\-]+)=([^#&;\s\"'<>]*)")
+_STRICT_URL_PARAM_RE = _LazyPattern(r"([?#&;])([A-Za-z0-9_.~+%\-]+)=([^#&;\s\"'<>]*)")
 
 # Userinfo in absolute and network-path (``//user:pass@host``) references; the
 # authority stops at path/query/fragment delimiters. Anchored on the mandatory
 # ``//`` — an optional-scheme prefix backtracked O(n²) on long alphanumeric runs
 # (~55s per sub() on a 320KB compaction payload).
-_STRICT_URL_USERINFO_RE = re.compile(r"(//)([^/\s?#@]+)@")
+_STRICT_URL_USERINFO_RE = _LazyPattern(r"(//)([^/\s?#@]+)@")
 
 # Form-urlencoded body: only when the ENTIRE text is a k=v&k=v string.
-_FORM_BODY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]*=[^&\s]*(?:&[A-Za-z_][A-Za-z0-9_.-]*=[^&\s]*)+$")
+_FORM_BODY_RE = _LazyPattern(r"^[A-Za-z_][A-Za-z0-9_.-]*=[^&\s]*(?:&[A-Za-z_][A-Za-z0-9_.-]*=[^&\s]*)+$")
 
 # Control / zero-width characters that can split a token body (``sk-abc\x1bdef``,
 # ``ghp_abc\n123``) and escape the contiguous prefix regexes.
-_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f\u200b-\u200f\u2028-\u202f\u2060\ufeff]")
+_CONTROL_CHARS_RE = _LazyPattern(r"[\x00-\x1f\x7f\u200b-\u200f\u2028-\u202f\u2060\ufeff]")
 
 # Union of every _PREFIX_PATTERNS body class: a control-stripped match may only
 # span token-body or control chars. ``=`` is excluded so a KEY=value separator
@@ -558,8 +608,8 @@ _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f\u200b-\u200f\u2028-\u202f\u2060\
 _TOKEN_BODY_CHARS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-.")
 
 
-def _compile_prefix_matcher(patterns: list) -> "re.Pattern[str]":
-    return re.compile(r"(?<![A-Za-z0-9_-])(" + "|".join(patterns) + r")(?![A-Za-z0-9_-])")
+def _compile_prefix_matcher(patterns: list) -> "_LazyPattern":
+    return _LazyPattern(r"(?<![A-Za-z0-9_-])(" + "|".join(patterns) + r")(?![A-Za-z0-9_-])")
 
 
 _PREFIX_RE = _compile_prefix_matcher(_PREFIX_PATTERNS)
@@ -603,7 +653,7 @@ def _mask_control_split_tokens(text: str, mask_fn) -> str:
 
 # mask_secret strips EVERY control char (incl. \n/\t, C1, DEL, zero-width) so a
 # masked secret never emits multiline or invisible bytes into display output.
-_DISPLAY_CONTROL_RE = re.compile(r"[\x00-\x1f\x7f\x80-\x9f\u200b-\u200f\u202a-\u202e\u2060-\u2064]")
+_DISPLAY_CONTROL_RE = _LazyPattern(r"[\x00-\x1f\x7f\x80-\x9f\u200b-\u200f\u202a-\u202e\u2060-\u2064]")
 
 
 def mask_secret(value: str, *, head: int = 4, tail: int = 4, floor: int = 12,
@@ -1107,7 +1157,7 @@ REDACTION_UNAVAILABLE = "[redaction-unavailable]"
 # The opaque branch needs a 20-char floor (the floor the gateway/A2A sweeps always had): without it the
 # English word "bearer" turns "the bearer of bad news" into "Bearer [redacted] bad news" on every chat
 # reply. The bracket branch folds an already-masked residue ("Bearer [redacted-jwt]") to one marker.
-_BEARER_RESIDUE_RE = re.compile(r"\bBearer\s+(?:\[[^\]]+\]|[A-Za-z0-9._~+/-]{20,}=*)", re.IGNORECASE)
+_BEARER_RESIDUE_RE = _LazyPattern(r"\bBearer\s+(?:\[[^\]]+\]|[A-Za-z0-9._~+/-]{20,}=*)", re.IGNORECASE)
 
 
 def redact_for_egress(text: str) -> str:

@@ -3923,7 +3923,90 @@ def config_command(args):
     sys.exit(1)
 
 
-# ---- OPTIONAL_ENV_VARS injection from provider profiles and platform plugins (once, at import) ----
+# ---- OPTIONAL_ENV_VARS injection from provider profiles and platform plugins (on first read) ----
+
+class _OptionalEnvVars(dict):
+    """``OPTIONAL_ENV_VARS`` plus the entries contributed by provider profiles and platform plugins.
+
+    Those entries come from importing every provider/platform plugin, which drags urllib and the
+    transport modules into ``shiina_cli.config``'s own import (~0.35 s on every command) for a
+    registry only the setup / config / dashboard surfaces read. The expansion therefore runs on
+    first read instead of at import.
+
+    Reads go through the dict methods below. A whole-mapping copy (``dict(OPTIONAL_ENV_VARS)`` /
+    ``{**OPTIONAL_ENV_VARS}``) bypasses Python-level overrides — call
+    :func:`ensure_optional_env_vars` or copy ``.items()`` first.
+    """
+
+    # Instance attribute in __init__; the class default keeps a copy made through the reduce
+    # protocol (deepcopy/pickle, which do not call __init__) working — expansion is idempotent.
+    _expanded = False
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._expanded = False
+
+    def ensure(self) -> None:
+        if self._expanded:
+            return
+        self._expanded = True  # set first: the injections read this same mapping back
+        _inject_profile_env_vars()
+        _inject_platform_plugin_env_vars()
+
+    def get(self, key, default=None):
+        self.ensure()
+        return super().get(key, default)
+
+    def __getitem__(self, key):
+        self.ensure()
+        return super().__getitem__(key)
+
+    def __contains__(self, key):
+        self.ensure()
+        return super().__contains__(key)
+
+    def __iter__(self):
+        self.ensure()
+        return super().__iter__()
+
+    def __len__(self):
+        self.ensure()
+        return super().__len__()
+
+    def keys(self):
+        self.ensure()
+        return super().keys()
+
+    def values(self):
+        self.ensure()
+        return super().values()
+
+    def items(self):
+        self.ensure()
+        return super().items()
+
+    def copy(self):
+        self.ensure()
+        return super().copy()
+
+    def __eq__(self, other):
+        self.ensure()
+        return super().__eq__(other)
+
+    def __repr__(self):
+        self.ensure()
+        return super().__repr__()
+
+
+def ensure_optional_env_vars() -> Dict[str, Any]:
+    """Materialize the plugin-contributed ``OPTIONAL_ENV_VARS`` entries, then return the mapping."""
+    OPTIONAL_ENV_VARS.ensure()
+    return OPTIONAL_ENV_VARS
+
+
+# Wrap the defaults table so the injections below stay lazy (see _OptionalEnvVars).
+OPTIONAL_ENV_VARS = _OptionalEnvVars(OPTIONAL_ENV_VARS)
+
 
 def _inject_profile_env_vars() -> None:
     """Expose env_vars of every ``auth_type="api_key"`` provider in providers/ via OPTIONAL_ENV_VARS
@@ -3947,9 +4030,6 @@ def _inject_profile_env_vars() -> None:
                     "advanced": True}
     except Exception:
         pass
-
-
-_inject_profile_env_vars()
 
 
 def _platform_plugin_manifests():
@@ -3998,9 +4078,6 @@ def _inject_platform_plugin_env_vars() -> None:
                     "category": meta.get("category") or "messaging"}
     except Exception:
         pass
-
-
-_inject_platform_plugin_env_vars()
 
 
 # ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
