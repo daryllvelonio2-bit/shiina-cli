@@ -68,9 +68,20 @@ describe('blockRenders', () => {
   const trail: Msg = { role: 'system', kind: 'trail', text: '', tools: ['Edit foo.ts'] }
   const model: Msg = { role: 'assistant', text: 'hi' }
   const todos: Msg = { role: 'system', kind: 'trail', text: '', todos: [{ content: 'a', id: '1', status: 'pending' }] }
+  const diff: Msg = { role: 'assistant', kind: 'diff', text: '```diff\n- a\n+ b\n```' }
+  const toolResult: Msg = { role: 'tool', text: 'ok' }
 
-  it('always renders non-trail blocks', () => {
+  it('always renders plain assistant blocks', () => {
     expect(blockRenders(model, { detailsMode: 'hidden', commandOverride: true })).toBe(true)
+  })
+
+  it('suppresses settled diffs and tool results unless details were asked for', () => {
+    expect(blockRenders(diff, { detailsMode: 'collapsed' })).toBe(false)
+    expect(blockRenders(toolResult, { detailsMode: 'collapsed' })).toBe(false)
+    expect(blockRenders(diff, { detailsMode: 'collapsed', live: true })).toBe(true)
+    expect(blockRenders(toolResult, { detailsMode: 'collapsed', live: true })).toBe(true)
+    expect(blockRenders(diff, { detailsMode: 'collapsed', commandOverride: true })).toBe(true)
+    expect(blockRenders(toolResult, { detailsMode: 'collapsed', commandOverride: true })).toBe(true)
   })
 
   it('suppresses a settled trail unless details were asked for', () => {

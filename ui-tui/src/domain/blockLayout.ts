@@ -120,13 +120,16 @@ export const trailSuppressed = (ctx: DetailsCtx): boolean =>
  * so a hidden or content-less trail never leaves a floating blank line, doubles
  * the gap after a user prompt, or pads the space above the final reply.
  */
-export const blockRenders = (msg: Pick<Msg, 'kind' | 'thinking' | 'todos' | 'tools'>, ctx: DetailsCtx): boolean => {
-  if (msg.kind !== 'trail') {
-    return true
+export const blockRenders = (
+  msg: Pick<Msg, 'kind' | 'role' | 'thinking' | 'todos' | 'tools'>,
+  ctx: DetailsCtx
+): boolean => {
+  if ((msg.kind === 'trail' || msg.kind === 'diff' || msg.role === 'tool') && trailSuppressed(ctx)) {
+    return false
   }
 
-  if (trailSuppressed(ctx)) {
-    return false
+  if (msg.kind !== 'trail') {
+    return true
   }
 
   if (msg.todos?.length) {

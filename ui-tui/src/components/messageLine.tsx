@@ -82,13 +82,17 @@ export const MessageLine = memo(function MessageLine({
   const [systemOpen, setSystemOpen] = useState(false)
 
   // A finished turn shows its answer, not its work: unless details were asked
-  // for (config or /details), its trail paints nothing — no chevron rows either,
-  // which is what left one or two dead header lines under every past message.
+  // for (config or /details), its trail, diffs, and tool results paint nothing —
+  // no chevron rows either, which is what left dead lines under past messages.
   // The live turn renders through StreamingAssistant and is exempt.
-  if (
-    msg.kind === 'trail' &&
-    trailSuppressed({ commandOverride: detailsModeCommandOverride, detailsMode, live: liveDetails, sections })
-  ) {
+  const isDetailsSuppressed = trailSuppressed({
+    commandOverride: detailsModeCommandOverride,
+    detailsMode,
+    live: liveDetails,
+    sections
+  })
+
+  if ((msg.kind === 'trail' || msg.kind === 'diff' || msg.role === 'tool') && isDetailsSuppressed) {
     return null
   }
 
@@ -174,7 +178,8 @@ export const MessageLine = memo(function MessageLine({
   const gutterWidth = transcriptGutterWidth(msg.role, t.brand.prompt)
 
   const showDetails =
-    (toolsMode !== 'hidden' && Boolean(msg.tools?.length)) || (thinkingMode !== 'hidden' && Boolean(thinking))
+    !isDetailsSuppressed &&
+    ((toolsMode !== 'hidden' && Boolean(msg.tools?.length)) || (thinkingMode !== 'hidden' && Boolean(thinking)))
 
   const showResponseSeparator = shouldShowResponseSeparator(msg, showDetails)
 
