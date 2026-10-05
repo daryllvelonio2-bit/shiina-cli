@@ -1167,11 +1167,11 @@ export const ToolTrail = memo(function ToolTrail({
           <Text color={t.color.muted} dim={!thinkingLive}>
             <Text color={t.color.accent}>{openThinking ? '▾ ' : '▸ '}</Text>
             {thinkingLive ? (
-              <Text bold color={t.color.text}>
+              <Text bold color={t.color.accent}>
                 Thinking
               </Text>
             ) : (
-              <Text color={t.color.muted} dim>
+              <Text bold color={t.color.accent}>
                 Thinking
               </Text>
             )}
