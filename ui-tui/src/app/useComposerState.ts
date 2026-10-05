@@ -309,8 +309,12 @@ export function useComposerState({ gw, submitRef, sys }: UseComposerStateOptions
   )
 
   const handleTextPaste = useCallback(
-    ({ bracketed, cursor, hotkey, text, value }: PasteEvent): MaybePromise<ComposerPasteResult | null> => {
+    ({ bracketed, cursor, hotkey, image, text, value }: PasteEvent): MaybePromise<ComposerPasteResult | null> => {
       if (hotkey) {
+        if (image) {
+          return pasteClipboardImage(value, cursor, false)
+        }
+
         const preferOsc52 = isRemoteShellSession(process.env)
 
         const readPreferredText = preferOsc52
@@ -334,14 +338,14 @@ export function useComposerState({ gw, submitRef, sys }: UseComposerStateOptions
             return handleResolvedPaste({ bracketed: false, cursor, text: preferredText, value })
           }
 
-          // No text on the clipboard — an image paste looks exactly like this.
-          return pasteClipboardImage(value, cursor, false)
+          sys('No text found in clipboard')
+          return null
         })
       }
 
       return handleResolvedPaste({ bracketed: !!bracketed, cursor, text, value })
     },
-    [handleResolvedPaste, pasteClipboardImage, querier]
+    [handleResolvedPaste, pasteClipboardImage, querier, sys]
   )
 
   /**

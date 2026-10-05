@@ -1392,16 +1392,31 @@ export function TextInput({
         return
       }
 
-      if (
+      // Clipboard chords. Matched on the DECODED key, not only the legacy raw
+      // bytes: shiina-ink pushes the kitty keyboard protocol, so Ctrl+V arrives
+      // as ESC[118;5u and the old `raw === '\x16'` comparison never fired —
+      // paste looked broken outright under kitty. Ctrl+V attaches the clipboard
+      // image; Ctrl+Shift+V and Alt+V paste text; Cmd+V pastes text on macOS.
+      const vKey = inp.toLowerCase() === 'v'
+      const pasteImageKey = eventRaw === '\x16' || (!isMac && k.ctrl && !k.shift && !k.meta && vKey)
+      const pasteTextKey =
         eventRaw === '\x1bv' ||
         eventRaw === '\x1bV' ||
-        eventRaw === '\x16' ||
-        (isMac && isActionMod(k) && inp.toLowerCase() === 'v')
-      ) {
+        (!isMac && !!k.meta && !k.ctrl && vKey) ||
+        (!isMac && k.ctrl && k.shift && vKey) ||
+        (isMac && isActionMod(k) && vKey)
+
+      if (pasteImageKey || pasteTextKey) {
         flushKeyBurst()
 
         if (cbPaste.current) {
-          return void emitPaste({ cursor: curRef.current, hotkey: true, text: '', value: vRef.current })
+          return void emitPaste({
+            cursor: curRef.current,
+            hotkey: true,
+            image: pasteImageKey,
+            text: '',
+            value: vRef.current
+          })
         }
 
         if (isMac) {
@@ -1809,6 +1824,9 @@ export interface PasteEvent {
   bracketed?: boolean
   cursor: number
   hotkey?: boolean
+  /** A hotkey paste that wants the clipboard IMAGE (Ctrl+V). Without it a
+   *  hotkey paste reads clipboard text (Ctrl+Shift+V / Alt+V / Cmd+V). */
+  image?: boolean
   text: string
   value: string
 }
