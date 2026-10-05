@@ -2614,6 +2614,21 @@ class CLICommandsMixin:
         _persist_display_choice("display.tui_status_indicator", arg, "Busy-indicator style",
                                 "The TUI picks up the new style on its next render.")
 
+    def _handle_layout_command(self, cmd: str):
+        """Handle /layout [minimal|workbench|studio] — pick the TUI's structural layout.
+        Persists to ``display.layout`` (the key the TUI reads) for its next render."""
+        from shiina_constants import DEFAULT_LAYOUT, LAYOUT_IDS
+        current = (self.config.get("display") or {}).get("layout", DEFAULT_LAYOUT)
+        arg = _command_arg(cmd, lower=True)
+        usage = _dim_line(f"Usage: /layout [{'|'.join(LAYOUT_IDS)}]")
+        if not arg or arg == "status":
+            return _cp(_accent_line(f"Layout: {current}"), usage)
+        if arg not in LAYOUT_IDS:
+            return _cp(_dim_line(f'(._.) Unknown layout: {arg}'), usage)
+        self.config.setdefault("display", {})["layout"] = arg
+        _persist_display_choice("display.layout", arg, "Layout",
+                                "The TUI picks up the new layout on its next render.")
+
     def _handle_fast_command(self, cmd: str):
         """Handle /fast — toggle fast mode (OpenAI Priority Processing / Anthropic Fast Mode).
         Session-scoped by default; ``--global`` persists agent.service_tier to config.yaml

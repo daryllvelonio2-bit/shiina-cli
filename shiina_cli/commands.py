@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass
 
 from utils import is_truthy_value
-from shiina_constants import INDICATOR_STYLES
+from shiina_constants import INDICATOR_STYLES, LAYOUT_IDS
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +199,9 @@ COMMAND_REGISTRY: list[CommandDef] = [
     CommandDef("indicator", "Pick the TUI busy-indicator style", "Configuration",
                cli_only=True, args_hint=f"[{'|'.join(INDICATOR_STYLES)}]",
                subcommands=INDICATOR_STYLES, desktop="terminal"),
+    CommandDef("layout", "Pick the TUI structural layout", "Configuration",
+               cli_only=True, args_hint=f"[{'|'.join(LAYOUT_IDS)}]",
+               subcommands=LAYOUT_IDS, desktop="terminal"),
     CommandDef("voice", "Toggle voice mode", "Configuration",
                args_hint="[on|off|tts|status]", subcommands=("on", "off", "tts", "status"),
                desktop="composer-voice"),

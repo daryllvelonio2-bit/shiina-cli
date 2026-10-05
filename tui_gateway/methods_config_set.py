@@ -6,7 +6,7 @@ Keys match exactly except ``details_mode.<section>`` (prefix) and ``_DISPLAY_TOG
 
 import os
 
-from shiina_constants import INDICATOR_STYLES
+from shiina_constants import INDICATOR_STYLES, LAYOUT_IDS
 
 from .method_ctx import HandlerRegistry, bind_module
 
@@ -346,8 +346,7 @@ def _word_setters() -> dict:
         "indicator": (_raw_word, INDICATOR_STYLES, "unknown indicator: {raw!r}; pick one of " + "|".join(INDICATOR_STYLES),
                       lambda w: _write_config_key("display.tui_status_indicator", w)),
         # Structural TUI layout; the renderer mirrors these words (ui-tui/src/domain/layout.ts).
-        "layout": (_word, {"minimal", "workbench", "studio"},
-                   "unknown layout: {value}; pick one of minimal|workbench|studio",
+        "layout": (_word, set(LAYOUT_IDS), "unknown layout: {value}; pick one of " + "|".join(LAYOUT_IDS),
                    lambda w: _write_config_key("display.layout", w)),
         # Which engine the desktop voice button mounts; applies to the NEXT conversation.
         "voice.voice_chat_mode": (_word, {"chained", "gpt-live"}, "unknown voice chat mode: {value}; pick chained|gpt-live",
