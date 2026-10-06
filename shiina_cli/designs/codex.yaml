@@ -1,0 +1,108 @@
+# codex — neutral, dim, minimal chrome (OpenAI Codex CLI flavour).
+#
+# The read: near-monochrome, almost no accent, secondary text genuinely dim,
+# and as little furniture as possible. What little colour there is only marks
+# state — a soft blue for the prompt, green/amber/red for done/warn/failed.
+#
+# Markers follow Codex's vocabulary: `•` for list items, `⏺` for an action in
+# flight, `✓`/`✗` for its outcome. Tool calls stay folded to one line each so a
+# long turn reads as a list of actions rather than a wall of output.
+#
+# `extends: default` means everything not named here is the built-in look.
+
+name: codex
+description: Codex-style — neutral and dim, minimal chrome, round composer box, bullet actions.
+extends: default
+
+colors:
+  accent: "#7aa2f7"          # the one real colour: the prompt and active marker
+  border: "#4b4b4b"          # boxes are structure, not decoration
+  completionBg: "#2a2a2a"
+  completionCurrentBg: "#3a3a3a"
+  completionMetaBg: "#2a2a2a"
+  completionMetaCurrentBg: "#3a3a3a"
+  diffAdded: "#8fd694"
+  diffAddedWord: "#b7ecc0"
+  diffRemoved: "#f7768e"
+  diffRemovedWord: "#ff9db0"
+  error: "#f7768e"
+  label: "#9ca3af"
+  muted: "#8b8b8b"           # genuinely dim — Codex leans on this hard
+  ok: "#8fd694"
+  primary: "#e0e0e0"
+  prompt: "#7aa2f7"
+  selectionBg: "#3a3a3a"
+  sessionBorder: "#4b4b4b"
+  sessionLabel: "#9ca3af"
+  shellDollar: "#7aa2f7"
+  statusBad: "#f7768e"
+  statusBg: "#2a2a2a"
+  statusCritical: "#f7768e"
+  statusFg: "#d4d4d4"
+  statusGood: "#8fd694"
+  statusWarn: "#e0af68"
+  syntaxComment: "#6b7280"
+  syntaxKeyword: "#7aa2f7"
+  syntaxNumber: "#e0af68"
+  syntaxString: "#8fd694"
+  text: "#d4d4d4"
+  thinking: "#6b7280"        # reasoning recedes
+  tool: "#9ca3af"
+  warn: "#e0af68"
+
+prompt: ">"
+
+design:
+  density: compact
+  panel: round               # Codex's composer/boxes are rounded
+  alert: round
+  rule: "─"
+
+  spacing:
+    insetPadX: 1
+
+  glyphs:
+    active: "⏺"              # an action in flight
+    bullet: "•"
+    check: "✓"
+    chevronClosed: "›"
+    chevronOpen: "⌄"
+    cross: "✗"
+    ellipsis: "…"
+    off: "○"
+    pending: "·"
+    progress: "⏺"
+    selected: "*"
+    waiting: "?"
+    separator: "  "          # dim air, not a drawn divider
+    statusHead: "─ "
+
+  status_bar:
+    # Close to Codex's idle status line: what model, where, how many tokens.
+    segments: [model, cwd, tokens]
+
+spinner:
+  think: [orbit]
+  tool: [scan]
+
+layout:
+  # Minimal furniture: no ambient rails, no pet, no persistent ledger. The
+  # transcript and the composer are the interface.
+  regions:
+    agentsDock: false
+    dock: true
+    fileChanges: true
+    ledger: false
+    pet: false
+    rails: false
+    scrollbar: true
+    sideColumn: false
+    statusRule: true
+    stickyPrompt: false
+    todoUnderPrompt: false
+  sections:
+    # Actions fold to one line each; reasoning and delegations stay out of the way.
+    activity: hidden
+    subagents: collapsed
+    thinking: collapsed
+    tools: collapsed

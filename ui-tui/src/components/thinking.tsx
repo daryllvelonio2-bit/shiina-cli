@@ -161,7 +161,9 @@ export function Spinner({ color, variant = 'think' }: { color: string; variant?:
 
   const spin = useMemo(() => {
     const chosen = frames?.length ? (frames as BrailleSpinnerName[]) : variant === 'tool' ? TOOL : THINK
-    const raw = spinners[pick(chosen)]
+    // A design naming an unknown animation must not crash the frame: fall back
+    // to the built-in pick rather than dereferencing undefined.frames.
+    const raw = spinners[pick(chosen)] ?? spinners[pick(variant === 'tool' ? TOOL : THINK)]
 
     return { ...raw, frames: raw.frames.map(f => [...f][0] ?? '⠀') }
   }, [frames, variant])
