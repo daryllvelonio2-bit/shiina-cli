@@ -49,7 +49,7 @@ export function GridTestOverlay({ cols, state, t }: GridTestOverlayProps) {
   })
 
   return (
-    <Box flexDirection="column" paddingY={1} width={gridCols}>
+    <Box flexDirection="column" paddingY={t.design.spacing.overlayPadY} width={gridCols}>
       <Box justifyContent="space-between" marginBottom={1} width="100%">
         <Text bold color={t.color.primary}>
           {state.zoomed ? `/grid-test / r${state.activeRow + 1} c${state.activeCol + 1}` : '/grid-test'}
@@ -241,8 +241,8 @@ function ZoomedGridCell({ cols, parentLabel, t }: { cols: number; parentLabel: s
       borderColor={t.color.primary}
       borderStyle={t.design.borders.panel}
       flexDirection="column"
-      paddingX={1}
-      paddingY={1}
+      paddingX={t.design.spacing.overlayPadX}
+      paddingY={t.design.spacing.overlayPadY}
       width={cols}
     >
       <WidgetGrid

@@ -625,6 +625,9 @@ export interface AppLayoutStatusProps {
   stickyPrompt: string
   turnStartedAt: null | number
   voiceLabel: string
+  /** Drives the voice readout's marker glyph + colour; the glyph itself is not
+   *  part of `voiceLabel` (statusSegments renders it from the design). */
+  voiceTone: 'idle' | 'rec' | 'stt'
 }
 
 export interface AppLayoutTranscriptProps {

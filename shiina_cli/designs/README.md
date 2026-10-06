@@ -127,6 +127,8 @@ design:
     overlayPadY: 1        # top/bottom padding inside an overlay
     panelPadX: 2          # left/right padding inside a bordered panel
     panelPadY: 1          # top/bottom padding inside a bordered panel
+    insetPadX: 1          # left/right padding inside a compact box / side pane
+    insetPadY: 0          # top/bottom padding inside a compact box / side pane
     rowGap: 0             # gap between rows inside a group
     sectionGap: 1          # gap between sections
 
@@ -134,9 +136,16 @@ design:
     chevronClosed: "▸"    # a collapsed section
     chevronOpen: "▾"      # an expanded section
     bullet: "●"           # tool-call / list marker
-    check: "✓"            # a completed step
+    check: "✓"            # a completed step / enabled entry
+    cross: "✗"            # a failed / disabled entry
     pending: "·"          # a not-yet-started step
     active: "▸"           # the active row marker
+    progress: "▶"         # a running / working row
+    ellipsis: "…"         # a starting / loading row
+    waiting: "?"          # a row waiting on input
+    warn: "!"             # a warning marker
+    off: "○"              # unavailable / not-authenticated
+    selected: "*"         # the currently-selected entry
     separator: " │ "      # status-rule segment separator (include spacing)
     statusHead: "─ "      # leading status-rule dash (include trailing space)
     chain: "⛓"            # subagent / delegation count

@@ -160,21 +160,58 @@ def test_payload_omits_empty_sections(designs_dir):
 
 
 def test_ensure_designs_dir_seeds_without_clobbering_edits(designs_dir):
-    written = de.ensure_designs_dir()
-    assert set(written) >= set(BUILTINS)
+    result = de.ensure_designs_dir()
+    assert set(result["written"]) >= set(BUILTINS)
 
     # An edit must survive a re-seed: these files belong to the user.
     (designs_dir / "timeline.yaml").write_text("name: timeline\nprompt: 'MINE'\n", encoding="utf-8")
     again = de.ensure_designs_dir()
 
-    assert "timeline" not in again
+    assert "timeline" in again["kept"]
+    assert "timeline" not in again["written"]
     assert de.load_design("timeline").prompt == "MINE"
 
     # --force is the documented way to discard local edits.
     forced = de.ensure_designs_dir(overwrite=True)
 
-    assert "timeline" in forced
+    assert "timeline" in forced["written"]
     assert de.load_design("timeline").prompt != "MINE"
+
+
+def test_an_untouched_seed_is_upgraded_by_a_new_builtin(designs_dir, monkeypatch):
+    # The point of the hash manifest: a built-in change must reach a folder that
+    # was already seeded, without ever overwriting an edit. Simulate the built-in
+    # moving by seeding, then "updating" the shipped file.
+    de.ensure_designs_dir()
+
+    src = de._builtin_designs_dir() / "timeline.yaml"
+    original = src.read_text(encoding="utf-8")
+    monkeypatch.setattr(de, "_builtin_designs_dir", lambda: src.parent)
+    try:
+        src.write_text(original.replace("prompt: \"▌\"", "prompt: \"UPDATED\""), encoding="utf-8")
+        upgraded = de.ensure_designs_dir()
+
+        assert "timeline" in upgraded["written"]
+        assert "UPDATED" in (designs_dir / "timeline.yaml").read_text(encoding="utf-8")
+    finally:
+        src.write_text(original, encoding="utf-8")
+
+
+def test_an_edited_seed_survives_a_builtin_change(designs_dir, monkeypatch):
+    de.ensure_designs_dir()
+    (designs_dir / "timeline.yaml").write_text("name: timeline\nprompt: 'MINE'\n", encoding="utf-8")
+
+    src = de._builtin_designs_dir() / "timeline.yaml"
+    original = src.read_text(encoding="utf-8")
+    monkeypatch.setattr(de, "_builtin_designs_dir", lambda: src.parent)
+    try:
+        src.write_text(original.replace("prompt: \"▌\"", "prompt: \"UPDATED\""), encoding="utf-8")
+        result = de.ensure_designs_dir()
+
+        assert "timeline" in result["kept"]
+        assert (designs_dir / "timeline.yaml").read_text(encoding="utf-8").find("MINE") >= 0
+    finally:
+        src.write_text(original, encoding="utf-8")
 
 
 def test_design_names_lists_builtins_sorted():

@@ -15,7 +15,6 @@ which ``ui-tui/src/domain/design.ts::resolveDesignSpec`` parses.
 from __future__ import annotations
 
 import logging
-import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -301,42 +300,114 @@ def resolve_design_payload() -> Dict[str, Any]:
     return {} if design.is_empty() else design.to_payload()
 
 
-def ensure_designs_dir(*, overwrite: bool = False) -> List[str]:
+# Records the sha256 of each file as we seeded it, so a later `init` can tell
+# "the user edited this" from "this is our own stale copy" and only rewrite the
+# latter. Without it, seeding is a one-shot: a built-in change never reaches a
+# folder that has already been seeded (or clobbers the user's edits).
+_SEED_MANIFEST = ".seeded.json"
+
+
+def _sha256(text: str) -> str:
+    import hashlib
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _read_seed_manifest() -> Dict[str, str]:
+    import json
+    try:
+        raw = (_designs_dir() / _SEED_MANIFEST).read_text(encoding="utf-8")
+        data = json.loads(raw)
+        return {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+    except Exception:  # noqa: BLE001 - a missing/corrupt manifest just means "unknown"
+        return {}
+
+
+def _write_seed_manifest(entries: Dict[str, str]) -> None:
+    import json
+    try:
+        from utils import atomic_json_write
+        atomic_json_write(_designs_dir() / _SEED_MANIFEST, entries)
+    except Exception as e:  # noqa: BLE001 - the manifest is an optimisation, not state
+        logger.debug("Could not write the design seed manifest: %s", e)
+
+
+def ensure_designs_dir(*, overwrite: bool = False) -> Dict[str, list]:
     """Seed ``~/.shiina/designs/`` from the shipped built-ins.
 
-    Returns the names written. Existing files are left alone unless
-    ``overwrite`` — these are the user's to edit, so seeding must never clobber
-    a customisation.
+    Returns ``{"written": [...], "kept": [...], "unchanged": [...]}``:
+
+    * ``written``   — copied (new, or upgraded because it was still our copy)
+    * ``kept``      — left alone because the user edited it
+    * ``unchanged`` — already identical to the built-in
+
+    "Still our copy" is decided by a hash manifest written at seed time, so an
+    updated built-in reaches a seeded folder WITHOUT ever overwriting an edit.
+    ``overwrite`` discards local edits deliberately (the ``--force`` flag).
     """
     target = _designs_dir()
-    written: List[str] = []
+    result: Dict[str, list] = {"kept": [], "unchanged": [], "written": []}
     try:
         target.mkdir(parents=True, exist_ok=True)
     except OSError as e:
         logger.warning("Could not create %s: %s", target, e)
-        return written
+        return result
+
+    manifest = _read_seed_manifest()
+    next_manifest: Dict[str, str] = dict(manifest)
 
     for src in sorted(_builtin_designs_dir().glob("*.yaml")):
-        dest = target / src.name
-        if dest.exists() and not overwrite:
-            continue
         try:
-            shutil.copyfile(src, dest)
-            written.append(src.stem)
+            builtin = src.read_text(encoding="utf-8")
         except OSError as e:
-            logger.warning("Could not seed design %s: %s", src.name, e)
+            logger.warning("Could not read built-in design %s: %s", src.name, e)
+            continue
 
-    # Ship the contract next to the files so the folder explains itself.
-    readme = _builtin_designs_dir() / "README.md"
-    if readme.is_file():
-        dest = target / "README.md"
-        if overwrite or not dest.exists():
+        dest = target / src.name
+        want = _sha256(builtin)
+
+        if not dest.exists():
             try:
-                shutil.copyfile(readme, dest)
-            except OSError:
-                pass
+                dest.write_text(builtin, encoding="utf-8")
+                next_manifest[src.stem] = want
+                result["written"].append(src.stem)
+            except OSError as e:
+                logger.warning("Could not seed design %s: %s", src.name, e)
+            continue
 
-    return written
+        try:
+            current = dest.read_text(encoding="utf-8")
+        except OSError:
+            continue
+
+        if current == builtin:
+            next_manifest[src.stem] = want
+            result["unchanged"].append(src.stem)
+            continue
+
+        # Differs. Only replace it when we know it is still the copy we wrote.
+        untouched_since_seed = not overwrite and manifest.get(src.stem) == _sha256(current)
+
+        if overwrite or untouched_since_seed:
+            try:
+                dest.write_text(builtin, encoding="utf-8")
+                next_manifest[src.stem] = want
+                result["written"].append(src.stem)
+            except OSError as e:
+                logger.warning("Could not upgrade design %s: %s", src.name, e)
+        else:
+            result["kept"].append(src.stem)
+
+    # The contract README ships alongside the files and is ours to refresh.
+    readme = _builtin_designs_dir() / "README.md"
+    dest_readme = target / "README.md"
+    if readme.is_file() and (overwrite or not dest_readme.exists()):
+        try:
+            dest_readme.write_text(readme.read_text(encoding="utf-8"), encoding="utf-8")
+        except OSError:
+            pass
+
+    _write_seed_manifest(next_manifest)
+    return result
 
 
 def design_names() -> List[str]:

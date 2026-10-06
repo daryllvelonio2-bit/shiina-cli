@@ -152,7 +152,7 @@ export function PetPicker({ gw, maxWidth, onClose, t }: PetPickerProps) {
         items.map((pet, i) => {
           const at = offset + i === idx
           const isActive = enabled && pet.slug === active
-          const mark = isActive ? '●' : pet.installed ? '✓' : ' '
+          const mark = isActive ? t.design.glyphs.bullet : pet.installed ? t.design.glyphs.check : ' '
           const tag = pet.installed ? '' : pet.curated ? ' · official' : ''
 
           return (

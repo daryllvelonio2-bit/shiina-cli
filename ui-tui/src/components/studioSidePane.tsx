@@ -16,7 +16,7 @@ export const StudioSidePane = memo(function StudioSidePane({ width }: { width: n
   const ui = useStore($uiState)
 
   return (
-    <NoSelect flexDirection="column" flexShrink={0} paddingX={1} width={width}>
+    <NoSelect flexDirection="column" flexShrink={0} paddingX={ui.theme.design.spacing.insetPadX} width={width}>
       <Text bold color={ui.theme.color.label}>
         instruments
       </Text>

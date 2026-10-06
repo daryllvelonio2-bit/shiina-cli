@@ -20,6 +20,9 @@ export interface DesignSpacing {
   /** Padding inside an overlay/dialog box. */
   overlayPadX: number
   overlayPadY: number
+  /** Padding inside a compact bordered box (prompts, pickers, side panes). */
+  insetPadX: number
+  insetPadY: number
   /** Gap between stacked list rows. */
   rowGap: number
   /** Space above a section heading. */
@@ -29,9 +32,9 @@ export interface DesignSpacing {
 export type DesignDensity = 'compact' | 'normal' | 'roomy'
 
 export const DENSITY_SCALES: Record<DesignDensity, DesignSpacing> = {
-  compact: { overlayPadX: 1, overlayPadY: 0, panelPadX: 1, panelPadY: 0, rowGap: 0, sectionGap: 0 },
-  normal: { overlayPadX: 1, overlayPadY: 1, panelPadX: 2, panelPadY: 1, rowGap: 0, sectionGap: 1 },
-  roomy: { overlayPadX: 2, overlayPadY: 1, panelPadX: 3, panelPadY: 1, rowGap: 1, sectionGap: 2 }
+  compact: { insetPadX: 1, insetPadY: 0, overlayPadX: 1, overlayPadY: 0, panelPadX: 1, panelPadY: 0, rowGap: 0, sectionGap: 0 },
+  normal: { insetPadX: 1, insetPadY: 0, overlayPadX: 1, overlayPadY: 1, panelPadX: 2, panelPadY: 1, rowGap: 0, sectionGap: 1 },
+  roomy: { insetPadX: 2, insetPadY: 0, overlayPadX: 2, overlayPadY: 1, panelPadX: 3, panelPadY: 1, rowGap: 1, sectionGap: 2 }
 }
 
 /**
@@ -70,6 +73,20 @@ export interface DesignGlyphs {
   idle: string
   /** "Resumes when the subagent finishes" hint. */
   resume: string
+  /** Unavailable / not-authenticated marker. */
+  off: string
+  /** The currently-selected entry. */
+  selected: string
+  /** Failed / disabled / negative marker. */
+  cross: string
+  /** A running/working row. */
+  progress: string
+  /** A starting/loading row. */
+  ellipsis: string
+  /** A row waiting on input. */
+  waiting: string
+  /** A warning marker. */
+  warn: string
 }
 
 export const DEFAULT_GLYPHS: DesignGlyphs = {
@@ -80,14 +97,21 @@ export const DEFAULT_GLYPHS: DesignGlyphs = {
   check: '✓',
   chevronClosed: '▸',
   chevronOpen: '▾',
+  cross: '✗',
+  ellipsis: '…',
   focus: '◉',
   idle: '✓',
   latency: '◷',
+  off: '○',
   pending: '·',
+  progress: '▶',
   resume: '↩',
+  selected: '*',
   separator: ' │ ',
   statusHead: '─ ',
-  tps: '↑'
+  tps: '↑',
+  waiting: '?',
+  warn: '!'
 }
 
 /** Line-drawing characters for rules and separators. */

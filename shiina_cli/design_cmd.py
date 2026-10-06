@@ -39,10 +39,11 @@ _DESIGN_KEYS: tuple[tuple[str, str], ...] = (
     ("design.alert", "single | round | double | bold — attention panels (approvals, warnings); "
                      "independent of `panel`, defaults to the built-in 'double'"),
     ("design.rule", "horizontal rule character, e.g. '\u2500' or '\u2501'"),
-    ("design.spacing.<name>", "overlayPadX, overlayPadY, panelPadX, panelPadY, rowGap, sectionGap — "
-                              "override the density scale individually"),
-    ("design.glyphs.<name>", "active, bullet, cache, chain, check, chevronClosed, chevronOpen, "
-                             "focus, idle, latency, pending, resume, separator, statusHead, tps"),
+    ("design.spacing.<name>", "overlayPadX, overlayPadY, panelPadX, panelPadY, insetPadX, insetPadY, "
+                              "rowGap, sectionGap — override the density scale individually"),
+    ("design.glyphs.<name>", "active, bullet, cache, chain, check, chevronClosed, chevronOpen, cross, "
+                             "ellipsis, focus, idle, latency, off, pending, progress, resume, selected, "
+                             "separator, statusHead, tps, waiting, warn"),
     ("design.status_bar.segments", "list of status fields, or null for the built-in order"),
     ("spinner.think", "animation names, e.g. [dna, helix, snake]"),
     ("spinner.tool", "animation names, e.g. [rain, columns, fillsweep]"),
@@ -111,12 +112,18 @@ def _design_path(name: str | None) -> int:
 
 def _design_init(overwrite: bool) -> int:
     from shiina_cli.design_engine import ensure_designs_dir
-    written = ensure_designs_dir(overwrite=overwrite)
+    result = ensure_designs_dir(overwrite=overwrite)
     target = f"{display_shiina_home()}/designs"
+    written, kept, unchanged = result["written"], result["kept"], result["unchanged"]
+
     if written:
-        print(f"✓ seeded {', '.join(written)} into {target}")
-    else:
-        print(f"✓ {target} already up to date (use --force to overwrite your edits)")
+        print(f"✓ seeded/upgraded {', '.join(written)} in {target}")
+    if kept:
+        # Only possible when the file differs from what we seeded — i.e. the user
+        # edited it. Never clobber silently.
+        print(f"• kept your edits to {', '.join(kept)} (use --force to discard them)")
+    if unchanged and not written and not kept:
+        print(f"✓ {target} already up to date")
     return 0
 
 

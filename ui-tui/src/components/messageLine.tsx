@@ -136,9 +136,9 @@ export const MessageLine = memo(function MessageLine({
     const preview = compactPreview(stripped, maxChars) || '(empty tool result)'
 
     return (
-      <Box alignSelf="flex-start" marginLeft={3} paddingX={1}>
+      <Box alignSelf="flex-start" marginLeft={3} paddingX={t.design.spacing.insetPadX}>
         <Accordion defaultOpen={liveDetails} t={t} title="Tool result" suffix={preview}>
-          <Box borderColor={t.color.muted} borderStyle={t.design.borders.panel} paddingX={1}>
+          <Box borderColor={t.color.muted} borderStyle={t.design.borders.panel} paddingX={t.design.spacing.insetPadX}>
             {hasAnsi(msg.text) ? (
               <Text wrap="truncate-end">
                 <Ansi>{safeAnsi}</Ansi>

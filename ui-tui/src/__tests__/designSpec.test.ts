@@ -110,6 +110,34 @@ describe('applyDesign', () => {
     expect(spec).toBeNull()
   })
 
+  it('applies per-key spacing overrides on top of the density scale', () => {
+    const spec = resolveDesignSpec({
+      name: 'sp',
+      design: { density: 'normal', spacing: { panelPadX: 4, rowGap: 2 } }
+    })
+
+    const themed = applyDesign(DEFAULT_THEME, spec)
+
+    // Density still supplies every key the design did not name...
+    expect(themed.design.spacing.overlayPadX).toBe(1)
+    // ...and the explicit override wins over it.
+    expect(themed.design.spacing.panelPadX).toBe(4)
+    expect(themed.design.spacing.rowGap).toBe(2)
+  })
+
+  it('drops out-of-range spacing values instead of collapsing a layout', () => {
+    const spec = resolveDesignSpec({
+      name: 'bad-sp',
+      design: { spacing: { panelPadX: -3, insetPadX: 99, rowGap: 1.5, overlayPadX: 2 } }
+    })
+
+    const themed = applyDesign(DEFAULT_THEME, spec)
+
+    expect(themed.design.spacing.overlayPadX).toBe(2)
+    expect(themed.design.spacing.panelPadX).toBe(DEFAULT_THEME.design.spacing.panelPadX)
+    expect(themed.design.spacing.rowGap).toBe(DEFAULT_THEME.design.spacing.rowGap)
+  })
+
   it('keeps every glyph the design stayed silent about', () => {
     const spec = resolveDesignSpec({ design: { glyphs: { bullet: '⬤' } }, name: 'partial' })
 

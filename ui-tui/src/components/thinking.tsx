@@ -1039,7 +1039,12 @@ export const ToolTrail = memo(function ToolTrail({
   }
 
   for (const item of activity.slice(-4)) {
-    const glyph = item.tone === 'error' ? '✗' : item.tone === 'warn' ? '!' : '·'
+    const glyph =
+      item.tone === 'error'
+        ? t.design.glyphs.cross
+        : item.tone === 'warn'
+          ? t.design.glyphs.warn
+          : t.design.glyphs.pending
     const color = item.tone === 'error' ? t.color.error : item.tone === 'warn' ? t.color.warn : t.color.muted
     meta.push({ color, content: `${glyph} ${item.text}`, dimColor: item.tone === 'info', key: `a-${item.id}` })
   }
@@ -1104,7 +1109,7 @@ export const ToolTrail = memo(function ToolTrail({
       <Box flexDirection="column">
         {alerts.map(i => (
           <Text color={i.tone === 'error' ? t.color.error : t.color.warn} key={`ha-${i.id}`}>
-            {i.tone === 'error' ? '✗' : '!'} {i.text}
+            {i.tone === 'error' ? t.design.glyphs.cross : t.design.glyphs.warn} {i.text}
           </Text>
         ))}
       </Box>

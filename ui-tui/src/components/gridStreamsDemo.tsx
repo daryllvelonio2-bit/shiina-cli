@@ -276,7 +276,7 @@ function StreamPanel({
       borderStyle={t.design.borders.panel}
       flexDirection="column"
       height={cell.height}
-      paddingX={1}
+      paddingX={t.design.spacing.insetPadX}
       width={cell.width}
     >
       {/* No phantom icon column: unfocused titles sit flush left — the ▸
@@ -322,7 +322,7 @@ export const GridStreamsDemo = memo(function GridStreamsDemo({
           borderStyle={t.design.borders.panel}
           height={cell.height}
           justifyContent="space-between"
-          paddingX={1}
+          paddingX={t.design.spacing.insetPadX}
           width={cell.width}
         >
           <Text bold color={t.color.primary}>

@@ -643,7 +643,7 @@ export function ModelPicker({
   // ── Provider selection stage ─────────────────────────────────────────
   if (stage === 'provider') {
     const rows = filteredProviderRows.map(({ provider: p, name }) => {
-      const authMark = p.authenticated === false ? '○' : p.is_current ? '*' : '●'
+      const authMark = p.authenticated === false ? t.design.glyphs.off : p.is_current ? t.design.glyphs.selected : t.design.glyphs.bullet
       const modelCount = p.total_models ?? p.models?.length ?? 0
 
       const suffix =

@@ -1,4 +1,4 @@
-import type { DesignBorders, DesignDensity, DesignGlyphs } from '../design.js'
+import type { DesignBorders, DesignDensity, DesignGlyphs, DesignSpacing } from '../design.js'
 import type { SectionVisibility } from '../types.js'
 
 /**
@@ -28,6 +28,8 @@ export interface DesignSpec {
     alert?: DesignBorders['panel']
     rule?: string
     glyphs?: Partial<DesignGlyphs>
+    /** Per-key overrides on top of the density scale. */
+    spacing?: Partial<DesignSpacing>
     /** `null` = built-in order and allowlist. */
     status_bar?: { segments?: string[] | null }
   }
@@ -53,6 +55,33 @@ const borderStyle = (value: unknown): DesignBorders['panel'] | undefined =>
 
 const str = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim() ? value : undefined
+
+/** Spacing values are small non-negative integers; anything else is dropped so a
+ *  bad number cannot collapse or explode a layout. Mirrors `spacingOf` in design.ts. */
+const SPACING_KEYS = [
+  'insetPadX',
+  'insetPadY',
+  'overlayPadX',
+  'overlayPadY',
+  'panelPadX',
+  'panelPadY',
+  'rowGap',
+  'sectionGap'
+] as const satisfies readonly (keyof DesignSpacing)[]
+
+const spacingMap = (raw: Record<string, unknown>): Partial<DesignSpacing> | undefined => {
+  const out: Partial<DesignSpacing> = {}
+
+  for (const key of SPACING_KEYS) {
+    const value = raw[key]
+
+    if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 8) {
+      out[key] = value
+    }
+  }
+
+  return Object.keys(out).length ? out : undefined
+}
 
 const strList = (value: unknown): string[] | undefined =>
   Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string' && v.trim() !== '') : undefined
@@ -123,6 +152,7 @@ export const resolveDesignSpec = (raw: unknown): DesignSpec | null => {
           glyphs: isRecord(design.glyphs) ? (design.glyphs as Partial<DesignGlyphs>) : undefined,
           panel: borderStyle(design.panel),
           rule: str(design.rule),
+          spacing: isRecord(design.spacing) ? spacingMap(design.spacing) : undefined,
           status_bar: statusBar ? { segments: segments === null ? null : strList(segments) } : undefined
         }
       : undefined,
@@ -154,6 +184,7 @@ const designChangesAnything = (spec: DesignSpec): boolean =>
       spec.design?.panel ||
       spec.design?.alert ||
       spec.design?.rule ||
+      (spec.design?.spacing && Object.keys(spec.design.spacing).length) ||
       (spec.design?.glyphs && Object.keys(spec.design.glyphs).length) ||
       spec.design?.status_bar ||
       (spec.layout?.regions && Object.keys(spec.layout.regions).length) ||

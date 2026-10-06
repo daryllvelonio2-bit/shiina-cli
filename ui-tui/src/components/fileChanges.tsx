@@ -69,9 +69,9 @@ export const FileChangesStrip = memo(function FileChangesStrip({
   const hidden = files.length - rows.length
 
   return (
-    <Box flexDirection="column" flexShrink={0} paddingX={1}>
+    <Box flexDirection="column" flexShrink={0} paddingX={t.design.spacing.insetPadX}>
       <Box onClick={toggleFileChanges}>
-        <Text color={t.color.muted}>{expanded ? '▾ ' : '▸ '}</Text>
+        <Text color={t.color.muted}>{expanded ? `${t.design.glyphs.chevronOpen} ` : `${t.design.glyphs.chevronClosed} `}</Text>
         <Text color={t.color.label}>✎ {summary}</Text>
         {!expanded && <Text color={t.color.muted}> (click for files)</Text>}
       </Box>

@@ -28,7 +28,7 @@ export function HelpHint({ t }: { t: Theme }) {
         flexDirection="column"
         marginBottom={1}
         opaque
-        paddingX={1}
+        paddingX={t.design.spacing.insetPadX}
       >
         <Text>
           <Text bold color={t.color.primary}>

@@ -31,14 +31,19 @@ const COMPLETION_WINDOW = 16
  * pane shell.
  */
 function PromptCell({ children, cols, id }: { children: ReactNode; cols: number; id: string }) {
+  // The design supplies the prompt cell's padding. Read from the store rather
+  // than threading a prop: PromptCell is mounted per prompt kind and a pure
+  // presentational wrapper should not force every host to carry a theme.
+  const theme = useStore($uiTheme)
+
   return (
     <Box flexDirection="column" flexShrink={0}>
       <WidgetGrid
         cols={cols}
         columns={1}
         gap={0}
-        paddingX={1}
-        paddingY={1}
+        paddingX={theme.design.spacing.overlayPadX}
+        paddingY={theme.design.spacing.overlayPadY}
         rowGap={0}
         widgets={[
           {

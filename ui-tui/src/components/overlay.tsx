@@ -83,8 +83,8 @@ export function Dialog({ children, hint, title, width }: DialogProps) {
       borderStyle={theme.design.borders.panel}
       flexDirection="column"
       opaque
-      paddingX={theme.design.spacing.overlayPadX}
-      paddingY={theme.design.spacing.overlayPadY}
+      paddingX={theme.design.spacing.panelPadX}
+      paddingY={theme.design.spacing.panelPadY}
       width={width}
     >
       {title && (

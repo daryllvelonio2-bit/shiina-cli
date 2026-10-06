@@ -23,12 +23,16 @@ const MIN_WIDTH = 64
 const MAX_WIDTH = 128
 const TITLE_MAX = 64
 
-const STATUS_GLYPH: Record<string, string> = {
-  idle: '✓',
-  starting: '…',
-  waiting: '?',
-  working: '▶'
-}
+const STATUS_GLYPH = (status: string, t: Theme) =>
+  status === 'idle'
+    ? t.design.glyphs.check
+    : status === 'working'
+      ? t.design.glyphs.progress
+      : status === 'starting'
+        ? t.design.glyphs.ellipsis
+        : status === 'waiting'
+          ? t.design.glyphs.waiting
+          : t.design.glyphs.pending
 
 const STATUS_LABEL: Record<string, string> = {
   idle: 'idle',
@@ -840,7 +844,7 @@ export function ActiveSessionSwitcher({
                 }
                 wrap="truncate-end"
               >
-                {STATUS_GLYPH[status] ?? '·'} {STATUS_LABEL[status] ?? status}
+                {STATUS_GLYPH(status, t)} {STATUS_LABEL[status] ?? status}
               </Text>
             </Box>
 

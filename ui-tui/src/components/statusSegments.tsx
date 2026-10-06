@@ -88,6 +88,9 @@ export interface StatusSegmentCtx {
   t: Theme
   usage: Usage
   voiceLabel?: null | string
+  /** Drives the voice readout's marker glyph and colour. The glyph itself is
+   *  NOT part of `voiceLabel` — it comes from the design's vocabulary. */
+  voiceTone?: 'idle' | 'rec' | 'stt'
 }
 
 export interface StatusSegmentView {
@@ -267,15 +270,15 @@ export const STATUS_SEGMENTS: StatusSegmentSpec[] = [
         return null
       }
 
-      const color = label.startsWith('●')
-        ? ctx.t.color.error
-        : label.startsWith('◉')
-          ? ctx.t.color.warn
-          : ctx.t.color.muted
+      const tone = ctx.voiceTone ?? 'idle'
+      const glyph =
+        tone === 'rec' ? ctx.t.design.glyphs.bullet : tone === 'stt' ? ctx.t.design.glyphs.focus : ''
+      const text = glyph ? `${glyph} ${label}` : label
+      const color = tone === 'rec' ? ctx.t.color.error : tone === 'stt' ? ctx.t.color.warn : ctx.t.color.muted
 
       return {
-        node: segment(ctx.t.design.glyphs, label, color),
-        reserve: stringWidth(label)
+        node: segment(ctx.t.design.glyphs, text, color),
+        reserve: stringWidth(text)
       }
     },
     field: 'voice',

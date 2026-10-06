@@ -108,7 +108,7 @@ export function ApprovalPrompt({ cols = 80, onChoice, req, t }: ApprovalPromptPr
   const overflow = rawLines.length - shown.length
 
   return (
-    <Box borderColor={t.color.warn} borderStyle={t.design.borders.alert} flexDirection="column" paddingX={1}>
+    <Box borderColor={t.color.warn} borderStyle={t.design.borders.alert} flexDirection="column" paddingX={t.design.spacing.insetPadX}>
       <Text bold color={t.color.warn}>
         ⚠ approval required · {req.description}
       </Text>
@@ -316,7 +316,7 @@ export function ClarifyPrompt({ cols = 80, onAnswer, onCancel, onQuestionAnswer,
         {batch.map((q, i) => {
           const answer = answers[q.qid]
           const isActive = i === active
-          const marker = answer !== undefined ? '✓' : isActive ? '▸' : '·'
+          const marker = answer !== undefined ? t.design.glyphs.check : isActive ? t.design.glyphs.active : t.design.glyphs.pending
 
           return (
             <Box flexDirection="column" key={q.qid}>
@@ -449,7 +449,7 @@ export function ConfirmPrompt({ onCancel, onConfirm, req, t }: ConfirmPromptProp
   ]
 
   return (
-    <Box borderColor={accent} borderStyle={t.design.borders.alert} flexDirection="column" paddingX={1}>
+    <Box borderColor={accent} borderStyle={t.design.borders.alert} flexDirection="column" paddingX={t.design.spacing.insetPadX}>
       <Text bold color={accent}>
         {req.danger ? '⚠' : '?'} {req.title}
       </Text>

@@ -719,7 +719,7 @@ export function FloatBox({ children, color }: { children: ReactNode; color: stri
       flexDirection="column"
       marginTop={1}
       opaque
-      paddingX={1}
+      paddingX={theme.design.spacing.insetPadX}
     >
       {children}
     </Box>
@@ -832,6 +832,9 @@ interface StatusRuleProps {
   turnStartedAt?: null | number
   usage: Usage
   voiceLabel?: string
+  /** Drives the voice readout's marker glyph + colour; the glyph is rendered by
+   *  statusSegments from the design's vocabulary, not baked into the label. */
+  voiceTone?: 'idle' | 'rec' | 'stt'
   onSessionCountClick?: () => void
 }
 

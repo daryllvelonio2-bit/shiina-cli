@@ -35,11 +35,6 @@ interface PluginsToggleResponse {
 
 type Scope = 'all' | 'user'
 
-const GLYPH: Record<string, string> = {
-  disabled: '✗',
-  enabled: '✓'
-}
-
 export function PluginsHub({ gw, maxWidth, onClose, t }: PluginsHubProps) {
   const [rows, setRows] = useState<PluginRow[]>([])
   const [bundledCount, setBundledCount] = useState(0)
@@ -180,7 +175,14 @@ export function PluginsHub({ gw, maxWidth, onClose, t }: PluginsHubProps) {
 
   const labels = effectiveRows.map(r => {
     const status = r.status ?? 'not enabled'
-    const glyph = GLYPH[status] ?? '○'
+    // Marker comes from the design's vocabulary, not a local table: a design
+    // that restyles `check`/`cross` restyles every plugin row with it.
+    const glyph =
+      status === 'enabled'
+        ? t.design.glyphs.check
+        : status === 'disabled'
+          ? t.design.glyphs.cross
+          : t.design.glyphs.off
     const ver = r.version ? ` v${r.version}` : ''
     const src = effectiveScope === 'all' && r.source === 'bundled' ? ' [bundled]' : ''
     const state = status === 'enabled' ? '' : ` (${status})`

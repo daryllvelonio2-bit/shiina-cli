@@ -1395,11 +1395,15 @@ export function useMainApp(gw: GatewayClient) {
       turnStartedAt: ui.sid ? turnStartedAt : null,
       // CLI parity: the classic prompt_toolkit status bar shows a red dot
       // on REC (cli.py:_get_voice_status_fragments line 2344).
+      // The marker glyph is NOT baked into this string: statusSegments renders
+      // it from the design's vocabulary, so restyling `bullet`/`focus` restyles
+      // the voice readout too. `voiceTone` is what it colours by.
       voiceLabel: voiceRecording
-        ? '● REC'
+        ? 'REC'
         : voiceProcessing
-          ? '◉ STT'
-          : `voice ${voiceEnabled ? 'on' : 'off'}${voiceTts ? ' [tts]' : ''}`
+          ? 'STT'
+          : `voice ${voiceEnabled ? 'on' : 'off'}${voiceTts ? ' [tts]' : ''}`,
+      voiceTone: voiceRecording ? ('rec' as const) : voiceProcessing ? ('stt' as const) : ('idle' as const),
     }),
     [
       cwd,

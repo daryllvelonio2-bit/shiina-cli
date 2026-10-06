@@ -217,7 +217,7 @@ const TranscriptPane = memo(function TranscriptPane({
         ref={transcript.scrollRef}
         stickyScroll
       >
-        <Box flexDirection="column" paddingX={1}>
+        <Box flexDirection="column" paddingX={ui.theme.design.spacing.insetPadX}>
           {transcript.virtualHistory.topSpacer > 0 ? <Box height={transcript.virtualHistory.topSpacer} /> : null}
 
           {transcript.virtualRows.slice(transcript.virtualHistory.start, transcript.virtualHistory.end).map(row => (
@@ -365,7 +365,7 @@ const ComposerPane = memo(function ComposerPane({
           actions.clearSelection()
         }
       }}
-      paddingX={1}
+      paddingX={ui.theme.design.spacing.insetPadX}
     >
       <QueuedMessages
         cols={composer.cols}
@@ -565,6 +565,7 @@ const StatusRulePane = memo(function StatusRulePane({
           turnStartedAt={status.turnStartedAt}
           usage={ui.usage}
           voiceLabel={status.voiceLabel}
+          voiceTone={status.voiceTone}
         />
       )}
     </Box>
