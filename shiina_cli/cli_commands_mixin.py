@@ -2677,14 +2677,183 @@ class CLICommandsMixin:
         return True
 
     def _handle_voice_command(self, command: str):
-        """Handle /voice [on|off|tts|status] command."""
+        """Handle /voice [on|off|tts|voice|status] command."""
         subcommand = _command_arg(command, lower=True) or ("off" if self._voice_mode else "on")
+        # ``_command_arg`` returns everything after the command word, so match the first token
+        # (``/voice voice mommy`` -> "voice mommy").
+        if subcommand.split()[0] == "voice":
+            self._handle_voice_pick(command)
+            return
         actions = {"on": self._enable_voice_mode, "off": self._disable_voice_mode,
                    "tts": self._toggle_voice_tts, "status": self._show_voice_status}
         if subcommand in actions:
             actions[subcommand]()
         else:
-            _cp(f"Unknown voice subcommand: {subcommand}", "Usage: /voice [on|off|tts|status]")
+            _cp(f"Unknown voice subcommand: {subcommand}",
+                "Usage: /voice [on|off|tts|voice|status]")
+
+    # ---- /voice voice: pick the TTS voice -------------------------------------------------
+    def _voice_pick_args(self, command: str):
+        """``(tts_config, provider, state, args)`` for /voice voice — args after the subcommand."""
+        from shiina_cli.config import load_config
+        from tools.tts_voices import current
+
+        tts_config = load_config().get("tts")
+        tts_config = tts_config if isinstance(tts_config, dict) else {}
+        state = current(tts_config)
+        return tts_config, state["provider"], state, command.split()[2:]
+
+    def _print_voice_picker(self, provider: str, state, *, note: str = ""):
+        """Current voice + the numbered preset list."""
+        from tools.tts_voices import FREE_PROVIDERS, describe, presets
+
+        _cp(_accent_line(f"TTS voice — {provider}"),
+            f"  Now: {state['voice']}" + (f"  (preset '{state['preset']}')" if state["preset"] else ""))
+        knobs = []
+        if state.get("speed") is not None:
+            knobs.append(f"speed {state['speed']}")
+        if state.get("pitch") is not None:
+            knobs.append(f"pitch {int(state['pitch']):+d}Hz")
+        if state.get("effects"):
+            knobs.append(f"fx {state['effects']}")
+        if knobs:
+            _cp(_dim_line("  knobs: " + ", ".join(knobs)))
+        rows = presets(provider)
+        live_speed, live_pitch = state.get("speed"), state.get("pitch")
+        for index, row in enumerate(rows, 1):
+            # Mark the preset that is actually in force: same voice AND (when the preset pins them)
+            # the same knobs — mommy and mommy-asmr share a voice id but not their speed.
+            same = row["voice"] == state["voice"]
+            if same and "speed" in row and row["speed"] != live_speed:
+                same = False
+            if same and "pitch" in row and row["pitch"] != (int(live_pitch) if live_pitch is not None else None):
+                same = False
+            mark = "●" if same else " "
+            _cp(f"  {mark} {index:2d}. {row['name']:<18} {_dim(describe(row, provider))}")
+        if not rows:
+            _cp(_dim_line(f"  no curated presets for '{provider}' — pass a raw voice id"))
+        if provider not in FREE_PROVIDERS:
+            _cp(_dim_line(f"  '{provider}' needs its API key set for these to work"))
+        if note:
+            _cp(_dim_line(f"  {note}"))
+
+    def _apply_voice_change(self, provider: str, *, voice=None, speed=None, pitch=None,
+                            effects=None, label: str = "") -> None:
+        """Persist and report a voice change (config is re-read per utterance, so it is live)."""
+        from tools.tts_voices import EFFECT_PROVIDERS, PITCH_PROVIDERS, changes
+
+        plan = changes(provider, voice=voice, speed=speed, pitch=pitch, effects=effects)
+        if not plan:
+            _cp(_dim_line("  nothing to change"), _dim_line(
+                "Usage: /voice voice [list|all|<name|#>|<voice-id>|speed N|pitch N|fx NAME|test]"))
+            return
+        if pitch is not None and provider not in PITCH_PROVIDERS:
+            _cp(_dim_line(f"  note: '{provider}' ignores pitch — the voice name still changed"))
+        if effects and provider not in EFFECT_PROVIDERS:
+            _cp(_dim_line(f"  note: '{provider}' ignores effects — the voice name still changed"))
+        saved = {key: _save(key, value) for key, value in plan.items()}
+        where = "config" if all(saved.values()) else "this session only (config write failed)"
+        shown = label or str(plan.get(f"tts.{provider}.voice") or "")
+        extra = ", ".join(f"{k.rsplit('.', 1)[-1]}={v}" for k, v in plan.items()
+                          if not k.endswith((".voice", ".voice_id")))
+        _cp(_accent_line(f"✓ Voice set to {shown}{(' (' + extra + ')') if extra else ''} — {where}"),
+            _dim_line("  the next reply speaks in it · /voice voice test to hear a sample"))
+
+    def _handle_voice_pick(self, command: str):
+        """Handle /voice voice [list|all|<name|#>|<voice-id>|speed N|pitch N|test] — pick Shiina's TTS voice.
+
+        Presets are curated per provider (``tools.tts_voices``) and work offline; a raw provider
+        voice id works too, which is how a keyed vendor (ElevenLabs/MiniMax) points at an account
+        voice. Changes go to ``tts.<provider>.<voice key>`` and are read per utterance, so the next
+        reply already speaks in the new voice.
+        """
+        from tools.tts_voices import fetch_provider_voices, find, sample_text
+
+        usage = _dim_line(
+            "Usage: /voice voice [list|all|<name|#>|<voice-id>|speed N|pitch N|fx NAME|test]")
+        _, provider, state, args = self._voice_pick_args(command)
+        head = args[0].lower() if args else ""
+
+        if not args or head in ("status", "list", "voices"):
+            self._print_voice_picker(provider, state)
+            return _cp(usage)
+
+        if head == "all":
+            voices, status = fetch_provider_voices(provider)
+            _cp(_accent_line(f"TTS voices — {provider} (live list, {len(voices)})"))
+            for row in voices[:80]:
+                detail = f"{row.get('gender', '')} {row.get('note', '')}".strip()
+                _cp(f"   {row['voice']:<36} {_dim(detail)}")
+            if len(voices) > 80:
+                _cp(_dim_line(f"  … {len(voices) - 80} more — narrow with a locale prefix, e.g. en-GB"))
+            if status:
+                _cp(_dim_line(f"  {status}"))
+            _cp(_dim_line("  set one with: /voice voice <voice-id>"))
+            return
+
+        if head == "test":
+            target = args[1] if len(args) > 1 else ""
+            preset = find(provider, target) if target else None
+            if target and preset is None:
+                return _cp(_dim_line(f"(._.) Unknown preset '{target}' — see /voice voice list"), usage)
+            label = str(preset["name"]) if preset else (state["preset"] or "")
+            self._speak_voice_sample(provider, preset, label)
+            return
+
+        if head == "fx":
+            from tools.tts_effects import names as _fx_names
+
+            if len(args) < 2:
+                return _cp(_dim_line(f"(._.) /voice voice fx needs a name — {' | '.join(_fx_names())} | off"),
+                           usage)
+            value = args[1].lower()
+            if value in ("off", "none", "0"):
+                return self._apply_voice_change(provider, effects="", label="no effect")
+            if value not in _fx_names():
+                return _cp(_dim_line(f"(._.) Unknown effect '{args[1]}' — {' | '.join(_fx_names())}"),
+                           usage)
+            return self._apply_voice_change(provider, effects=value, label=f"fx {value}")
+
+        if head in ("speed", "pitch"):
+            if len(args) < 2:
+                return _cp(_dim_line(f"(._.) /voice voice {head} needs a value"), usage)
+            if head == "speed":
+                try:
+                    return self._apply_voice_change(provider, speed=float(args[1]),
+                                                    label=f"speed {args[1]}")
+                except ValueError:
+                    return _cp(_dim_line(f"(._.) '{args[1]}' is not a number (0.25-4.0)"), usage)
+            try:
+                return self._apply_voice_change(provider, pitch=int(float(args[1])),
+                                                label=f"pitch {args[1]}Hz")
+            except ValueError:
+                return _cp(_dim_line(f"(._.) '{args[1]}' is not a number (-50..50 Hz)"), usage)
+
+        preset = find(provider, args[0])
+        if preset is not None:
+            return self._apply_voice_change(provider, voice=preset["voice"],
+                                            speed=preset.get("speed"), pitch=preset.get("pitch"),
+                                            effects=preset.get("effects"),
+                                            label=f"{preset['name']} ({preset['voice']})")
+        if args[0].startswith("-"):
+            return _cp(_dim_line(f"(._.) Unknown option '{args[0]}'"), usage)
+        # A raw provider voice id / name (the only way for account-level vendor voices).
+        self._apply_voice_change(provider, voice=args[0], label=args[0])
+
+    def _speak_voice_sample(self, provider: str, preset, label: str) -> None:
+        """Apply the preset (when one was named) and play the audition line in that voice."""
+        from tools.tts_voices import sample_text
+
+        if preset is not None:  # `/voice voice test <name>` is "try it on", not a preview
+            self._apply_voice_change(provider, voice=preset["voice"], speed=preset.get("speed"),
+                                     pitch=preset.get("pitch"), effects=preset.get("effects"),
+                                     label=f"{preset['name']} ({preset['voice']})")
+        from shiina_cli.voice import speak_text
+        _cp(_dim_line(f"  speaking the {label or 'current'} voice sample…"))
+        try:
+            speak_text(sample_text(label))
+        except Exception as exc:
+            _cp(_dim_line(f"  ✗ sample failed: {exc}"))
 
     def _handle_wake_command(self, command: str):
         """Handle /wake [on|off|status] — the 'Hey Shiina' hotword listener. The toggle IS the

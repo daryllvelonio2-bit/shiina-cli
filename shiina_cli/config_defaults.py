@@ -1015,7 +1015,13 @@ DEFAULT_CONFIG = {
         # "gemini" | "deepinfra" | "neutts" (local) | "kittentts" (local) | "piper" (local)
         "provider": "edge",
         "edge": {
-            # Popular: AriaNeural, JennyNeural, AndrewNeural, BrianNeural, SoniaNeural
+            # Popular: AriaNeural, JennyNeural, AndrewNeural, BrianNeural, SoniaNeural.
+            # Presets + the full 300+ voice catalog: `/voice voice` in the CLI
+            # (`list` | `all` | `<name|#|voice-id>` | `speed N` | `pitch N` | `fx NAME` | `test`).
+            # All three knobs are optional and written only when the picker sets them: `speed`
+            # 0.25-4.0 (1.0 = normal; unset falls back to the global tts.speed), `pitch`, a signed
+            # Hz offset in -50..50 (0 = unchanged), and `effects`, a post-synthesis chain from
+            # tools/tts_effects.py ("sultry" or "" for none) applied with ffmpeg after synthesis.
             "voice": "en-US-AriaNeural",
         },
         "elevenlabs": {

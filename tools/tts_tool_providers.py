@@ -193,6 +193,18 @@ def _rewrite_with_auxiliary_model(
 
 
 # --- Edge TTS (free default) ---
+def _edge_pitch_hz(edge_config: Dict[str, Any]) -> int:
+    """``tts.edge.pitch`` in Hz, clamped to the service's useful band (0 = leave the default).
+
+    Edge takes a signed Hertz offset (``-50Hz``..``+50Hz``); out-of-range or non-numeric values
+    are clamped/dropped rather than sent as a malformed request.
+    """
+    try:
+        return int(max(-50, min(50, int(round(float(edge_config.get("pitch") or 0))))))
+    except (TypeError, ValueError):
+        return 0
+
+
 async def _generate_edge_tts(text: str, output_path: str, tts_config: Dict[str, Any]) -> str:
     edge_tts = _origin()._import_edge_tts()
     edge_config = tts_config.get("edge") or {}
@@ -200,8 +212,28 @@ async def _generate_edge_tts(text: str, output_path: str, tts_config: Dict[str, 
     kwargs = {"voice": edge_config.get("voice", DEFAULT_EDGE_VOICE)}
     if speed != 1.0:
         kwargs["rate"] = f"{round((speed - 1.0) * 100):+d}%"
+    pitch = _edge_pitch_hz(edge_config)
+    if pitch:
+        kwargs["pitch"] = f"{pitch:+d}Hz"
     await edge_tts.Communicate(text, **kwargs).save(output_path)
+    _apply_edge_effects(output_path, edge_config.get("effects"))
     return output_path
+
+
+def _apply_edge_effects(output_path: str, name: Any) -> bool:
+    """Run a named post-synthesis voice effect (``tts.edge.effects``) over the generated file.
+
+    Best-effort by contract: a missing ffmpeg/filter leaves the untouched audio in place.
+    """
+    if not name:
+        return False
+    try:
+        from tools.tts_effects import apply_effects
+
+        return apply_effects(str(output_path), str(name))
+    except Exception as exc:  # never fail a synthesis because an effect could not run
+        logger.debug("edge effects '%s' failed: %s", name, exc)
+        return False
 
 
 # --- ElevenLabs ---
