@@ -1,22 +1,46 @@
-// Structural TUI layouts — the arrangement of chrome around the transcript.
+// TUI layouts — the arrangement of chrome around the transcript AND the way a
+// turn's progress reads inside it.
 //
 // A layout is selected by `display.layout` in config.yaml, switched live with
-// `/layout`, and read here as pure DATA: one `LayoutSpec` table of region
-// flags, so the frame components ask "is this region on?" instead of branching
-// on layout ids, and every decision is testable without a React runtime.
+// `/layout`, and read here as pure DATA: one `LayoutSpec` table, so the frame
+// components ask "is this region on?" / "how does progress read?" instead of
+// branching on layout ids, and every decision is testable without a React
+// runtime.
 //
-//   minimal    the reading/writing surface: transcript, prompt, one status line
-//   workbench  single column — every instrument wraps the composer (default)
+//   minimal    the reading surface — transcript, prompt, one status line, and
+//              progress folded to a single compact row
+//   workbench  single column — every instrument wraps the composer; the
+//              long-standing default shape (progress streams open)
 //   studio     two panes — a reserved right column holds the live instruments
+//   timeline   progress-forward — the turn's steps stay visible as a running
+//              ledger under the transcript, chrome kept quiet
+//
+// Two axes, deliberately separate:
+//   * REGIONS (`LayoutSpec`) say where chrome sits.
+//   * PROGRESS (`LayoutSpec.sections`) says how much of the agent's work shows
+//     by default — the reasoning, tool calls and subagent trees a design leads
+//     with. It layers exactly where `SECTION_DEFAULTS` used to sit (see
+//     domain/details.ts), so an explicit `display.sections.*` or `/details`
+//     still wins, and settled turns still paint nothing unless asked.
 //
 // The ids are a user-facing contract (config value + slash argument), so add to
 // the end of LAYOUT_IDS, never rename an existing one.
 
-export const LAYOUT_IDS = ['minimal', 'workbench', 'studio'] as const
+import type { SectionVisibility } from '../types.js'
+
+export const LAYOUT_IDS = ['minimal', 'workbench', 'studio', 'timeline'] as const
 
 export type LayoutId = (typeof LAYOUT_IDS)[number]
 
 export const DEFAULT_LAYOUT: LayoutId = 'workbench'
+
+/** Design hints a layout carries so its *look* moves with its structure.
+ *  Density/borders feed the theme's chrome tokens; `statusRule` below still
+ *  owns whether the rule mounts at all. */
+export interface LayoutDesign {
+  density: 'compact' | 'normal' | 'roomy'
+  panel: 'single' | 'round' | 'double' | 'bold'
+}
 
 export interface LayoutSpec {
   /** Ambient corner-widget rails reserve columns beside the transcript. */
@@ -39,43 +63,84 @@ export interface LayoutSpec {
   scrollbar: boolean
   /** A reserved right-hand instrument column (agents + todo live there). */
   sideColumn: boolean
+  /** The live step ledger — the running turn's steps as a persistent list. */
+  ledger: boolean
+  /** Default per-section progress visibility. Absent keys fall through to the
+   *  global details mode, matching the pre-layout behaviour. */
+  sections: SectionVisibility
+  /** Chrome design tokens this layout leads with. */
+  design: LayoutDesign
 }
 
 const SPECS: Record<LayoutId, LayoutSpec> = {
+  // Reading and typing. Progress is present but folded to one compact row per
+  // section: the transcript is the point, not the instrument panel.
   minimal: {
     agentsDock: false,
+    design: { density: 'compact', panel: 'single' },
     dock: false,
     fileChanges: false,
+    ledger: false,
     pet: false,
     rails: false,
     scrollbar: false,
+    sections: { activity: 'hidden', subagents: 'hidden', thinking: 'collapsed', tools: 'collapsed' },
     sideColumn: false,
     statusRule: true,
     stickyPrompt: false,
     todoUnderPrompt: false
   },
+  // The compatibility default — its section defaults are byte-for-byte the
+  // built-in ones (thinking/tools expanded, activity hidden, subagents falling
+  // through to the global mode), so an existing user sees no change at all.
   workbench: {
     agentsDock: true,
+    design: { density: 'normal', panel: 'round' },
     dock: true,
     fileChanges: true,
+    ledger: false,
     pet: true,
     rails: true,
     scrollbar: true,
+    sections: { activity: 'hidden', thinking: 'expanded', tools: 'expanded' },
     sideColumn: false,
     statusRule: true,
     stickyPrompt: true,
     todoUnderPrompt: true
   },
+  // Panes. The reserved column already carries the team, so subagent trees
+  // stream open too — the pane is where a delegation is watched.
   studio: {
     agentsDock: false,
+    design: { density: 'normal', panel: 'round' },
     dock: true,
     fileChanges: true,
+    ledger: false,
     pet: true,
     rails: true,
     scrollbar: true,
+    sections: { activity: 'hidden', subagents: 'expanded', thinking: 'expanded', tools: 'expanded' },
     sideColumn: true,
     statusRule: true,
     stickyPrompt: true,
+    todoUnderPrompt: false
+  },
+  // Progress-forward. The ledger keeps the turn's steps on screen, tool calls
+  // and subagent trees stay open, and the reasoning stays a compact running
+  // line instead of a wall of prose.
+  timeline: {
+    agentsDock: false,
+    design: { density: 'compact', panel: 'single' },
+    dock: true,
+    fileChanges: true,
+    ledger: true,
+    pet: false,
+    rails: false,
+    scrollbar: true,
+    sections: { activity: 'collapsed', subagents: 'expanded', thinking: 'collapsed', tools: 'expanded' },
+    sideColumn: false,
+    statusRule: true,
+    stickyPrompt: false,
     todoUnderPrompt: false
   }
 }
@@ -88,9 +153,12 @@ const LAYOUT_ALIASES: Record<string, LayoutId> = {
   bare: 'minimal',
   default: 'workbench',
   full: 'workbench',
+  ledger: 'timeline',
   minimal: 'minimal',
   panes: 'studio',
+  steps: 'timeline',
   studio: 'studio',
+  timeline: 'timeline',
   workbench: 'workbench',
   zen: 'minimal'
 }
@@ -107,6 +175,12 @@ export const parseLayout = (raw: string): LayoutId | null => {
 }
 
 export const layoutSpec = (id: LayoutId): LayoutSpec => SPECS[id] ?? SPECS[DEFAULT_LAYOUT]
+
+/** Default progress visibility for a layout — the layer that sits between the
+ *  user's explicit `display.sections.*` and the global details mode. */
+export const layoutSections = (id: LayoutId): SectionVisibility => layoutSpec(id).sections
+
+export const layoutDesign = (id: LayoutId): LayoutDesign => layoutSpec(id).design
 
 /** Next layout in the cycle — bare `/layout` walks this order. */
 export const cycleLayout = (id: LayoutId): LayoutId => LAYOUT_IDS[(LAYOUT_IDS.indexOf(id) + 1) % LAYOUT_IDS.length]
@@ -146,10 +220,14 @@ export const layoutRegions = (id: LayoutId, cols: number, opts: LayoutOptions = 
   const sideWidth = !opts.singleColumn && spec.sideColumn ? studioSideWidth(cols) : 0
   const sideActive = sideWidth > 0
   const fallback = spec.sideColumn && !sideActive
+  // A reserved column or a phone PTY leaves no room for a persistent ledger;
+  // its steps fall back to the instruments the layout would otherwise wrap.
+  const ledger = spec.ledger && !opts.singleColumn && !sideActive
 
   return {
     ...spec,
-    agentsDock: spec.agentsDock || fallback,
+    agentsDock: spec.agentsDock || fallback || (spec.ledger && !ledger),
+    ledger,
     rails: spec.rails && !opts.singleColumn,
     sideActive,
     sideWidth,

@@ -91,6 +91,8 @@ export const hasLeadGap = (prev: Pick<Msg, 'kind' | 'role'> | undefined, cur: Pi
 export interface DetailsCtx {
   commandOverride?: boolean
   detailsMode: DetailsMode
+  /** Default progress visibility contributed by the active TUI layout. */
+  layoutDefaults?: SectionVisibility
   /** The turn is still running — it renders through StreamingAssistant and is
    *  the one place a trail is meant to be visible. */
   live?: boolean
@@ -98,9 +100,9 @@ export interface DetailsCtx {
 }
 
 const trailAllHidden = (ctx: DetailsCtx): boolean =>
-  sectionMode('thinking', ctx.detailsMode, ctx.sections, ctx.commandOverride) === 'hidden' &&
-  sectionMode('tools', ctx.detailsMode, ctx.sections, ctx.commandOverride) === 'hidden' &&
-  sectionMode('activity', ctx.detailsMode, ctx.sections, ctx.commandOverride) === 'hidden'
+  sectionMode('thinking', ctx.detailsMode, ctx.sections, ctx.commandOverride, ctx.layoutDefaults) === 'hidden' &&
+  sectionMode('tools', ctx.detailsMode, ctx.sections, ctx.commandOverride, ctx.layoutDefaults) === 'hidden' &&
+  sectionMode('activity', ctx.detailsMode, ctx.sections, ctx.commandOverride, ctx.layoutDefaults) === 'hidden'
 
 /** A finished turn shows its answer, not its work. Unless the user asked for
  *  details (config or `/details`), a settled trail paints NOTHING — not even the

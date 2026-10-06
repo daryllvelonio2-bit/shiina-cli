@@ -49,6 +49,7 @@ export const MessageLine = memo(function MessageLine({
   detailsMode = 'collapsed',
   detailsModeCommandOverride = false,
   isStreaming = false,
+  layoutSections,
   liveDetails = false,
   msg,
   prev,
@@ -65,9 +66,9 @@ export const MessageLine = memo(function MessageLine({
   // feeds Thinking + Tool calls.  Gating on every section would let
   // `thinking` (expanded by default) keep an empty wrapper alive when only
   // `tools` is hidden — exactly the empty-Box bug Copilot caught.
-  const thinkingMode = sectionMode('thinking', detailsMode, sections, detailsModeCommandOverride)
-  const toolsMode = sectionMode('tools', detailsMode, sections, detailsModeCommandOverride)
-  const activityMode = sectionMode('activity', detailsMode, sections, detailsModeCommandOverride)
+  const thinkingMode = sectionMode('thinking', detailsMode, sections, detailsModeCommandOverride, layoutSections)
+  const toolsMode = sectionMode('tools', detailsMode, sections, detailsModeCommandOverride, layoutSections)
+  const activityMode = sectionMode('activity', detailsMode, sections, detailsModeCommandOverride, layoutSections)
   const thinking = msg.thinking?.trim() ?? ''
 
   // One blank line above this block iff it opens a new visual group relative
@@ -104,6 +105,7 @@ export const MessageLine = memo(function MessageLine({
         <ToolTrail
           commandOverride={detailsModeCommandOverride}
           detailsMode={detailsMode}
+          layoutSections={layoutSections}
           preferExpandedThinking={liveDetails}
           reasoning={thinking}
           reasoningActive={reasoningActive}
@@ -357,6 +359,9 @@ interface MessageLineProps {
   detailsMode?: DetailsMode
   detailsModeCommandOverride?: boolean
   isStreaming?: boolean
+  /** Default progress visibility contributed by the active TUI layout
+   *  (`display.layout`). Layered under the user's explicit `sections`. */
+  layoutSections?: SectionVisibility
   liveDetails?: boolean
   msg: Msg
   // The block rendered directly above this one. Drives the group-boundary

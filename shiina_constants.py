@@ -23,7 +23,7 @@ DEFAULT_INDICATOR_STYLE: str = "kaomoji"
 
 # TUI structural layouts (CLI /layout, TUI gateway config, /help registry).
 # Keep in sync with LAYOUT_IDS / DEFAULT_LAYOUT in ui-tui/src/domain/layout.ts.
-LAYOUT_IDS: tuple[str, ...] = ("minimal", "workbench", "studio")
+LAYOUT_IDS: tuple[str, ...] = ("minimal", "workbench", "studio", "timeline")
 DEFAULT_LAYOUT: str = "workbench"
 
 

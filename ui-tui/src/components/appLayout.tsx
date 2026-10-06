@@ -14,7 +14,7 @@ import { usePet } from '../app/usePet.js'
 import { INLINE_MODE, SHOW_FPS, TERMUX_TUI_MODE } from '../config/env.js'
 import { PLACEHOLDER } from '../content/placeholders.js'
 import { prevRenderedMsg } from '../domain/blockLayout.js'
-import { layoutRegions, type LayoutRegions } from '../domain/layout.js'
+import { layoutRegions, layoutSections, type LayoutRegions } from '../domain/layout.js'
 import {
   COMPOSER_PROMPT_GAP_WIDTH,
   composerPromptWidth,
@@ -27,6 +27,7 @@ import { ActiveWidgetSlot, AmbientDock, AmbientRail, useAmbientRailWidth } from 
 
 import { AgentsOverlay } from './agentsOverlay.js'
 import { LiveAgentsPanel } from './agentsPanel.js'
+import { StepLedger } from './stepLedger.js'
 import { GoodVibesHeart, StatusRule, StickyPromptTracker, TranscriptScrollbar } from './appChrome.js'
 import { FloatingOverlays, PromptZone } from './appOverlays.js'
 import { Banner, Panel } from './branding.js'
@@ -242,9 +243,11 @@ const TranscriptPane = memo(function TranscriptPane({
                   detailsMode={ui.detailsMode}
                   detailsModeCommandOverride={ui.detailsModeCommandOverride}
                   msg={row.msg}
+                  layoutSections={layoutSections(ui.layout)}
                   prev={prevRenderedMsg(i => transcript.virtualRows[i]?.msg, row.index, {
                     commandOverride: ui.detailsModeCommandOverride,
                     detailsMode: ui.detailsMode,
+                    layoutDefaults: layoutSections(ui.layout),
                     sections: ui.sections
                   })}
                   sections={ui.sections}
@@ -388,6 +391,7 @@ const ComposerPane = memo(function ComposerPane({
       )}
 
       {regions.agentsDock && <LiveAgentsPanel cols={Math.max(1, composer.cols - 2)} />}
+      {regions.ledger && <StepLedger cols={Math.max(1, composer.cols - 2)} t={ui.theme} />}
       <StatusRulePane
         at="top"
         cols={composer.cols}

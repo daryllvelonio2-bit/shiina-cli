@@ -17,6 +17,7 @@ import { WHEEL_SCROLL_STEP } from '../config/limits.js'
 import { RESIZE_COALESCE_MS } from '../config/timing.js'
 import { hasLeadGap, prevRenderedMsg } from '../domain/blockLayout.js'
 import { SECTION_NAMES, sectionMode } from '../domain/details.js'
+import { layoutSections } from '../domain/layout.js'
 import { composeTabTitle, fmtProjectCwdBranch, shortCwd } from '../domain/paths.js'
 import { sessionScopedModelArg } from '../domain/slash.js'
 import { type GatewayClient } from '../gatewayClient.js'
@@ -369,11 +370,12 @@ export function useMainApp(gw: GatewayClient) {
   )
 
   const detailsLayoutKey = useMemo(() => {
-    const thinking = sectionMode('thinking', ui.detailsMode, ui.sections, ui.detailsModeCommandOverride)
-    const tools = sectionMode('tools', ui.detailsMode, ui.sections, ui.detailsModeCommandOverride)
+    const layoutDefaults = layoutSections(ui.layout)
+    const thinking = sectionMode('thinking', ui.detailsMode, ui.sections, ui.detailsModeCommandOverride, layoutDefaults)
+    const tools = sectionMode('tools', ui.detailsMode, ui.sections, ui.detailsModeCommandOverride, layoutDefaults)
 
     return `${thinking}:${tools}`
-  }, [ui.detailsMode, ui.detailsModeCommandOverride, ui.sections])
+  }, [ui.detailsMode, ui.detailsModeCommandOverride, ui.layout, ui.sections])
 
   const [thinkingDetailsMode, toolsDetailsMode] = detailsLayoutKey.split(':')
   const thinkingDetailsVisible = thinkingDetailsMode !== 'hidden'
@@ -1226,18 +1228,24 @@ export function useMainApp(gw: GatewayClient) {
   // resolved to hidden, the only thing ToolTrail will surface is the
   // floating-alert backstop (errors/warnings).  Mirror that so we don't
   // render an empty wrapper Box above the streaming area in quiet mode.
+  // Default progress visibility the active layout contributes — the layer
+  // between the user's explicit `sections` and the built-in defaults. `minimal`
+  // folds the trail away, `timeline` keeps steps open; both resolve here so the
+  // quiet-mode gate agrees with what ToolTrail actually paints.
+  const layoutDefaults = useMemo(() => layoutSections(ui.layout), [ui.layout])
+
   const anyPanelVisible = SECTION_NAMES.some(
-    s => sectionMode(s, ui.detailsMode, ui.sections, ui.detailsModeCommandOverride) !== 'hidden'
+    s => sectionMode(s, ui.detailsMode, ui.sections, ui.detailsModeCommandOverride, layoutDefaults) !== 'hidden'
   )
 
   const thinkingPanelVisible =
-    sectionMode('thinking', ui.detailsMode, ui.sections, ui.detailsModeCommandOverride) !== 'hidden'
+    sectionMode('thinking', ui.detailsMode, ui.sections, ui.detailsModeCommandOverride, layoutDefaults) !== 'hidden'
 
   const toolsPanelVisible =
-    sectionMode('tools', ui.detailsMode, ui.sections, ui.detailsModeCommandOverride) !== 'hidden'
+    sectionMode('tools', ui.detailsMode, ui.sections, ui.detailsModeCommandOverride, layoutDefaults) !== 'hidden'
 
   const activityPanelVisible =
-    sectionMode('activity', ui.detailsMode, ui.sections, ui.detailsModeCommandOverride) !== 'hidden'
+    sectionMode('activity', ui.detailsMode, ui.sections, ui.detailsModeCommandOverride, layoutDefaults) !== 'hidden'
 
   const showProgressArea = useTurnSelector(state =>
     anyPanelVisible

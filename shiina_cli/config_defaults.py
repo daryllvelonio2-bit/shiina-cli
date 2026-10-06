@@ -759,10 +759,15 @@ DEFAULT_CONFIG = {
     "display": {
         "compact": False,
         "tui_compact": True,
-        # Structural TUI layout: "minimal" (transcript + prompt, no widget
-        # chrome) | "workbench" (single column — every instrument wraps the
-        # composer; the long-standing look) | "studio" (a reserved right column
-        # holds the live agents board + todo list beside the transcript).
+        # Structural TUI layout. Each one is a complete arrangement: where the
+        # chrome sits AND how much of the agent's work shows by default.
+        #   "minimal"   transcript + prompt, progress folded to compact rows
+        #   "workbench" single column — every instrument wraps the composer;
+        #               the long-standing look (default)
+        #   "studio"    a reserved right column holds the live agents board +
+        #               todo list beside the transcript
+        #   "timeline"  progress-forward — the turn's steps stay visible as a
+        #               running ledger above the composer
         # Switch live with `/layout`. Unknown values fall back to workbench
         # rather than blanking the UI; renderer mirror: ui-tui/src/domain/layout.ts.
         "layout": "workbench",

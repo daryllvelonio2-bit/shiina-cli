@@ -5,6 +5,7 @@ import type { AppLayoutProgressProps } from '../app/interfaces.js'
 import { toggleTodoCollapsed, useTurnSelector } from '../app/turnStore.js'
 import { $uiState } from '../app/uiStore.js'
 import { blockRenders } from '../domain/blockLayout.js'
+import { layoutSections } from '../domain/layout.js'
 import { appendToolShelfMessage } from '../lib/liveProgress.js'
 import type { ActiveTool, DetailsMode, Msg, SectionVisibility } from '../types.js'
 
@@ -62,7 +63,9 @@ export const StreamingAssistant = memo(function StreamingAssistant({
     blocks.push({ key: 'pending-tools', msg: { kind: 'trail', role: 'system', text: '', tools: streamPendingTools } })
   }
 
-  const detailsCtx = { commandOverride: detailsModeCommandOverride, detailsMode, live: true, sections }
+  // Stable identity (the spec table is module-level), so the trail memo holds.
+  const layoutDefaults = layoutSections(ui.layout)
+  const detailsCtx = { commandOverride: detailsModeCommandOverride, detailsMode, layoutDefaults, live: true, sections }
   let prev = prevMsg
 
   return (
@@ -76,6 +79,7 @@ export const StreamingAssistant = memo(function StreamingAssistant({
             detailsModeCommandOverride={detailsModeCommandOverride}
             isStreaming={block.isStreaming}
             key={block.key}
+            layoutSections={layoutDefaults}
             liveDetails
             msg={block.msg}
             prev={prev}

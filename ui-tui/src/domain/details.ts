@@ -58,7 +58,8 @@ export const resolveSections = (raw: unknown): SectionVisibility =>
     : {}
 
 // Effective mode for one section: explicit override → global command mode →
-// built-in live-stream defaults → global config mode.
+// the layout's own progress defaults → built-in live-stream defaults → global
+// config mode.
 //
 // The `commandOverride` flag is set for in-session `/details <mode>` changes.
 // That command should immediately apply to every section, including sections
@@ -66,12 +67,20 @@ export const resolveSections = (raw: unknown): SectionVisibility =>
 // startup/config sync we keep those defaults layered above the persisted global
 // config so the TUI still opens live reasoning/tools by default unless the user
 // pins explicit per-section overrides.
+//
+// `layoutDefaults` is the layer a TUI layout contributes (`display.layout`):
+// minimal folds progress to compact rows, timeline keeps tool calls and
+// subagent trees open. It sits BELOW the explicit `sections` override and
+// below `/details`, so a user pin always wins, and it never enters
+// `detailsRequested()` — a layout must not make settled turns paint their trail.
 export const sectionMode = (
   name: SectionName,
   global: DetailsMode,
   sections?: SectionVisibility,
-  commandOverride = false
-): DetailsMode => sections?.[name] ?? (commandOverride ? global : (SECTION_DEFAULTS[name] ?? global))
+  commandOverride = false,
+  layoutDefaults?: SectionVisibility
+): DetailsMode =>
+  sections?.[name] ?? (commandOverride ? global : (layoutDefaults?.[name] ?? SECTION_DEFAULTS[name] ?? global))
 
 /** Whether the user asked for details explicitly — `display.sections.*` in
  *  config or an in-session `/details <mode>` — rather than leaving the built-in

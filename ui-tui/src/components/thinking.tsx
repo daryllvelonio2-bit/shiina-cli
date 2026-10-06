@@ -752,6 +752,7 @@ export const ToolTrail = memo(function ToolTrail({
   busy = false,
   commandOverride = false,
   detailsMode = 'collapsed',
+  layoutSections,
   outcome = '',
   preferExpandedThinking = false,
   reasoningActive = false,
@@ -770,6 +771,9 @@ export const ToolTrail = memo(function ToolTrail({
   busy?: boolean
   commandOverride?: boolean
   detailsMode?: DetailsMode
+  /** Default progress visibility contributed by the active TUI layout — the
+   *  layer between the user's explicit `sections` and the built-in defaults. */
+  layoutSections?: SectionVisibility
   outcome?: string
   preferExpandedThinking?: boolean
   reasoningActive?: boolean
@@ -790,12 +794,12 @@ export const ToolTrail = memo(function ToolTrail({
 }) {
   const visible = useMemo(
     () => ({
-      thinking: sectionMode('thinking', detailsMode, sections, commandOverride),
-      tools: sectionMode('tools', detailsMode, sections, commandOverride),
-      subagents: sectionMode('subagents', detailsMode, sections, commandOverride),
-      activity: sectionMode('activity', detailsMode, sections, commandOverride)
+      thinking: sectionMode('thinking', detailsMode, sections, commandOverride, layoutSections),
+      tools: sectionMode('tools', detailsMode, sections, commandOverride, layoutSections),
+      subagents: sectionMode('subagents', detailsMode, sections, commandOverride, layoutSections),
+      activity: sectionMode('activity', detailsMode, sections, commandOverride, layoutSections)
     }),
-    [commandOverride, detailsMode, sections]
+    [commandOverride, detailsMode, layoutSections, sections]
   )
 
   const thinkingDefaultExpanded =

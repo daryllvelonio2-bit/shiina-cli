@@ -302,7 +302,7 @@ export const coreCommands: SlashCommand[] = [
   },
 
   {
-    help: 'switch the structural layout (minimal | workbench | studio)',
+    help: `switch the structural layout (${LAYOUT_IDS.join(' | ')})`,
     name: 'layout',
     run: (arg, ctx) => {
       const word = arg.trim().toLowerCase()

@@ -21,6 +21,7 @@ import { resetOverlayState } from '../app/overlayStore.js'
 import { $petBox } from '../app/petFlashStore.js'
 import { patchUiState, resetUiState } from '../app/uiStore.js'
 import { AppLayout } from '../components/appLayout.js'
+import type { LayoutId } from '../domain/layout.js'
 import type { GatewayClient } from '../gatewayClient.js'
 import { DEFAULT_VOICE_RECORD_KEY } from '../lib/platform.js'
 import { DEFAULT_THEME } from '../theme.js'
@@ -28,11 +29,22 @@ import type { Msg } from '../types.js'
 
 const renders = vi.hoisted(() => ({
   agents: 0,
+  ledger: 0,
   messageCols: [] as number[],
   messages: [] as string[],
   statusRule: 0,
   todo: 0,
   transcript: 0
+}))
+
+// The ledger subscribes to the turn store; the frame test only cares whether the
+// region mounts, so stub it rather than driving a live turn.
+vi.mock('../components/stepLedger.js', () => ({
+  StepLedger: () => {
+    renders.ledger++
+
+    return null
+  }
 }))
 
 vi.mock('../components/agentsPanel.js', async importOriginal => {
@@ -178,7 +190,7 @@ const props = (cols: number): AppLayoutProps => ({
 
 const mounted: Array<() => void> = []
 
-const mount = (layout: 'minimal' | 'studio' | 'workbench', cols: number) => {
+const mount = (layout: LayoutId, cols: number) => {
   patchUiState({ layout })
   const stdout = new PassThrough()
   const stdin = new PassThrough()
@@ -221,6 +233,7 @@ const flushPaint = () => new Promise(resolve => setTimeout(resolve, 50))
 
 beforeEach(() => {
   renders.agents = 0
+  renders.ledger = 0
   renders.messageCols = []
   renders.messages = []
   renders.statusRule = 0
@@ -258,6 +271,17 @@ describe('layout frame', () => {
     expect(renders.transcript).toBeGreaterThan(0)
     expect(renders.agents).toBeGreaterThan(0)
     expect(output()).not.toContain('instruments')
+  })
+
+  it('timeline mounts the step ledger instead of the agents dock', () => {
+    mount('timeline', 120)
+
+    // The ledger is this design's instrument surface; mounting the dock too
+    // would print the same steps twice.
+    expect(renders.ledger).toBeGreaterThan(0)
+    expect(renders.agents).toBe(0)
+    expect(renders.transcript).toBeGreaterThan(0)
+    expect(renders.statusRule).toBeGreaterThan(0)
   })
 
   it('studio moves the instruments into the reserved side column', async () => {
