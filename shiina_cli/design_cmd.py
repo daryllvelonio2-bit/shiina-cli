@@ -35,10 +35,20 @@ _DESIGN_KEYS: tuple[tuple[str, str], ...] = (
                      "diffRemovedWord, syntaxString, syntaxNumber, syntaxKeyword, syntaxComment"),
     ("prompt", "composer prompt symbol, e.g. '>' or '\u276f'"),
     ("design.density", "compact | normal | roomy — vertical rhythm"),
-    ("design.panel", "single | round | double | bold — panel/overlay border"),
-    ("design.alert", "single | round | double | bold — attention panels (approvals, warnings); "
+    ("design.panel", "single | round | double | bold | none — panel/overlay border; none draws no box"),
+    ("design.alert", "single | round | double | bold | none — attention panels (approvals, warnings); "
                      "independent of `panel`, defaults to the built-in 'double'"),
     ("design.rule", "horizontal rule character, e.g. '\u2500' or '\u2501'"),
+    ("design.flank", "rule | space | none — what flanks a title/header: a drawn rule, blank air, "
+                     "or nothing"),
+    ("design.header.case", "upper | lower | none — header label transform"),
+    ("design.header.emphasis", "bold | dim | none — header label weight"),
+    ("design.header.marker", "chevron | rule | none — what a header is drawn with before its label"),
+    ("design.indent.unit", "one nesting level, repeated per depth; '' flattens the tree "
+                           "(tool output, subagents, ledger steps)"),
+    ("design.indent.stem", "rail drawn inside a level whose branch continues (default '\u2502 ')"),
+    ("design.indent.branch", "lead before a non-final child (default '\u251c\u2500 ')"),
+    ("design.indent.last", "lead before the final child (default '\u2514\u2500 ')"),
     ("design.spacing.<name>", "overlayPadX, overlayPadY, panelPadX, panelPadY, insetPadX, insetPadY, "
                               "rowGap, sectionGap — override the density scale individually"),
     ("design.glyphs.<name>", "active, bullet, cache, chain, check, chevronClosed, chevronOpen, cross, "

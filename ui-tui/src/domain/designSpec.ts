@@ -1,4 +1,12 @@
-import type { DesignBorders, DesignDensity, DesignGlyphs, DesignSpacing } from '../design.js'
+import type {
+  DesignBorders,
+  DesignDensity,
+  DesignFlank,
+  DesignGlyphs,
+  DesignHeader,
+  DesignIndent,
+  DesignSpacing
+} from '../design.js'
 import type { SectionVisibility } from '../types.js'
 
 /**
@@ -27,7 +35,11 @@ export interface DesignSpec {
     /** Panels that demand attention (approvals, warnings). */
     alert?: DesignBorders['panel']
     rule?: string
+    /** How a title/header is flanked: `rule`, blank `space`, or `none`. */
+    flank?: DesignFlank
     glyphs?: Partial<DesignGlyphs>
+    header?: Partial<DesignHeader>
+    indent?: Partial<DesignIndent>
     /** Per-key overrides on top of the density scale. */
     spacing?: Partial<DesignSpacing>
     /** `null` = built-in order and allowlist. */
@@ -46,12 +58,68 @@ export interface DesignSpec {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-const BORDER_STYLES = ['single', 'double', 'bold', 'round'] as const
+const BORDER_STYLES = ['single', 'double', 'bold', 'round', 'none'] as const
 
 const borderStyle = (value: unknown): DesignBorders['panel'] | undefined =>
   typeof value === 'string' && (BORDER_STYLES as readonly string[]).includes(value)
     ? (value as DesignBorders['panel'])
     : undefined
+
+const isOneOf = <T extends string>(value: unknown, allowed: readonly T[]): value is T =>
+  typeof value === 'string' && (allowed as readonly string[]).includes(value)
+
+const FLANKS = ['rule', 'space', 'none'] as const
+const HEADER_CASES = ['upper', 'lower', 'none'] as const
+const HEADER_EMPHASES = ['bold', 'dim', 'none'] as const
+const HEADER_MARKERS = ['chevron', 'rule', 'none'] as const
+const INDENT_MAX = 8
+
+const flankStyle = (value: unknown): DesignFlank | undefined =>
+  isOneOf(value, FLANKS) ? value : undefined
+
+/** Only the facets the design actually names, so the rest keep their built-in
+ *  value; an unknown value for a named facet is dropped, not guessed. */
+const headerMap = (raw: unknown): Partial<DesignHeader> | undefined => {
+  if (!isRecord(raw)) {
+    return undefined
+  }
+
+  const out: Partial<DesignHeader> = {}
+
+  if (isOneOf(raw.case, HEADER_CASES)) {
+    out.case = raw.case
+  }
+
+  if (isOneOf(raw.emphasis, HEADER_EMPHASES)) {
+    out.emphasis = raw.emphasis
+  }
+
+  if (isOneOf(raw.marker, HEADER_MARKERS)) {
+    out.marker = raw.marker
+  }
+
+  return Object.keys(out).length ? out : undefined
+}
+
+/** Indent fields are strings; `''` is valid (flat), a long value is dropped so
+ *  a typo cannot explode every nested row. */
+const indentMap = (raw: unknown): Partial<DesignIndent> | undefined => {
+  if (!isRecord(raw)) {
+    return undefined
+  }
+
+  const out: Partial<DesignIndent> = {}
+
+  for (const key of ['unit', 'stem', 'branch', 'last'] as const) {
+    const value = raw[key]
+
+    if (typeof value === 'string' && value.length <= INDENT_MAX) {
+      out[key] = value
+    }
+  }
+
+  return Object.keys(out).length ? out : undefined
+}
 
 const str = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim() ? value : undefined
@@ -149,7 +217,10 @@ export const resolveDesignSpec = (raw: unknown): DesignSpec | null => {
           density: design.density === 'compact' || design.density === 'roomy' || design.density === 'normal'
             ? design.density
             : undefined,
+          flank: flankStyle(design.flank),
           glyphs: isRecord(design.glyphs) ? (design.glyphs as Partial<DesignGlyphs>) : undefined,
+          header: headerMap(design.header),
+          indent: indentMap(design.indent),
           panel: borderStyle(design.panel),
           rule: str(design.rule),
           spacing: isRecord(design.spacing) ? spacingMap(design.spacing) : undefined,
@@ -184,6 +255,9 @@ const designChangesAnything = (spec: DesignSpec): boolean =>
       spec.design?.panel ||
       spec.design?.alert ||
       spec.design?.rule ||
+      spec.design?.flank ||
+      (spec.design?.header && Object.keys(spec.design.header).length) ||
+      (spec.design?.indent && Object.keys(spec.design.indent).length) ||
       (spec.design?.spacing && Object.keys(spec.design.spacing).length) ||
       (spec.design?.glyphs && Object.keys(spec.design.glyphs).length) ||
       spec.design?.status_bar ||

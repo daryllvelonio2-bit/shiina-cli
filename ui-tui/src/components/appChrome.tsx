@@ -13,6 +13,7 @@ import { useTurnSelector } from '../app/turnStore.js'
 import { DEV_CREDITS_MODE } from '../config/env.js'
 import { FACES } from '../content/faces.js'
 import { VERBS } from '../content/verbs.js'
+import { flankFill } from '../design.js'
 import { fmtDuration } from '../domain/messages.js'
 import { stickyPromptFromViewport } from '../domain/viewport.js'
 import { buildSubagentTree, treeTotals, widthByDepth } from '../lib/subagentTree.js'
@@ -664,11 +665,12 @@ export function StatusRule({
               const remainingSep = Math.max(0, separatorWidth - titleW)
               const leftDash = Math.floor(remainingSep / 2)
               const rightDash = remainingSep - leftDash
+              const fill = (n: number) => flankFill(t.design.flank, t.design.borders.rule, n)
               return (
                 <>
-                  <Text color={t.color.border}>{leftDash > 0 ? t.design.borders.rule.repeat(leftDash) : ''}</Text>
+                  <Text color={t.color.border}>{fill(leftDash)}</Text>
                   <Text bold color={t.color.accent}>{` ${sessionTitle} `}</Text>
-                  <Text color={t.color.border}>{rightDash > 0 ? t.design.borders.rule.repeat(rightDash) : ''}</Text>
+                  <Text color={t.color.border}>{fill(rightDash)}</Text>
                 </>
               )
             })()

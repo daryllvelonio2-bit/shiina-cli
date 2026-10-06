@@ -114,14 +114,21 @@ export const DEFAULT_GLYPHS: DesignGlyphs = {
   warn: '!'
 }
 
+/**
+ * Box-drawing border language. `none` draws no box at all: the panel keeps its
+ * content and padding but reclaims the border cells, so a borderless design is
+ * a real layout choice rather than a recoloured box.
+ */
+export type DesignBorderStyle = 'single' | 'round' | 'double' | 'bold' | 'none'
+
 /** Line-drawing characters for rules and separators. */
 export interface DesignBorders {
   /** Horizontal rule character (status rule, title flanking). */
   rule: string
   /** Native box-drawing border style for panels and overlays. */
-  panel: 'single' | 'round' | 'double' | 'bold'
+  panel: DesignBorderStyle
   /** Panels that demand attention (approvals, warnings). Defaults to `panel`. */
-  alert: 'single' | 'round' | 'double' | 'bold'
+  alert: DesignBorderStyle
 }
 
 export const DEFAULT_BORDERS: DesignBorders = { alert: 'double', panel: 'round', rule: '─' }
@@ -135,10 +142,55 @@ export interface DesignStatusBar {
   segments: string[] | null
 }
 
+/** How a title is flanked by decoration — the lines beside a header. */
+export type DesignFlank = 'rule' | 'space' | 'none'
+
+/** Header label transform. */
+export type DesignHeaderCase = 'upper' | 'lower' | 'none'
+
+/** Header weight. */
+export type DesignHeaderEmphasis = 'bold' | 'dim' | 'none'
+
+/** The decoration a header is drawn with before its label. */
+export type DesignHeaderMarker = 'chevron' | 'rule' | 'none'
+
+export interface DesignHeader {
+  /** Label transform: `upper`, `lower`, or as authored. */
+  case: DesignHeaderCase
+  /** Weight: `bold`, `dim`, or plain. */
+  emphasis: DesignHeaderEmphasis
+  /** Leading decoration: the expand chevron, a rule dash, or nothing. */
+  marker: DesignHeaderMarker
+}
+
+export const DEFAULT_HEADER: DesignHeader = { case: 'none', emphasis: 'bold', marker: 'chevron' }
+
+/**
+ * One nesting step of the tree and ledger chrome.
+ *
+ * Every field is a string, so a design can be flat (`''`) or deeply stepped;
+ * `unit` is repeated once per depth, which makes its width the indent width.
+ */
+export interface DesignIndent {
+  /** One nesting level, repeated per depth. `''` flattens the tree. */
+  unit: string
+  /** The rail drawn inside a level whose branch continues. */
+  stem: string
+  /** Lead before a non-final child. */
+  branch: string
+  /** Lead before the final child. */
+  last: string
+}
+
+export const DEFAULT_INDENT: DesignIndent = { branch: '├─ ', last: '└─ ', stem: '│ ', unit: '  ' }
+
 export interface Design {
   borders: DesignBorders
   density: DesignDensity
+  flank: DesignFlank
   glyphs: DesignGlyphs
+  header: DesignHeader
+  indent: DesignIndent
   spacing: DesignSpacing
   statusBar: DesignStatusBar
 }
@@ -146,10 +198,45 @@ export interface Design {
 export const DEFAULT_DESIGN: Design = {
   borders: DEFAULT_BORDERS,
   density: 'normal',
+  flank: 'rule',
   glyphs: DEFAULT_GLYPHS,
+  header: DEFAULT_HEADER,
+  indent: DEFAULT_INDENT,
   spacing: DENSITY_SCALES.normal,
   statusBar: { segments: null }
 }
+
+/**
+ * The decoration a header is drawn with before its label. `rule` reuses the
+ * status-rule lead so a "flat" design can head sections the same way it heads
+ * the status line; `none` leaves the label bare (the row is still clickable).
+ */
+export const headerLead = (header: DesignHeader, open: boolean, glyphs: DesignGlyphs): string => {
+  if (header.marker === 'rule') {
+    return glyphs.statusHead
+  }
+
+  if (header.marker === 'none') {
+    return ''
+  }
+
+  return `${open ? glyphs.chevronOpen : glyphs.chevronClosed} `
+}
+
+/** A header label after its case transform. */
+export const headerLabel = (header: DesignHeader, title: string): string =>
+  header.case === 'upper' ? title.toUpperCase() : header.case === 'lower' ? title.toLowerCase() : title
+
+/** The `bold`/`dim` props a header's Text node should carry. */
+export const headerEmphasis = (header: DesignHeader): { bold?: true; dim?: true } =>
+  header.emphasis === 'bold' ? { bold: true } : header.emphasis === 'dim' ? { dim: true } : {}
+
+/**
+ * The decoration flanking a title, `count` cells wide: a drawn `rule`, blank
+ * `space` (keeps the title centred but draws nothing), or nothing at all.
+ */
+export const flankFill = (flank: DesignFlank, rule: string, count: number): string =>
+  count <= 0 ? '' : flank === 'rule' ? rule.repeat(count) : flank === 'space' ? ' '.repeat(count) : ''
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -177,12 +264,13 @@ const glyphsOf = (raw: unknown): DesignGlyphs => {
   return glyphs
 }
 
-const BORDER_STYLES = ['single', 'double', 'bold', 'round'] as const
+const isOneOf = <T extends string>(value: unknown, allowed: readonly T[]): value is T =>
+  typeof value === 'string' && (allowed as readonly string[]).includes(value)
 
-const borderStyleOf = (value: unknown, fallback: DesignBorders['panel']): DesignBorders['panel'] =>
-  typeof value === 'string' && (BORDER_STYLES as readonly string[]).includes(value)
-    ? (value as DesignBorders['panel'])
-    : fallback
+const BORDER_STYLES = ['single', 'double', 'bold', 'round', 'none'] as const
+
+const borderStyleOf = (value: unknown, fallback: DesignBorderStyle): DesignBorderStyle =>
+  isOneOf(value, BORDER_STYLES) ? value : fallback
 
 const bordersOf = (raw: unknown): DesignBorders => {
   if (!isRecord(raw)) {
@@ -236,6 +324,50 @@ const statusBarOf = (raw: unknown): DesignStatusBar => {
   return { segments: ids.length > 0 ? ids : null }
 }
 
+const FLANKS = ['rule', 'space', 'none'] as const
+const HEADER_CASES = ['upper', 'lower', 'none'] as const
+const HEADER_EMPHASES = ['bold', 'dim', 'none'] as const
+const HEADER_MARKERS = ['chevron', 'rule', 'none'] as const
+
+const flankOf = (value: unknown): DesignFlank => (isOneOf(value, FLANKS) ? value : DEFAULT_DESIGN.flank)
+
+/** Each header facet falls back independently, so `case: upper` alone still
+ *  keeps the built-in emphasis and marker. */
+const headerOf = (raw: unknown): DesignHeader => {
+  if (!isRecord(raw)) {
+    return DEFAULT_HEADER
+  }
+
+  return {
+    case: isOneOf(raw.case, HEADER_CASES) ? raw.case : DEFAULT_HEADER.case,
+    emphasis: isOneOf(raw.emphasis, HEADER_EMPHASES) ? raw.emphasis : DEFAULT_HEADER.emphasis,
+    marker: isOneOf(raw.marker, HEADER_MARKERS) ? raw.marker : DEFAULT_HEADER.marker
+  }
+}
+
+const INDENT_KEYS = ['unit', 'stem', 'branch', 'last'] as const satisfies readonly (keyof DesignIndent)[]
+const INDENT_MAX = 8
+
+const indentOf = (raw: unknown): DesignIndent => {
+  if (!isRecord(raw)) {
+    return DEFAULT_INDENT
+  }
+
+  const indent = { ...DEFAULT_INDENT }
+
+  for (const key of INDENT_KEYS) {
+    const value = raw[key]
+
+    // Unlike a glyph, `''` is meaningful here: it is how a design goes flat.
+    // The cap keeps a fat-fingered value from exploding every nested row.
+    if (typeof value === 'string' && value.length <= INDENT_MAX) {
+      indent[key] = value
+    }
+  }
+
+  return indent
+}
+
 /**
  * Build the chrome design from a skin's `tui:` section.
  *
@@ -253,7 +385,10 @@ export const resolveDesign = (raw: unknown): Design => {
   return {
     borders: bordersOf(raw.borders),
     density,
+    flank: flankOf(raw.flank),
     glyphs: glyphsOf(raw.glyphs),
+    header: headerOf(raw.header),
+    indent: indentOf(raw.indent),
     spacing: spacingOf(raw.spacing, density),
     statusBar: statusBarOf(raw.status_bar)
   }
@@ -265,7 +400,16 @@ export const designEquals = (a: Design, b: Design): boolean => {
     return true
   }
 
-  if (a.density !== b.density || a.borders.panel !== b.borders.panel || a.borders.rule !== b.borders.rule) {
+  if (
+    a.density !== b.density ||
+    a.borders.panel !== b.borders.panel ||
+    a.borders.alert !== b.borders.alert ||
+    a.borders.rule !== b.borders.rule ||
+    a.flank !== b.flank ||
+    a.header.case !== b.header.case ||
+    a.header.emphasis !== b.header.emphasis ||
+    a.header.marker !== b.header.marker
+  ) {
     return false
   }
 
@@ -275,6 +419,12 @@ export const designEquals = (a: Design, b: Design): boolean => {
 
   for (const key of Object.keys(a.glyphs) as (keyof DesignGlyphs)[]) {
     if (a.glyphs[key] !== b.glyphs[key]) {
+      return false
+    }
+  }
+
+  for (const key of Object.keys(a.indent) as (keyof DesignIndent)[]) {
+    if (a.indent[key] !== b.indent[key]) {
       return false
     }
   }

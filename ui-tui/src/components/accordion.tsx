@@ -1,6 +1,7 @@
 import { Box, Text } from '@shiina/ink'
 import { type ReactNode, useState } from 'react'
 
+import { headerEmphasis, headerLabel, headerLead } from '../design.js'
 import type { Theme } from '../theme.js'
 
 /**
@@ -32,6 +33,7 @@ export function Accordion({
 }) {
   const [uncontrolled, setUncontrolled] = useState(defaultOpen)
   const isOpen = open ?? uncontrolled
+  const header = t.design.header
 
   const toggle = () => {
     onToggle?.()
@@ -44,9 +46,9 @@ export function Accordion({
   return (
     <Box flexDirection="column">
       <Box onClick={toggle}>
-        <Text color={t.color.accent}>{isOpen ? '▾ ' : '▸ '}</Text>
-        <Text bold color={t.color.accent}>
-          {title}
+        <Text color={t.color.accent}>{headerLead(header, isOpen, t.design.glyphs)}</Text>
+        <Text color={t.color.accent} {...headerEmphasis(header)}>
+          {headerLabel(header, title)}
         </Text>
         {typeof count === 'number' ? <Text color={t.color.muted}> ({count})</Text> : null}
         {suffix ? <Text color={t.color.muted}> {suffix}</Text> : null}

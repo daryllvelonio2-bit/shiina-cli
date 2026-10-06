@@ -55,6 +55,10 @@ export const StepLedger = ({ cols, t }: { cols: number; t: Theme }) => {
   }
 
   const glyphs = t.design.glyphs
+  const indent = t.design.indent.unit
+  // '  ' (the built-in unit) + '✓ ' accounts for the two columns this used to
+  // hardcode as `cols - 6`; a wider design indent shrinks the preview by as much.
+  const lead = stringWidth(indent) + 4
   const done = steps.length
   const header = `${glyphs.active} Steps${done ? ` ${glyphs.separator.trim()} ${done}` : ''}`
   const hint = running ? `${glyphs.bullet} ${tools.length} running` : `${glyphs.idle} idle`
@@ -67,17 +71,17 @@ export const StepLedger = ({ cols, t }: { cols: number; t: Theme }) => {
       </Text>
       {steps.map((line, index) => (
         <Text color={t.color.muted} dim key={`${index}:${line}`} wrap="truncate-end">
-          {`  ${glyphs.check} ${compactPreview(line, Math.max(8, cols - 6))}`}
+          {`${indent}${glyphs.check} ${compactPreview(line, Math.max(8, cols - lead))}`}
         </Text>
       ))}
       {tools.map(tool => {
         const elapsed = tool.startedAt ? fmtDuration(now - tool.startedAt) : ''
         const label = tool.context ? `${tool.name} ${glyphs.separator}${tool.context}` : tool.name
-        const room = Math.max(8, cols - 6 - stringWidth(elapsed))
+        const room = Math.max(8, cols - lead - stringWidth(elapsed))
 
         return (
           <Text color={t.color.tool} key={tool.id} wrap="truncate-end">
-            {`  ${glyphs.bullet} ${compactPreview(label, room)}`}
+            {`${indent}${glyphs.bullet} ${compactPreview(label, room)}`}
             {elapsed ? <Text color={t.color.muted}>{` ${elapsed}`}</Text> : null}
           </Text>
         )

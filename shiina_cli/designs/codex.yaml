@@ -58,6 +58,14 @@ design:
   alert: round
   rule: "─"
 
+  # Structure: air beside a title (never a drawn line), rule-led headers, and
+  # the default stepped tree.
+  flank: space
+  header:
+    case: none
+    emphasis: bold
+    marker: rule
+
   spacing:
     insetPadX: 1
 
@@ -69,7 +77,7 @@ design:
     chevronOpen: "⌄"
     cross: "✗"
     ellipsis: "…"
-    off: "○"
+    "off": "○"               # quoted: a bare `off:` key is YAML 1.1 boolean False
     pending: "·"
     progress: "⏺"
     selected: "*"

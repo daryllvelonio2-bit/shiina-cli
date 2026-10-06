@@ -116,10 +116,35 @@ and inherit the rest.
 ```yaml
 design:
   density: compact        # compact | normal | roomy  — vertical rhythm
-  panel: round            # single | round | double | bold — box border language
+  panel: round            # single | round | double | bold | none — box border language
   alert: double           # border for attention panels (approvals, warnings).
                           # Independent of `panel`; defaults to the built-in "double".
+                          # `none` draws no box at all and reclaims the border cells,
+                          # so a borderless design is a real layout, not a recoloured one.
   rule: "─"               # horizontal rule character
+
+  # What flanks a title/header — the lines beside it.
+  flank: rule             # rule | space | none
+                          #   rule  = draw the rule character either side
+                          #   space = blank air, keeps the title centred
+                          #   none  = nothing either side
+
+  # Header treatment: label transform, weight, and what precedes the label.
+  header:
+    case: none            # upper | lower | none
+    emphasis: bold        # bold | dim | none
+    marker: chevron       # chevron | rule | none
+                          #   chevron = the expand marker (default)
+                          #   rule    = a rule dash, same as the status line's lead
+                          #   none    = a bare label (the row stays clickable)
+
+  # Nesting unit for tool output, subagents and ledger steps. Every field is a
+  # string, so `''` goes flat and a wider `unit` steps deeper.
+  indent:
+    unit: "  "            # one nesting level, repeated per depth; '' = flat
+    stem: "│ "            # rail inside a level whose branch continues
+    branch: "├─ "         # lead before a non-final child
+    last: "└─ "           # lead before the final child
 
   # Container chrome spacing. Omit any key to take it from `density`.
   spacing:
@@ -229,7 +254,7 @@ code change, no rebuild, and no restart of anything but the TUI.
 
 | what | where |
 |---|---|
-| schema types | `ui-tui/src/domain/design.ts` — `Design`, `DesignSpec` |
+| schema types | `ui-tui/src/design.ts` — `Design`, `DesignBorders`, `DesignGlyphs`, `DesignHeader`, `DesignIndent`; `ui-tui/src/domain/designSpec.ts` — the design-file `DesignSpec` |
 | applying it | `ui-tui/src/domain/applyDesign.ts` — `applyDesign(theme, spec)` |
 | the loader | `shiina_cli/design_engine.py` — `load_design`, `list_designs`, `get_active_design` |
 | config key | `display.design` (`shiina_cli/config_defaults.py`) |

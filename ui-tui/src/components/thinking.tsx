@@ -6,6 +6,7 @@ import spinners, { type BrailleSpinnerName } from 'unicode-animations'
 
 import { $uiState } from '../app/uiStore.js'
 import { THINKING_COT_MAX, THINKING_TRAIL_MAX_CHARS, THINKING_TRAIL_MAX_LINES } from '../config/limits.js'
+import { type DesignIndent, headerEmphasis, headerLabel, headerLead } from '../design.js'
 import { sectionMode } from '../domain/details.js'
 import {
   buildSubagentTree,
@@ -54,8 +55,8 @@ type TreeRails = readonly boolean[]
 
 const nextTreeRails = (rails: TreeRails, branch: TreeBranch) => [...rails, branch === 'mid']
 
-const treeLead = (rails: TreeRails, branch: TreeBranch) =>
-  `${rails.map(on => (on ? '│ ' : '  ')).join('')}${branch === 'mid' ? '├─ ' : '└─ '}`
+const treeLead = (rails: TreeRails, branch: TreeBranch, indent: DesignIndent) =>
+  `${rails.map(on => (on ? indent.stem : indent.unit)).join('')}${branch === 'mid' ? indent.branch : indent.last}`
 
 // ── Primitives ───────────────────────────────────────────────────────
 
@@ -74,7 +75,7 @@ function TreeRow({
   stemDim?: boolean
   t: Theme
 }) {
-  const lead = treeLead(rails, branch)
+  const lead = treeLead(rails, branch, t.design.indent)
 
   return (
     <Box>
@@ -267,12 +268,13 @@ function Chevron({
   // strength; the chevron keeps it too. They used to render muted+dim, which put
   // the body text (reasoning) visually above its own header.
   const color = chevronColor(t, tone)
+  const header = t.design.header
 
   return (
     <Box onClick={(e: any) => onClick(!!e?.shiftKey || !!e?.ctrlKey)}>
-      <Text bold color={color}>
-        {open ? '▾ ' : '▸ '}
-        {title}
+      <Text color={color} {...headerEmphasis(header)}>
+        {headerLead(header, open, t.design.glyphs)}
+        {headerLabel(header, title)}
         {typeof count === 'number' ? <Text color={t.color.muted}> ({count})</Text> : ''}
         {suffix ? (
           <Text color={t.color.statusFg} dim>

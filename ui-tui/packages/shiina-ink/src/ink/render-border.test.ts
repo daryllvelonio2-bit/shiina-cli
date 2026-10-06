@@ -180,6 +180,18 @@ describe('renderBorder viewport parity', () => {
     expect(decorated.cells[2]![2]![2]).toContain('\u001B[44m')
   })
 
+  it('draws nothing for the `none` style, leaving the interior untouched', () => {
+    const { cells } = paint(borderNode({ borderStyle: 'none' }))
+
+    expect(cells.flat().every(([char]) => char === ' ')).toBe(true)
+  })
+
+  it('tolerates an unknown border style instead of dereferencing an undefined box', () => {
+    const { cells } = paint(borderNode({ borderStyle: 'sparkly' }))
+
+    expect(cells.flat().every(([char]) => char === ' ')).toBe(true)
+  })
+
   it('keeps clipped border parity when an absolute-style overlay paints afterward', () => {
     const overlay = (output: Output, phase: 'before' | 'after') => {
       if (phase === 'after') {

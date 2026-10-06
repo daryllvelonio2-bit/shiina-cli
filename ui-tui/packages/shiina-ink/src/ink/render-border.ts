@@ -17,6 +17,19 @@ export type BorderTextOptions = {
 }
 
 export const CUSTOM_BORDER_STYLES = {
+  // A design's `none`: a real, understood style that draws no box. Kept as a
+  // glyph table (rather than a special case at every call site) so any
+  // `borderStyle` consumer — Box, Dialog, every panel — honours it for free.
+  none: {
+    top: '',
+    left: '',
+    right: '',
+    bottom: '',
+    topLeft: '',
+    topRight: '',
+    bottomLeft: '',
+    bottomRight: ''
+  },
   dashed: {
     top: '╌',
     left: '╎',
@@ -183,6 +196,12 @@ const renderBorder = (
         ? (CUSTOM_BORDER_STYLES[node.style.borderStyle as keyof typeof CUSTOM_BORDER_STYLES] ??
           cliBoxes[node.style.borderStyle as keyof Boxes])
         : node.style.borderStyle
+
+    // An empty box — the `none` style — draws nothing. Returning here also
+    // keeps the vertical-border path from writing bare newlines into content.
+    if (!box || (!box.top && !box.bottom && !box.left && !box.right)) {
+      return
+    }
 
     const topBorderColor = node.style.borderTopColor ?? node.style.borderColor
 

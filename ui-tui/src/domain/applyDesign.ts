@@ -40,6 +40,9 @@ export const applyDesign = (theme: Theme, spec: DesignSpec | null): Theme => {
   const panel = spec.design?.panel
   const alert = spec.design?.alert
   const rule = spec.design?.rule
+  const flank = spec.design?.flank
+  const header = spec.design?.header
+  const indent = spec.design?.indent
   const spacing = spec.design?.spacing
   const statusBar = spec.design?.status_bar
 
@@ -56,7 +59,10 @@ export const applyDesign = (theme: Theme, spec: DesignSpec | null): Theme => {
         ...(rule ? { rule } : {})
       },
       ...(density ? { density, spacing: DENSITY_SCALES[density] } : {}),
+      flank: flank ?? design.flank,
       glyphs: glyphs ? { ...design.glyphs, ...glyphs } : design.glyphs,
+      header: header ? { ...design.header, ...header } : design.header,
+      indent: indent ? { ...design.indent, ...indent } : design.indent,
       // After the density block on purpose: an explicit per-key override wins
       // over the scale the density just installed.
       ...(spacing ? { spacing: { ...(density ? DENSITY_SCALES[density] : design.spacing), ...spacing } } : {}),
