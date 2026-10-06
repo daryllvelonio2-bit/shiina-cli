@@ -2615,7 +2615,7 @@ class CLICommandsMixin:
                                 "The TUI picks up the new style on its next render.")
 
     def _handle_layout_command(self, cmd: str):
-        """Handle /layout [minimal|workbench|studio] — pick the TUI's structural layout.
+        """Handle /layout [minimal|workbench|studio|timeline] — pick the TUI's design.
         Persists to ``display.layout`` (the key the TUI reads) for its next render."""
         from shiina_constants import DEFAULT_LAYOUT, LAYOUT_IDS
         current = (self.config.get("display") or {}).get("layout", DEFAULT_LAYOUT)
