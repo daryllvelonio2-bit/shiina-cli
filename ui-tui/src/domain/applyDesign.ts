@@ -38,6 +38,7 @@ export const applyDesign = (theme: Theme, spec: DesignSpec | null): Theme => {
   const density = spec.design?.density
   const glyphs = spec.design?.glyphs
   const panel = spec.design?.panel
+  const alert = spec.design?.alert
   const rule = spec.design?.rule
   const statusBar = spec.design?.status_bar
 
@@ -49,6 +50,7 @@ export const applyDesign = (theme: Theme, spec: DesignSpec | null): Theme => {
       ...design,
       borders: {
         ...design.borders,
+        ...(alert ? { alert } : {}),
         ...(panel ? { panel } : {}),
         ...(rule ? { rule } : {})
       },

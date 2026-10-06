@@ -80,11 +80,11 @@ export function Dialog({ children, hint, title, width }: DialogProps) {
   return (
     <Box
       borderColor={theme.color.primary}
-      borderStyle="round"
+      borderStyle={theme.design.borders.panel}
       flexDirection="column"
       opaque
-      paddingX={2}
-      paddingY={1}
+      paddingX={theme.design.spacing.overlayPadX}
+      paddingY={theme.design.spacing.overlayPadY}
       width={width}
     >
       {title && (

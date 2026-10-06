@@ -40,14 +40,14 @@ export function SubscriptionOverlay({ onClose, onPatch, overlay, t }: Subscripti
   // Teams have no personal subscription — dead-end to /topup, no picker.
   if (s.context === 'team') {
     return (
-      <Box borderColor={t.color.accent} borderStyle="round" flexDirection="column" paddingX={1}>
+      <Box borderColor={t.color.accent} borderStyle={t.design.borders.panel} flexDirection="column" paddingX={1}>
         <TeamContextScreen onClose={onClose} s={s} t={t} />
       </Box>
     )
   }
 
   return (
-    <Box borderColor={t.color.accent} borderStyle="round" flexDirection="column" paddingX={1}>
+    <Box borderColor={t.color.accent} borderStyle={t.design.borders.panel} flexDirection="column" paddingX={1}>
       {screen === 'picker' && <PickerScreen onClose={onClose} onPatch={onPatch} overlay={overlay} t={t} />}
       {screen === 'confirm' && <ConfirmScreen onClose={onClose} onPatch={onPatch} overlay={overlay} t={t} />}
       {screen === 'result' && <ResultScreen onClose={onClose} overlay={overlay} t={t} />}

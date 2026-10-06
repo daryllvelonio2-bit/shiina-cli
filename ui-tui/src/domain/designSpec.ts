@@ -24,6 +24,8 @@ export interface DesignSpec {
   design?: {
     density?: DesignDensity
     panel?: DesignBorders['panel']
+    /** Panels that demand attention (approvals, warnings). */
+    alert?: DesignBorders['panel']
     rule?: string
     glyphs?: Partial<DesignGlyphs>
     /** `null` = built-in order and allowlist. */
@@ -41,6 +43,13 @@ export interface DesignSpec {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const BORDER_STYLES = ['single', 'double', 'bold', 'round'] as const
+
+const borderStyle = (value: unknown): DesignBorders['panel'] | undefined =>
+  typeof value === 'string' && (BORDER_STYLES as readonly string[]).includes(value)
+    ? (value as DesignBorders['panel'])
+    : undefined
 
 const str = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim() ? value : undefined
@@ -107,14 +116,12 @@ export const resolveDesignSpec = (raw: unknown): DesignSpec | null => {
     description: str(raw.description),
     design: design
       ? {
+          alert: borderStyle(design.alert),
           density: design.density === 'compact' || design.density === 'roomy' || design.density === 'normal'
             ? design.density
             : undefined,
           glyphs: isRecord(design.glyphs) ? (design.glyphs as Partial<DesignGlyphs>) : undefined,
-          panel:
-            design.panel === 'single' || design.panel === 'round' || design.panel === 'double' || design.panel === 'bold'
-              ? design.panel
-              : undefined,
+          panel: borderStyle(design.panel),
           rule: str(design.rule),
           status_bar: statusBar ? { segments: segments === null ? null : strList(segments) } : undefined
         }
@@ -145,6 +152,7 @@ const designChangesAnything = (spec: DesignSpec): boolean =>
       spec.spinner?.tool?.length ||
       spec.design?.density ||
       spec.design?.panel ||
+      spec.design?.alert ||
       spec.design?.rule ||
       (spec.design?.glyphs && Object.keys(spec.design.glyphs).length) ||
       spec.design?.status_bar ||

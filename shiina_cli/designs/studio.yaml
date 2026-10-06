@@ -45,6 +45,7 @@ prompt: "❯"
 design:
   density: normal
   panel: round
+  alert: double
   rule: "─"
   glyphs:
     active: "▸"

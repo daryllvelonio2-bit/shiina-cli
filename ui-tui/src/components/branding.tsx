@@ -70,12 +70,12 @@ const centerIn = (s: string, w: number) => {
   return `${' '.repeat(left)}${f}${' '.repeat(slack - left)}`
 }
 
-const ruleIn = (label: string, w: number) => {
+const ruleIn = (label: string, w: number, rule: string) => {
   const f = clip(label, Math.max(1, w - 4))
   const slack = Math.max(0, w - f.length - 2)
   const left = slack >> 1
 
-  return `${'─'.repeat(left)} ${f} ${'─'.repeat(slack - left)}`
+  return `${rule.repeat(left)} ${f} ${rule.repeat(slack - left)}`
 }
 
 function CompactBanner({ cols, t }: { cols: number; t: Theme }) {
@@ -84,8 +84,8 @@ function CompactBanner({ cols, t }: { cols: number; t: Theme }) {
 
   return (
     <Box flexDirection="column" height={2} marginBottom={1} width={w}>
-      <Text color={t.color.primary}>{ruleIn('shiinaaa', w)}</Text>
-      <Text color={t.color.primary}>{'─'.repeat(w)}</Text>
+      <Text color={t.color.primary}>{ruleIn('shiinaaa', w, t.design.borders.rule)}</Text>
+      <Text color={t.color.primary}>{t.design.borders.rule.repeat(w)}</Text>
     </Box>
   )
 }
@@ -445,7 +445,7 @@ export function SessionPanel({ info, maxWidth, sid, t }: SessionPanelProps) {
   )
 
   return (
-    <Box borderColor={t.color.border} borderStyle="round" marginBottom={1} paddingX={2} paddingY={1}>
+    <Box borderColor={t.color.border} borderStyle={t.design.borders.panel} marginBottom={1} paddingX={t.design.spacing.panelPadX} paddingY={t.design.spacing.panelPadY}>
       <WidgetGrid
         cols={wide ? leftW + 2 + w : w}
         columns={wide ? [leftW, { fr: 1 }] : 1}
@@ -468,7 +468,7 @@ export function SessionPanel({ info, maxWidth, sid, t }: SessionPanelProps) {
 
 export function Panel({ sections, t, title }: PanelProps) {
   return (
-    <Box borderColor={t.color.border} borderStyle="round" flexDirection="column" paddingX={2} paddingY={1}>
+    <Box borderColor={t.color.border} borderStyle={t.design.borders.panel} flexDirection="column" paddingX={t.design.spacing.panelPadX} paddingY={t.design.spacing.panelPadY}>
       <Box justifyContent="center" marginBottom={1}>
         <Text bold color={t.color.primary}>
           {title}

@@ -375,7 +375,7 @@ const renderTable = (k: number, rows: string[][], t: Theme, cols?: number) => {
   }
 
   const isHard = totalMin > availableWidth // tier 3 needs hard word breaks
-  const sep = columnWidths.map(w => '─'.repeat(Math.max(1, w))).join('  ')
+  const sep = columnWidths.map(w => t.design.borders.rule.repeat(Math.max(1, w))).join('  ')
 
   // When wrapping isn't needed, build single-line strings per row.
   // All cells render as plain text via stripInlineMarkup.
@@ -489,7 +489,7 @@ const renderTable = (k: number, rows: string[][], t: Theme, cols?: number) => {
           <Fragment key={ri}>
             {ri > 0 ? (
               <Text color={t.color.muted} dimColor>
-                {'─'.repeat(sepWidth)}
+                {t.design.borders.rule.repeat(sepWidth)}
               </Text>
             ) : null}
             {headers.map((header, ci) => {
@@ -947,7 +947,7 @@ function MdImpl({ cols, compact, t, text }: MdProps) {
         start('rule')
         nodes.push(
           <Text color={t.color.muted} key={key}>
-            {'─'.repeat(36)}
+            {t.design.borders.rule.repeat(36)}
           </Text>
         )
         i++

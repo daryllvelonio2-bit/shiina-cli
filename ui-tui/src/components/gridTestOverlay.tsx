@@ -153,7 +153,7 @@ function AreaDemoCell({ active, cell, label, t }: { active: boolean; cell: GridA
     <Box
       alignItems="center"
       borderColor={borderColor}
-      borderStyle="round"
+      borderStyle={t.design.borders.panel}
       flexDirection="column"
       height={cell.height}
       justifyContent="center"
@@ -196,7 +196,7 @@ function GridCell({
   return (
     <Box
       borderColor={borderColor}
-      borderStyle="round"
+      borderStyle={t.design.borders.panel}
       flexDirection="column"
       height={height}
       paddingX={padX}
@@ -239,7 +239,7 @@ function ZoomedGridCell({ cols, parentLabel, t }: { cols: number; parentLabel: s
   return (
     <Box
       borderColor={t.color.primary}
-      borderStyle="round"
+      borderStyle={t.design.borders.panel}
       flexDirection="column"
       paddingX={1}
       paddingY={1}
@@ -297,16 +297,16 @@ const childCellWidgets = (t: Theme, count: number, columns: number): WidgetGridW
   return Array.from({ length: count }, (_, idx) => ({
     colSpan: lastSpansRow && idx === count - 1 ? columns : 1,
     id: `child-c${idx + 1}`,
-    render: w => <MiniCell color={colors[idx % colors.length]!} label={`c${idx + 1}`} width={w} />
+    render: w => <MiniCell color={colors[idx % colors.length]!} label={`c${idx + 1}`} t={t} width={w} />
   }))
 }
 
-function MiniCell({ color, label, width }: { color: string; label: string; width: number }) {
+function MiniCell({ color, label, t, width }: { color: string; label: string; t: Theme; width: number }) {
   return (
     <Box
       alignItems="center"
       borderColor={color}
-      borderStyle="single"
+      borderStyle={t.design.borders.panel}
       height={MINI_CELL_HEIGHT}
       justifyContent="center"
       overflow="hidden"

@@ -36,7 +36,11 @@ _DESIGN_KEYS: tuple[tuple[str, str], ...] = (
     ("prompt", "composer prompt symbol, e.g. '>' or '\u276f'"),
     ("design.density", "compact | normal | roomy — vertical rhythm"),
     ("design.panel", "single | round | double | bold — panel/overlay border"),
+    ("design.alert", "single | round | double | bold — attention panels (approvals, warnings); "
+                     "independent of `panel`, defaults to the built-in 'double'"),
     ("design.rule", "horizontal rule character, e.g. '\u2500' or '\u2501'"),
+    ("design.spacing.<name>", "overlayPadX, overlayPadY, panelPadX, panelPadY, rowGap, sectionGap — "
+                              "override the density scale individually"),
     ("design.glyphs.<name>", "active, bullet, cache, chain, check, chevronClosed, chevronOpen, "
                              "focus, idle, latency, pending, resume, separator, statusHead, tps"),
     ("design.status_bar.segments", "list of status fields, or null for the built-in order"),

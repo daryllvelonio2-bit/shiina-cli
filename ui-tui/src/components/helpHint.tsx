@@ -24,7 +24,7 @@ export function HelpHint({ t }: { t: Theme }) {
       <Box
         alignSelf="flex-start"
         borderColor={t.color.primary}
-        borderStyle="round"
+        borderStyle={t.design.borders.panel}
         flexDirection="column"
         marginBottom={1}
         opaque

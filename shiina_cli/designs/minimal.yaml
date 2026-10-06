@@ -45,6 +45,7 @@ prompt: ">"
 design:
   density: compact
   panel: single
+  alert: single
   rule: "-"
   glyphs:
     active: ">"

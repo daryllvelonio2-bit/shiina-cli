@@ -8,6 +8,7 @@ import unicodeSpinners from 'unicode-animations'
 import { $delegationState } from '../app/delegationStore.js'
 import type { BatteryInfo, IndicatorStyle, Notice } from '../app/interfaces.js'
 import { $isStatusRuleOccluded } from '../app/overlayStore.js'
+import { $uiState } from '../app/uiStore.js'
 import { useTurnSelector } from '../app/turnStore.js'
 import { DEV_CREDITS_MODE } from '../config/env.js'
 import { FACES } from '../content/faces.js'
@@ -665,9 +666,9 @@ export function StatusRule({
               const rightDash = remainingSep - leftDash
               return (
                 <>
-                  <Text color={t.color.border}>{leftDash > 0 ? '─'.repeat(leftDash) : ''}</Text>
+                  <Text color={t.color.border}>{leftDash > 0 ? t.design.borders.rule.repeat(leftDash) : ''}</Text>
                   <Text bold color={t.color.accent}>{` ${sessionTitle} `}</Text>
-                  <Text color={t.color.border}>{rightDash > 0 ? '─'.repeat(rightDash) : ''}</Text>
+                  <Text color={t.color.border}>{rightDash > 0 ? t.design.borders.rule.repeat(rightDash) : ''}</Text>
                 </>
               )
             })()
@@ -705,11 +706,16 @@ export function StatusRule({
 }
 
 export function FloatBox({ children, color }: { children: ReactNode; color: string }) {
+  // The border language comes from the active design. Read from the store rather
+  // than threading a prop: FloatBox is mounted from a dozen overlay sites, and a
+  // purely presentational wrapper should not force every caller to carry `t`.
+  const theme = useStore($uiState).theme
+
   return (
     <Box
       alignSelf="flex-start"
       borderColor={color}
-      borderStyle="double"
+      borderStyle={theme.design.borders.alert}
       flexDirection="column"
       marginTop={1}
       opaque

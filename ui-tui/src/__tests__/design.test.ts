@@ -55,8 +55,20 @@ describe('resolveDesign', () => {
   })
 
   it('accepts a known border preset and a single-character rule only', () => {
-    expect(resolveDesign({ borders: { panel: 'double', rule: '═' } }).borders).toEqual({ panel: 'double', rule: '═' })
+    expect(resolveDesign({ borders: { panel: 'double', rule: '═' } }).borders).toEqual({
+      // `alert` is unset, so it follows `panel`.
+      alert: 'double',
+      panel: 'double',
+      rule: '═'
+    })
     expect(resolveDesign({ borders: { panel: 'sparkly', rule: '──' } }).borders).toEqual(DEFAULT_DESIGN.borders)
+  })
+
+  it('rejects an unknown alert style and keeps the built-in one', () => {
+    const design = resolveDesign({ borders: { alert: 'sparkly', panel: 'bold' } })
+
+    expect(design.borders.alert).toBe(DEFAULT_DESIGN.borders.alert)
+    expect(design.borders.panel).toBe('bold')
   })
 
   it('treats an empty segment list as "unset" and dedupes an explicit one', () => {

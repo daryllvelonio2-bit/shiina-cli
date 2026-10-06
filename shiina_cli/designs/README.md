@@ -117,7 +117,18 @@ and inherit the rest.
 design:
   density: compact        # compact | normal | roomy  — vertical rhythm
   panel: round            # single | round | double | bold — box border language
+  alert: double           # border for attention panels (approvals, warnings).
+                          # Independent of `panel`; defaults to the built-in "double".
   rule: "─"               # horizontal rule character
+
+  # Container chrome spacing. Omit any key to take it from `density`.
+  spacing:
+    overlayPadX: 1        # left/right padding inside an overlay
+    overlayPadY: 1        # top/bottom padding inside an overlay
+    panelPadX: 2          # left/right padding inside a bordered panel
+    panelPadY: 1          # top/bottom padding inside a bordered panel
+    rowGap: 0             # gap between rows inside a group
+    sectionGap: 1          # gap between sections
 
   glyphs:
     chevronClosed: "▸"    # a collapsed section
@@ -143,7 +154,8 @@ design:
 ```
 
 Available `status_bar.segments` ids are the ones the status rule knows; run
-`shiina design segments` for the live list.
+`shiina design keys` for the full key list, and `/status` in the TUI to see the
+live segment ids.
 
 ## Motion
 

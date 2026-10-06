@@ -409,7 +409,7 @@ export function Journey({ gw, onClose, t }: JourneyProps) {
     const body = activeNode.body ? activeNode.body.split(/\r?\n/) : ['No additional detail recorded yet.']
 
     return (
-      <Box alignItems="stretch" flexDirection="column" flexGrow={1} paddingX={1} paddingY={1}>
+      <Box alignItems="stretch" flexDirection="column" flexGrow={1} paddingX={t.design.spacing.overlayPadX} paddingY={t.design.spacing.overlayPadY}>
         <Box flexDirection="column" marginBottom={1}>
           <Text wrap="truncate-end">
             <Text bold color={fadeInk(palette, activeNode.style, 1)}>
@@ -452,7 +452,7 @@ export function Journey({ gw, onClose, t }: JourneyProps) {
   const start = windowStart(cursor, tree.length, listH)
 
   return (
-    <Box alignItems="stretch" flexDirection="column" flexGrow={1} paddingX={1} paddingY={1}>
+    <Box alignItems="stretch" flexDirection="column" flexGrow={1} paddingX={t.design.spacing.overlayPadX} paddingY={t.design.spacing.overlayPadY}>
       <Box flexDirection="column" marginBottom={1}>
         <Text wrap="truncate-end">
           <Text bold color={t.color.primary}>
@@ -556,7 +556,7 @@ function TreeLine({ active, palette, row, t }: { active: boolean; palette: Starm
 
 function Shell({ children, t }: { children: React.ReactNode; t: Theme }) {
   return (
-    <Box flexDirection="column" paddingX={1} paddingY={1}>
+    <Box flexDirection="column" paddingX={t.design.spacing.overlayPadX} paddingY={t.design.spacing.overlayPadY}>
       <Text bold color={t.color.primary}>
         ✦ Journey
       </Text>

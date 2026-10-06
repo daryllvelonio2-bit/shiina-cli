@@ -96,9 +96,11 @@ export interface DesignBorders {
   rule: string
   /** Native box-drawing border style for panels and overlays. */
   panel: 'single' | 'round' | 'double' | 'bold'
+  /** Panels that demand attention (approvals, warnings). Defaults to `panel`. */
+  alert: 'single' | 'round' | 'double' | 'bold'
 }
 
-export const DEFAULT_BORDERS: DesignBorders = { panel: 'round', rule: '─' }
+export const DEFAULT_BORDERS: DesignBorders = { alert: 'double', panel: 'round', rule: '─' }
 
 /**
  * Status-rule layout. `segments === null` keeps the built-in order and shows
@@ -151,18 +153,28 @@ const glyphsOf = (raw: unknown): DesignGlyphs => {
   return glyphs
 }
 
+const BORDER_STYLES = ['single', 'double', 'bold', 'round'] as const
+
+const borderStyleOf = (value: unknown, fallback: DesignBorders['panel']): DesignBorders['panel'] =>
+  typeof value === 'string' && (BORDER_STYLES as readonly string[]).includes(value)
+    ? (value as DesignBorders['panel'])
+    : fallback
+
 const bordersOf = (raw: unknown): DesignBorders => {
   if (!isRecord(raw)) {
     return DEFAULT_BORDERS
   }
 
-  const panel = raw.panel
-  const rule = raw.rule
+  const panel = borderStyleOf(raw.panel, DEFAULT_BORDERS.panel)
 
   return {
-    panel:
-      panel === 'single' || panel === 'double' || panel === 'bold' || panel === 'round' ? panel : DEFAULT_BORDERS.panel,
-    rule: typeof rule === 'string' && rule.length === 1 ? rule : DEFAULT_BORDERS.rule
+    // `alert` is independent of `panel` on purpose: the built-ins are
+    // {panel: round, alert: double}, so deriving one from the other would make
+    // "panel: round" silently restyle the approval boxes. A design that wants
+    // them to match sets the same value for both.
+    alert: borderStyleOf(raw.alert, DEFAULT_BORDERS.alert),
+    panel,
+    rule: typeof raw.rule === 'string' && raw.rule.length === 1 ? raw.rule : DEFAULT_BORDERS.rule
   }
 }
 

@@ -36,7 +36,10 @@ description: "Built-in Shiina — the long-standing look. Colours come from the 
 # design:
 #   density: normal          # compact | normal | roomy
 #   panel: round             # single | round | double | bold
+#   alert: double            # attention panels; independent of `panel`
 #   rule: "─"
+#   spacing:                 # omit any key to take it from `density`
+#     overlayPadX: 1
 #   glyphs:
 #     chevronClosed: "▸"
 #     chevronOpen: "▾"

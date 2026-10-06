@@ -273,7 +273,7 @@ function StreamPanel({
   return (
     <Box
       borderColor={borderColor}
-      borderStyle="round"
+      borderStyle={t.design.borders.panel}
       flexDirection="column"
       height={cell.height}
       paddingX={1}
@@ -319,7 +319,7 @@ export const GridStreamsDemo = memo(function GridStreamsDemo({
         <Box
           alignItems="center"
           borderColor={t.color.border}
-          borderStyle="round"
+          borderStyle={t.design.borders.panel}
           height={cell.height}
           justifyContent="space-between"
           paddingX={1}

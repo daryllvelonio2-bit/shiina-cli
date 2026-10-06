@@ -47,6 +47,7 @@ prompt: "▌"
 design:
   density: compact
   panel: bold
+  alert: bold
   rule: "━"
   glyphs:
     active: "▶"

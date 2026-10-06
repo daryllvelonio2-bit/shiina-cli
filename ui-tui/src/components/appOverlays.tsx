@@ -321,7 +321,7 @@ export function FloatingOverlays({
       id: 'pager',
       render: () => (
         <FloatBox color={theme.color.border}>
-          <Box flexDirection="column" paddingX={1} paddingY={1}>
+          <Box flexDirection="column" paddingX={theme.design.spacing.overlayPadX} paddingY={theme.design.spacing.overlayPadY}>
             {pager.title && (
               <Box justifyContent="center" marginBottom={1}>
                 <Text bold color={theme.color.primary}>

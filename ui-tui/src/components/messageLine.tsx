@@ -138,7 +138,7 @@ export const MessageLine = memo(function MessageLine({
     return (
       <Box alignSelf="flex-start" marginLeft={3} paddingX={1}>
         <Accordion defaultOpen={liveDetails} t={t} title="Tool result" suffix={preview}>
-          <Box borderColor={t.color.muted} borderStyle="round" paddingX={1}>
+          <Box borderColor={t.color.muted} borderStyle={t.design.borders.panel} paddingX={1}>
             {hasAnsi(msg.text) ? (
               <Text wrap="truncate-end">
                 <Ansi>{safeAnsi}</Ansi>

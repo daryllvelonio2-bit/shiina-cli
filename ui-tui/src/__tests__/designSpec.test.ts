@@ -87,6 +87,29 @@ describe('applyDesign', () => {
     expect(themed.design.statusBar.segments).toEqual(['model'])
   })
 
+  it('applies the alert border independently of the panel border', () => {
+    const both = applyDesign(DEFAULT_THEME, resolveDesignSpec({ design: { alert: 'single', panel: 'round' }, name: 'a' }))
+
+    expect(both.design.borders.alert).toBe('single')
+    expect(both.design.borders.panel).toBe('round')
+
+    // Setting only `panel` must NOT drag the attention boxes with it: the
+    // built-ins are {panel: round, alert: double}, so a design asking for
+    // `panel: bold` would otherwise silently restyle every approval prompt.
+    const onlyPanel = resolveDesignSpec({ design: { panel: 'bold' }, name: 'b' })
+    const themed = applyDesign(DEFAULT_THEME, onlyPanel)
+
+    expect(themed.design.borders.panel).toBe('bold')
+    expect(themed.design.borders.alert).toBe(DEFAULT_THEME.design.borders.alert)
+  })
+
+  it('rejects an unknown alert style rather than passing it to the renderer', () => {
+    const spec = resolveDesignSpec({ design: { alert: 'spiky' }, name: 'c' })
+
+    // `alert: 'spiky'` alone is not a change, so the whole spec is a no-op.
+    expect(spec).toBeNull()
+  })
+
   it('keeps every glyph the design stayed silent about', () => {
     const spec = resolveDesignSpec({ design: { glyphs: { bullet: '⬤' } }, name: 'partial' })
 

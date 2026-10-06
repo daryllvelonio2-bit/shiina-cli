@@ -194,7 +194,7 @@ function GanttStrip({
       return '·'
     }
 
-    return '─'
+    return t.design.borders.rule
   }).join('')
 
   const rulerLabels = (() => {
@@ -545,7 +545,7 @@ function DiffView({
   const sumTokens = (x: typeof aTotals) => x.inputTokens + x.outputTokens
 
   return (
-    <Box flexDirection="column" flexGrow={1} paddingX={1} paddingY={1}>
+    <Box flexDirection="column" flexGrow={1} paddingX={t.design.spacing.overlayPadX} paddingY={t.design.spacing.overlayPadY}>
       <Box flexDirection="column" marginBottom={1}>
         <Text bold color={t.color.border}>
           Replay diff
@@ -918,7 +918,7 @@ export function AgentsOverlay({ gw, initialHistoryIndex = 0, onClose, t }: Agent
   }
 
   return (
-    <Box alignItems="stretch" flexDirection="column" flexGrow={1} paddingX={1} paddingY={1}>
+    <Box alignItems="stretch" flexDirection="column" flexGrow={1} paddingX={t.design.spacing.overlayPadX} paddingY={t.design.spacing.overlayPadY}>
       <Box flexDirection="column" marginBottom={1}>
         <Text wrap="truncate-end">
           <Text bold color={replayMode ? t.color.border : t.color.primary}>
