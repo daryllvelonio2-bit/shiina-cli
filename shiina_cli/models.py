@@ -43,7 +43,6 @@ from shiina_cli.models_catalog_static import (
     _OPENAI_FAST_MODE_PREFIXES,
     _PROVIDER_ALIASES,
     _PROVIDER_LABELS,
-    _PROVIDER_MODELS,
     _PROVIDER_RETIRED_ALIASES,
     _SILENT_DEFAULT_PROVIDERS,
     _xai_finalize_catalog)
@@ -63,6 +62,24 @@ from shiina_cli.models_local import (
     fetch_ollama_cloud_models)
 
 logger = logging.getLogger(__name__)
+
+
+def provider_models() -> dict[str, list[str]]:
+    """Curated per-provider catalog — the disk-derived xAI/Codex entries resolve on first use.
+
+    Resolving them at import dragged ``agent.models_dev`` (→ ``requests``) and
+    ``agent.model_metadata`` (→ ``shiina_cli.config``) into every `shiina` start that never opens a
+    model picker. Reads the module global first so ``monkeypatch.setattr(models, "_PROVIDER_MODELS",
+    ...)`` keeps intercepting this path, exactly as it did when the name was bound at import.
+    """
+    models = globals().get("_PROVIDER_MODELS")
+    if models is None:
+        from shiina_cli import models_catalog_static as _catalog_static
+
+        models = _catalog_static.provider_models()
+        globals()["_PROVIDER_MODELS"] = models
+    return models
+
 
 # Identify ourselves so endpoints fronted by Cloudflare's Browser Integrity
 # Check (error 1010) don't reject the default ``Python-urllib/*`` signature.
@@ -514,7 +531,7 @@ def recommended_nous_default_model() -> dict[str, Any]:
 def get_default_model_for_provider(provider: str) -> str:
     """Cost-safe default model for a provider, or "" — the NON-INTERACTIVE fallback when a provider
     is configured but no model was ever selected."""
-    models = _PROVIDER_MODELS.get(provider, [])
+    models = provider_models().get(provider, [])
     if provider in _SILENT_DEFAULT_PROVIDERS:
         preferred = get_preferred_silent_default_model(provider)
         # Trust the preferred default even without a static catalog (OpenRouter's picker list is
@@ -658,7 +675,7 @@ def get_curated_nous_model_ids() -> list[str]:
         remote = get_curated_nous_models()
     except Exception:
         remote = None
-    return list(remote or _PROVIDER_MODELS.get("nous", []))
+    return list(remote or provider_models().get("nous", []))
 
 
 def _ai_gateway_model_is_free(pricing: Any) -> bool:
@@ -883,7 +900,7 @@ def curated_models_for_provider(
         return [(m, "") for m in live]
 
     # Fallback to static catalog
-    models = _PROVIDER_MODELS.get(normalized, [])
+    models = provider_models().get(normalized, [])
     return [(m, "") for m in models]
 
 
@@ -895,7 +912,7 @@ def _provider_keys(provider: str) -> set[str]:
 
 def _provider_catalog_names(provider: str) -> tuple[str, ...]:
     """Active picker models plus retired aliases recognized for detection."""
-    return tuple(_PROVIDER_MODELS.get(provider, [])) + _PROVIDER_RETIRED_ALIASES.get(provider, ())
+    return tuple(provider_models().get(provider, [])) + _PROVIDER_RETIRED_ALIASES.get(provider, ())
 
 
 def _model_in_provider_catalog(name_lower: str, providers: set[str]) -> bool:
@@ -920,13 +937,13 @@ def _resolve_static_model_alias(
     def _match(provider: str) -> Optional[str]:
         prefix = f"{identity.vendor}/{identity.family}" if provider in _AGGREGATOR_PROVIDERS else identity.family
         prefix = prefix.lower()
-        return next((m for m in _PROVIDER_MODELS.get(provider, []) if m.lower().startswith(prefix)), None)
+        return next((m for m in provider_models().get(provider, []) if m.lower().startswith(prefix)), None)
 
     # Current provider first, then native vendors, then aggregators / borrow-list providers the user
     # is already on — so `sonnet` resolves to anthropic before any re-exposing provider.
     skip = current_keys | _AGGREGATOR_PROVIDERS | _BORROWED_MODEL_PROVIDERS
     candidates = [
-        *current_keys, *(p for p in _PROVIDER_MODELS if p not in skip),
+        *current_keys, *(p for p in provider_models() if p not in skip),
         *(p for p in _AGGREGATOR_PROVIDERS if p in current_keys),
         *(p for p in _BORROWED_MODEL_PROVIDERS if p in current_keys)]
     for provider in candidates:
@@ -954,7 +971,7 @@ def detect_static_provider_for_model(
     # provider's default. Skip "custom" (no catalog) and "openrouter" (needs an explicit model).
     resolved_provider = _PROVIDER_ALIASES.get(name_lower, name_lower)
     if resolved_provider not in {"custom", "openrouter"}:
-        default_models = _PROVIDER_MODELS.get(resolved_provider, [])
+        default_models = provider_models().get(resolved_provider, [])
         if resolved_provider in _PROVIDER_LABELS and default_models and resolved_provider not in current_keys:
             # Cost-safe default, not ``default_models[0]``: metered aggregators list most-capable-first,
             # so [0] would silently escalate `/model nous` to the priciest flagship.
@@ -968,7 +985,7 @@ def detect_static_provider_for_model(
     # auto-switch TO them. A custom endpoint (custom / custom:*) is never auto-switched away
     # from: the user configured it deliberately and may serve the same model name there.
     if current_provider != "custom" and not current_provider.startswith("custom:"):
-        for pid in _PROVIDER_MODELS:
+        for pid in provider_models():
             if pid in current_keys or pid in _AGGREGATOR_PROVIDERS or pid in _BORROWED_MODEL_PROVIDERS:
                 continue
             if _model_in_provider_catalog(name_lower, {pid}):
@@ -1334,7 +1351,7 @@ def _copilot_catalog(normalized: str, force_refresh: bool) -> Optional[list[str]
             return live
     except Exception:
         pass
-    return list(_PROVIDER_MODELS.get("copilot", [])) if normalized == "copilot-acp" else None
+    return list(provider_models().get("copilot", [])) if normalized == "copilot-acp" else None
 
 
 def _nous_catalog(normalized: str, force_refresh: bool) -> Optional[list[str]]:
@@ -1382,7 +1399,7 @@ def _anthropic_catalog(normalized: str, force_refresh: bool) -> list[str]:
         cfg_base_url = str(model_cfg.get("base_url", "") or "").strip()
         cfg_api_key = str(model_cfg.get("api_key", "") or "").strip()
     live = _fetch_anthropic_models(base_url=cfg_base_url or None, api_key=cfg_api_key or None)
-    curated = list(_PROVIDER_MODELS.get("anthropic", []))
+    curated = list(provider_models().get("anthropic", []))
     if not live:
         return curated
     # The live /v1/models dump lags newly-routed curated aliases (reachable before enumerated):
@@ -1415,7 +1432,7 @@ def _openai_catalog(normalized: str, force_refresh: bool) -> Optional[list[str]]
     if not is_official_openai_host(base):
         return live
     live_lower = {m.lower() for m in live}
-    curated = list(_PROVIDER_MODELS.get(normalized, []))
+    curated = list(provider_models().get(normalized, []))
     # Curated order, only models the account has access to; an account serving none of them (rare)
     # falls back to curated so the picker still offers sane defaults.
     discovered = [m for m in curated if m.lower() in live_lower]
@@ -1501,7 +1518,7 @@ def _profile_live_catalog(normalized: str) -> Optional[list[str]]:
         live = [m for m in live if str(m).lower() not in _OPENCODE_FREE_EXCLUDED_MODELS]
     if not live:
         return list(profile.fallback_models) if profile.fallback_models else None
-    curated = list(_PROVIDER_MODELS.get(normalized, [])) or list(profile.fallback_models or ())
+    curated = list(provider_models().get(normalized, [])) or list(profile.fallback_models or ())
     if not curated:
         return live
     primary, secondary = (live, curated) if normalized in _LIVE_FIRST_PICKER_PROVIDERS else (curated, live)
@@ -1536,7 +1553,7 @@ def provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) 
     # _PROVIDER_MODELS entry fall back to the profile's curated fallback_models so their agentic picks lead
     # the picker instead of whatever the live catalog happens to return first (e.g. Fireworks lists an image
     # model, flux-*, ahead of its chat models).
-    curated_static = list(_PROVIDER_MODELS.get(normalized, []))
+    curated_static = list(provider_models().get(normalized, []))
     if normalized not in _MODELS_DEV_PREFERRED:
         return curated_static
     merged = _merge_with_models_dev(normalized, curated_static)
@@ -2660,6 +2677,14 @@ def is_nous_free_tier(account_info: dict[str, Any]) -> bool:
     except (TypeError, ValueError):
         return False
 
+
+def __getattr__(name):  # PEP 562 — lazy so no import cycles
+    """Lazy module exports: ``_PROVIDER_MODELS`` materializes on first access, never at import."""
+    if name == "_PROVIDER_MODELS":
+        return provider_models()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 _PLUGIN_COMPAT_LAZY = {
     'LMStudioLoadResult': ('shiina_cli.models_local', 'LMStudioLoadResult'),
     'PROVIDER_GROUPS': ('shiina_cli.models_catalog_static', 'PROVIDER_GROUPS'),
@@ -2697,10 +2722,13 @@ _PLUGIN_COMPAT_LAZY = {
 }
 
 
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
+_plugin_compat_prev_getattr = __getattr__
+
+
+def __getattr__(name):  # PEP 562 — chained onto the module's own __getattr__
     target = _PLUGIN_COMPAT_LAZY.get(name)
     if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+        return _plugin_compat_prev_getattr(name)
     import importlib
     from shiina_cli.plugin_compat import warn_once
     warn_once(__name__, name, *target)
