@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { $uiState, resetUiState } from '../app/uiStore.js'
+import { $uiState, patchUiState, resetUiState } from '../app/uiStore.js'
 import {
   applyDisplay,
   hydrateFullConfig,
@@ -340,6 +340,40 @@ describe('applyDisplay → busy_input_mode', () => {
 
     applyDisplay({ config: { display: { busy_input_mode: 'drop' } } }, setBell)
     expect($uiState.get().busyInputMode).toBe('queue')
+  })
+})
+
+describe('applyDisplay → display.layout', () => {
+  beforeEach(() => {
+    resetUiState()
+  })
+
+  it('threads display.layout into $uiState and defaults an absent key', () => {
+    const setBell = vi.fn()
+
+    applyDisplay({ config: { display: { layout: 'studio' } } }, setBell)
+    expect($uiState.get().layout).toBe('studio')
+
+    // A typo/alias resolves through the same table the slash command uses.
+    applyDisplay({ config: { display: { layout: 'bare' } } }, setBell)
+    expect($uiState.get().layout).toBe('minimal')
+
+    // A real payload without the key still resolves to the default.
+    applyDisplay({ config: { display: {} } }, setBell)
+    expect($uiState.get().layout).toBe('workbench')
+  })
+
+  it('preserves a live /layout switch across a transient config RPC failure', () => {
+    const setBell = vi.fn()
+
+    patchUiState({ layout: 'studio' })
+
+    // quietRpc() collapses a failed config.get full to null. The mtime poll
+    // advances its stamp before the fetch, so a reverted value would stick
+    // until the next config edit or a restart.
+    applyDisplay(null, setBell)
+
+    expect($uiState.get().layout).toBe('studio')
   })
 })
 

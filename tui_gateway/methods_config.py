@@ -4,7 +4,7 @@
 
 from .method_ctx import HandlerRegistry, bind_module
 
-from shiina_constants import DEFAULT_INDICATOR_STYLE, INDICATOR_STYLES
+from shiina_constants import DEFAULT_INDICATOR_STYLE, DEFAULT_LAYOUT, INDICATOR_STYLES, LAYOUT_IDS
 from shiina_constants import display_shiina_home as _display_shiina_home
 
 _registry = HandlerRegistry()
@@ -217,6 +217,7 @@ _CONFIG_GETTERS = {
     "density": lambda params: {"value": "on" if bool(_display_raw().get("tui_compact", False)) else "off"},
     "theme": lambda params: {"value": _display_word("tui_theme", "auto", {"auto", "light", "dark"})},
     "statusbar": lambda params: {"value": _coerce_statusbar(_display_cfg().get("tui_statusbar", "top"))},
+    "layout": lambda params: {"value": _display_word("layout", DEFAULT_LAYOUT, set(LAYOUT_IDS))},
     "focus": lambda params: {"value": "on" if bool(_display_cfg().get("focus_view", False)) else "off",
                              "tool_progress": _load_tool_progress_mode()},
     "mouse": lambda params: {"value": _display_mouse_tracking(_load_cfg().get("display"))},

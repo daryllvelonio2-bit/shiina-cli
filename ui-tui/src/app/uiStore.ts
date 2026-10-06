@@ -1,6 +1,7 @@
 import { atom, computed } from 'nanostores'
 
 import { MOUSE_TRACKING } from '../config/env.js'
+import { DEFAULT_LAYOUT } from '../domain/layout.js'
 import { ZERO } from '../domain/usage.js'
 import { bootTheme } from '../lib/themeBoot.js'
 import { DEFAULT_THEME } from '../theme.js'
@@ -21,6 +22,7 @@ const buildUiState = (): UiState => ({
   focusView: false,
   indicatorStyle: DEFAULT_INDICATOR_STYLE,
   info: null,
+  layout: DEFAULT_LAYOUT,
   liveSessionCount: 0,
   inlineDiffs: true,
   mouseTracking: MOUSE_TRACKING,

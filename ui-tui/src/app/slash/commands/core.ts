@@ -4,6 +4,7 @@ import { DASHBOARD_TUI_MODE, NO_CONFIRM_DESTRUCTIVE } from '../../../config/env.
 import { dailyFortune, randomFortune } from '../../../content/fortunes.js'
 import { HOTKEYS } from '../../../content/hotkeys.js'
 import { isSectionName, nextDetailsMode, parseDetailsMode, SECTION_NAMES } from '../../../domain/details.js'
+import { cycleLayout, LAYOUT_IDS, parseLayout } from '../../../domain/layout.js'
 import type {
   ConfigGetValueResponse,
   ConfigSetResponse,
@@ -297,6 +298,25 @@ export const coreCommands: SlashCommand[] = [
       ctx.gateway.rpc<ConfigSetResponse>('config.set', { key: 'density', value: next ? 'on' : 'off' }).catch(() => {})
 
       queueMicrotask(() => ctx.transcript.sys(`density ${next ? 'on' : 'off'}`))
+    }
+  },
+
+  {
+    help: 'switch the structural layout (minimal | workbench | studio)',
+    name: 'layout',
+    run: (arg, ctx) => {
+      const word = arg.trim().toLowerCase()
+      const next =
+        !word || word === 'cycle' || word === 'toggle' ? cycleLayout(ctx.ui.layout) : parseLayout(word)
+
+      if (!next) {
+        return ctx.transcript.sys(`usage: /layout [${LAYOUT_IDS.join('|')}|cycle]`)
+      }
+
+      patchUiState({ layout: next })
+      ctx.gateway.rpc<ConfigSetResponse>('config.set', { key: 'layout', value: next }).catch(() => {})
+
+      queueMicrotask(() => ctx.transcript.sys(`layout ${next}`))
     }
   },
 

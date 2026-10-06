@@ -21,6 +21,11 @@ _SHIINA_HOME_OVERRIDE: ContextVar[str | object] = ContextVar("_SHIINA_HOME_OVERR
 INDICATOR_STYLES: tuple[str, ...] = ("ascii", "emoji", "kaomoji", "unicode")
 DEFAULT_INDICATOR_STYLE: str = "kaomoji"
 
+# TUI structural layouts (CLI /layout, TUI gateway config, /help registry).
+# Keep in sync with LAYOUT_IDS / DEFAULT_LAYOUT in ui-tui/src/domain/layout.ts.
+LAYOUT_IDS: tuple[str, ...] = ("minimal", "workbench", "studio")
+DEFAULT_LAYOUT: str = "workbench"
+
 
 def set_shiina_home_override(path: str | Path | None) -> Token:
     """Set a context-local Shiina home override and return its reset token.

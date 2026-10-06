@@ -397,7 +397,7 @@ ui-tui/
       activeSessionSwitcher.tsx  active session switch overlay
       agentsOverlay.tsx          subagent delegation overlay
       appChrome.tsx              status bar, input row, completions
-      appLayout.tsx              top-level layout composition
+      appLayout.tsx              top-level layout composition (see LAYOUTS.md)
       appOverlays.tsx            overlay routing (pickers, prompts)
       billingOverlay.tsx         billing overlay
       branding.tsx               banner + session summary
@@ -414,6 +414,7 @@ ui-tui/
       skillsHub.tsx              skills hub overlay
       streamingAssistant.tsx     live streaming assistant row
       streamingMarkdown.tsx      streaming Markdown renderer
+      studioSidePane.tsx         studio layout's reserved instrument column
       textInput.tsx              custom line editor
       themed.tsx                 theme-aware wrapper
       thinking.tsx               spinner, reasoning, tool activity
@@ -436,6 +437,7 @@ ui-tui/
     domain/
       blockLayout.ts             block layout and lead-gap helpers
       details.ts                 details visibility mode resolution (hidden/collapsed/expanded)
+      layout.ts                  structural layout specs (minimal | workbench | studio)
       messages.ts                message formatting and transcript helpers
       paths.ts                   cwd shortening and path display helpers
       providers.ts               provider display name helpers

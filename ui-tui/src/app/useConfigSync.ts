@@ -2,6 +2,7 @@ import type { MouseTrackingMode } from '@shiina/ink'
 import { useEffect, useRef } from 'react'
 
 import { resolveDetailsMode, resolveSections } from '../domain/details.js'
+import { normalizeLayout } from '../domain/layout.js'
 import type { GatewayClient } from '../gatewayClient.js'
 import type { ConfigFullResponse, ConfigMtimeResponse, ReloadMcpResponse } from '../gatewayTypes.js'
 import { DEFAULT_VOICE_RECORD_KEY, type ParsedVoiceRecordKey, parseVoiceRecordKey } from '../lib/platform.js'
@@ -301,6 +302,11 @@ export const applyDisplay = (
     focusView: !!d.focus_view,
     indicatorStyle: normalizeIndicatorStyle(d.tui_status_indicator),
     inlineDiffs: d.inline_diffs !== false,
+    // Fail safe like the other cosmetic keys: a null config payload (transient
+    // RPC failure) preserves the last known layout instead of clobbering a
+    // live /layout switch. An absent key in a real payload still resolves to
+    // the documented default.
+    ...(cfg ? { layout: normalizeLayout(d.layout) } : {}),
     mouseTracking: normalizeMouseTracking(d),
     pasteCollapseLines: _pasteCollapseLinesFromConfig(cfg),
     pasteCollapseChars: _pasteCollapseCharsFromConfig(cfg),
