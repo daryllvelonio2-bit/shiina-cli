@@ -303,9 +303,10 @@ export const applyDisplay = (
     indicatorStyle: normalizeIndicatorStyle(d.tui_status_indicator),
     inlineDiffs: d.inline_diffs !== false,
     // Fail safe like the other cosmetic keys: a null config payload (transient
-    // RPC failure) must not blank the layout, so an absent key resolves to the
-    // default rather than clobbering a live /layout switch.
-    layout: normalizeLayout(d.layout),
+    // RPC failure) preserves the last known layout instead of clobbering a
+    // live /layout switch. An absent key in a real payload still resolves to
+    // the documented default.
+    ...(cfg ? { layout: normalizeLayout(d.layout) } : {}),
     mouseTracking: normalizeMouseTracking(d),
     pasteCollapseLines: _pasteCollapseLinesFromConfig(cfg),
     pasteCollapseChars: _pasteCollapseCharsFromConfig(cfg),

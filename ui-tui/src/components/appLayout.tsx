@@ -145,12 +145,14 @@ const TranscriptPane = memo(function TranscriptPane({
   progress,
   rails,
   scrollbar,
+  sideColumn,
   todoUnderPrompt,
   transcript
 }: Pick<AppLayoutProps, 'actions' | 'progress' | 'transcript'> & {
   cols: number
   rails: boolean
   scrollbar: boolean
+  sideColumn: boolean
   todoUnderPrompt: boolean
 }) {
   const ui = useStore($uiState)
@@ -159,15 +161,18 @@ const TranscriptPane = memo(function TranscriptPane({
   // A layout without rails never mounts AmbientRail, so their columns are not
   // part of this pane's width budget either.
   const railCols = rails ? railWidth : 0
+  // The pet owns the frame's bottom-right corner, which in studio is the
+  // reserved side column — this pane has nothing to clear there.
+  const pet = sideColumn ? null : petBox
 
   // Keep transcript text clear of the floating pet, responsively:
   //  - wide terminals: reserve a right gutter so lines wrap to the pet's left
   //    (as long as enough width is left for comfortable reading);
   //  - narrow terminals: keep full width and reserve bottom rows instead, so
   //    the newest lines sit above the pet rather than getting cramped.
-  const useGutter = !!petBox && cols - railCols - petBox.width >= MIN_GUTTER_BODY_COLS
-  const bodyCols = Math.max(28, (useGutter && petBox ? cols - petBox.width : cols) - railCols)
-  const petBandRows = petBox && !useGutter ? petBox.height : 0
+  const useGutter = !!pet && cols - railCols - pet.width >= MIN_GUTTER_BODY_COLS
+  const bodyCols = Math.max(28, (useGutter && pet ? cols - pet.width : cols) - railCols)
+  const petBandRows = pet && !useGutter ? pet.height : 0
 
   // LiveTodoPanel rides as a child of the latest user-message row so it
   // visually belongs to the prompt and follows it during scroll. -1 when
@@ -577,8 +582,11 @@ export const AppLayout = memo(function AppLayout({
   // seeing a stable prop between keystrokes (a fresh object every render would
   // defeat them); it only depends on the layout id and the terminal width.
   const regions = useMemo(
-    // Inline mode / phone PTYs cannot afford reserved panes: degrade cleanly.
-    () => layoutRegions(ui.layout, composer.cols, { singleColumn: INLINE_MODE || TERMUX_TUI_MODE }),
+    // Phone PTYs cannot afford reserved panes: degrade cleanly. Inline mode
+    // alone does not degrade — primary-buffer rendering on a wide terminal
+    // keeps the same regions, and `layoutRegions` already drops studio's side
+    // column when the width cannot afford it.
+    () => layoutRegions(ui.layout, composer.cols, { singleColumn: TERMUX_TUI_MODE }),
     [ui.layout, composer.cols]
   )
   // An open agents/journey overlay owns the screen: rails, side column, prompt
@@ -618,6 +626,7 @@ export const AppLayout = memo(function AppLayout({
                 progress={progress}
                 rails={regions.rails}
                 scrollbar={regions.scrollbar}
+                sideColumn={regions.sideActive}
                 todoUnderPrompt={regions.todoUnderPrompt}
                 transcript={transcript}
               />

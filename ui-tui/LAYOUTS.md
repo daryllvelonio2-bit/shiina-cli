@@ -48,11 +48,19 @@ resolved region table whether a region mounts.
 - **Too narrow**: below `STUDIO_MIN_COLS` (100) the side column cannot be
   afforded, so studio's instruments fall back to the workbench placement instead
   of vanishing or squeezing the transcript to a sliver.
-- **Inline mode / phone PTYs** (`INLINE_MODE`, `TERMUX_TUI_MODE`): panes and
-  reserved rails fight the host's native scrollback, so `layoutRegions` is
-  called with `singleColumn: true` — single column, no reserved rails.
+- **Phone PTYs** (`TERMUX_TUI_MODE`): reserved panes and rails fight a phone
+  terminal's width, so `layoutRegions` is called with `singleColumn: true` —
+  single column, no reserved rails. Inline mode (`SHIINA_TUI_INLINE=1`, the
+  Termux default) only changes the shell (primary buffer instead of the
+  alternate screen); it does not strip the arrangement a wide terminal can
+  afford.
+- **Floating pet**: it owns the frame's bottom-right corner. In studio that
+  corner is the side column, so the transcript keeps its full wrap width and
+  reserves no pet gutter there; in workbench it still clears the pet.
 - **Unknown / absent / malformed value**: `normalizeLayout` resolves to
-  `workbench`. A typo or a transient `config.get` failure never blanks the frame.
+  `workbench`. A typo never blanks the frame, and a transient `config.get`
+  failure (null payload) preserves the last known layout instead of reverting a
+  live `/layout` switch.
 
 ## Rendering overhead (opt-perf evidence)
 

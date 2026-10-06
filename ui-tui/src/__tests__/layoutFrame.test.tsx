@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GatewayProvider } from '../app/gatewayContext.js'
 import type { AppLayoutComposerProps, AppLayoutProps } from '../app/interfaces.js'
 import { resetOverlayState } from '../app/overlayStore.js'
+import { $petBox } from '../app/petFlashStore.js'
 import { patchUiState, resetUiState } from '../app/uiStore.js'
 import { AppLayout } from '../components/appLayout.js'
 import type { GatewayClient } from '../gatewayClient.js'
@@ -212,6 +213,12 @@ const mount = (layout: 'minimal' | 'studio' | 'workbench', cols: number) => {
   return { output: () => output }
 }
 
+/** Ink throttles paints and buffers each frame (synchronized output) and the
+ *  test stream delivers the bytes asynchronously, so a sync read after a mount
+ *  or a store switch can land before any output arrives. Let the throttle
+ *  window and the stream flush settle before asserting on the painted frame. */
+const flushPaint = () => new Promise(resolve => setTimeout(resolve, 50))
+
 beforeEach(() => {
   renders.agents = 0
   renders.messageCols = []
@@ -222,6 +229,7 @@ beforeEach(() => {
   resetOverlayState()
   resetUiState()
   patchUiState({ statusBar: 'top', status: 'ready' })
+  $petBox.set(null)
 })
 
 afterEach(() => {
@@ -252,14 +260,45 @@ describe('layout frame', () => {
     expect(output()).not.toContain('instruments')
   })
 
-  it('studio moves the instruments into the reserved side column', () => {
+  it('studio moves the instruments into the reserved side column', async () => {
     const { output } = mount('studio', 160)
 
     // The agents board and todo list mount — in the side pane, so the
     // composer-flow copies must not appear a second time.
     expect(renders.agents).toBeGreaterThan(0)
     expect(renders.todo).toBeGreaterThan(0)
+    await flushPaint()
     expect(output()).toContain('instruments')
+  })
+
+  it('does not reserve the floating pet gutter in studio', () => {
+    // The pet floats bottom-right, which in studio is the reserved side
+    // column — the transcript must not give up ~petBox.width of wrap on top
+    // of the column it already lost.
+    const pet = { height: 4, width: 24 }
+    // The pet-applied paint is the narrowest one: PetPane clears $petBox just
+    // after the first render when no pet is installed in this harness.
+    const narrowest = () => Math.min(...renders.messageCols)
+
+    $petBox.set(pet)
+    mount('studio', 160)
+    const studioWithPet = narrowest()
+
+    renders.messageCols = []
+    $petBox.set(null)
+    mount('studio', 160)
+    const studioWithoutPet = narrowest()
+
+    expect(studioWithPet).toBe(studioWithoutPet)
+    // Non-vacuous: studio did narrow the transcript for its side column.
+    expect(studioWithPet).toBeLessThan(160)
+
+    // Control: workbench still clears the pet, so it never covers its text.
+    renders.messageCols = []
+    $petBox.set(pet)
+    mount('workbench', 160)
+
+    expect(narrowest()).toBeLessThan(160)
   })
 
   it('an explicit studio switch re-renders the frame without dropping content', async () => {
@@ -269,7 +308,7 @@ describe('layout frame', () => {
 
     // Live switch through the same store the config-sync poll writes.
     patchUiState({ layout: 'studio' })
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await flushPaint()
 
     expect(output()).toContain('instruments')
     // The transcript rows are still handed to the renderer after the switch —

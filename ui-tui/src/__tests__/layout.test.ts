@@ -109,9 +109,9 @@ describe('layout regions', () => {
     expect(r.todoUnderPrompt).toBe(true)
   })
 
-  it('degrades to a single column on inline / phone hosts', () => {
-    // INLINE_MODE writes into the host's native scrollback and phone PTYs are
-    // too narrow for panes — both must fall back, not fight the terminal.
+  it('degrades to a single column on phone hosts', () => {
+    // Phone PTYs are too narrow to afford panes and reserved rails — they must
+    // fall back, not fight the terminal.
     const r = layoutRegions('studio', 160, { singleColumn: true })
 
     expect(r.sideActive).toBe(false)
