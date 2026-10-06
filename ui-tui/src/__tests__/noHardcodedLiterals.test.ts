@@ -1,0 +1,482 @@
+/**
+ * Regression guard: no hardcoded presentation literals in the TUI.
+ *
+ * The chrome — glyph vocabulary, border styles, container spacing — is owned by
+ * the design token table in `src/design.ts` and overridable per design from
+ * `shiina_cli/designs/*.yaml`. A literal typed into a component escapes that
+ * table: the design switch misses it and restyling is a hunt through renderers
+ * again. This test reads SOURCE (comments stripped, so banner art and prose
+ * never match) and fails on a reintroduced literal, naming the file, the line,
+ * the literal, and the fix.
+ *
+ * Scanned: every `.ts`/`.tsx` under `ui-tui/src` — tests included, because a
+ * fixture that hard-codes chrome is how the next component gets one.
+ * Allowlisted: the genuinely non-chrome hits in `ALLOWLIST` below, each WITH A
+ * REASON. An entry without a reason — or one that matches nothing any more —
+ * fails too, so the list cannot rot.
+ *
+ * Deliberately NOT detected: a single box-drawing character (`\u2500`). Alone
+ * it is a token definition (design.ts) or a legitimate token override in a
+ * fixture; the regression this guards is chrome DRAWN inline, i.e. a run.
+ */
+
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { dirname, join, relative, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { describe, expect, it } from 'vitest'
+
+const SRC_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+
+/** Escape-written so this file is itself literal-free — it gets scanned too. */
+const GLYPH_CHARS = [
+  '\u25b8',
+  '\u25be',
+  '\u25cf',
+  '\u2713',
+  '\u2717',
+  '\u25b6',
+  '\u25cb',
+  '\u25c9',
+  '\u203a',
+  '\u2304',
+  '\u2022',
+  '\u23fa'
+]
+
+const BORDER_STYLE_RE = /borderStyle\s*=\s*["']/
+const BOX_DRAWING_RE = /[\u2500\u2501]{2,}/g
+const PADDING_RE = /padding([XY])\s*=\s*\{\s*(\d+)\s*\}/g
+
+type LiteralKind = 'glyph' | 'borderStyle' | 'boxDrawing' | 'padding'
+
+interface Violation {
+  /** Path relative to `ui-tui/src`, posix separators. */
+  file: string
+  line: number
+  literal: string
+  kind: LiteralKind
+  /** The offending source line, trimmed — context for the failure message. */
+  text: string
+}
+
+/** A regex literal can only start where a value is expected, never after an identifier. */
+const isRegexStart = (source: string, at: number): boolean => {
+  for (let i = at - 1; i >= 0; i -= 1) {
+    const c = source[i]!
+
+    if (c === ' ' || c === '\t' || c === '\n' || c === '\r') {
+      continue
+    }
+
+    return '(,=:[!&|?{};+-*/%~^>'.includes(c)
+  }
+
+  return true
+}
+
+/**
+ * Blank out line, block and JSX comments while preserving line numbers, so the
+ * pre-existing banner comments in this tree never read as a hardcoded rule.
+ *
+ * Strings, template literals — including their `${}` holes, which are code
+ * again — and regex literals are skipped whole. Getting that wrong is not
+ * cosmetic: a template nested inside another template reads as a closed string,
+ * which leaves the rest of the file unstripped and turns every later banner
+ * comment into a false positive.
+ */
+const blankComments = (source: string): string => {
+  const chars = source.split('')
+
+  const blank = (from: number, to: number): void => {
+    for (let i = from; i < to && i < chars.length; i += 1) {
+      if (chars[i] !== '\n') {
+        chars[i] = ' '
+      }
+    }
+  }
+
+  const skipQuoted = (at: number): number => {
+    const quote = source[at]!
+    let i = at + 1
+
+    while (i < source.length) {
+      if (source[i] === '\\') {
+        i += 2
+        continue
+      }
+      const c = source[i]!
+      i += 1
+      if (c === quote) {
+        break
+      }
+    }
+
+    return i
+  }
+
+  const skipRegex = (at: number): number => {
+    let inClass = false
+    let i = at + 1
+
+    while (i < source.length) {
+      const c = source[i]!
+
+      if (c === '\\') {
+        i += 2
+        continue
+      }
+
+      if (c === '[') {
+        inClass = true
+      } else if (c === ']') {
+        inClass = false
+      } else if (c === '/' && !inClass) {
+        return i + 1
+      } else if (c === '\n') {
+        return i
+      }
+
+      i += 1
+    }
+
+    return i
+  }
+
+  function skipBraces(at: number): number {
+    let depth = 1
+    let i = at
+
+    while (i < source.length) {
+      const c = source[i]!
+
+      if (c === '`') {
+        i = skipTemplate(i)
+        continue
+      }
+      if (c === '"' || c === "'") {
+        i = skipQuoted(i)
+        continue
+      }
+
+      if (c === '{') {
+        depth += 1
+      } else if (c === '}') {
+        depth -= 1
+        if (depth === 0) {
+          return i + 1
+        }
+      }
+
+      i += 1
+    }
+
+    return i
+  }
+
+  function skipTemplate(at: number): number {
+    let i = at + 1
+
+    while (i < source.length) {
+      const c = source[i]!
+
+      if (c === '\\') {
+        i += 2
+        continue
+      }
+      if (c === '`') {
+        return i + 1
+      }
+      if (c === '$' && source[i + 1] === '{') {
+        i = skipBraces(i + 2)
+        continue
+      }
+
+      i += 1
+    }
+
+    return i
+  }
+
+  let i = 0
+
+  while (i < source.length) {
+    if (source.startsWith('//', i)) {
+      const end = source.indexOf('\n', i)
+      const stop = end === -1 ? source.length : end
+      blank(i, stop)
+      i = stop
+      continue
+    }
+
+    if (source.startsWith('/*', i)) {
+      const close = source.indexOf('*/', i + 2)
+      const stop = close === -1 ? source.length : close + 2
+      blank(i, stop)
+      i = stop
+      continue
+    }
+
+    const c = source[i]!
+
+    if (c === '"' || c === "'") {
+      i = skipQuoted(i)
+      continue
+    }
+
+    if (c === '`') {
+      i = skipTemplate(i)
+      continue
+    }
+
+    if (c === '/' && isRegexStart(source, i)) {
+      i = skipRegex(i)
+      continue
+    }
+
+    i += 1
+  }
+
+  return chars.join('')
+}
+
+/** Every hardcoded presentation literal in one file's source. */
+const scan = (source: string, file: string): Violation[] => {
+  const violations: Violation[] = []
+
+  blankComments(source)
+    .split('\n')
+    .forEach((line, index) => {
+      const push = (literal: string, kind: LiteralKind) =>
+        violations.push({ file, line: index + 1, literal, kind, text: line.trim() })
+
+      for (const glyph of GLYPH_CHARS) {
+        if (line.includes(glyph)) {
+          push(glyph, 'glyph')
+        }
+      }
+
+      const border = line.match(BORDER_STYLE_RE)
+      if (border) {
+        push(border[0], 'borderStyle')
+      }
+
+      for (const rule of line.matchAll(BOX_DRAWING_RE)) {
+        push(rule[0], 'boxDrawing')
+      }
+
+      for (const padding of line.matchAll(PADDING_RE)) {
+        if (padding[2] !== '0') {
+          push(`padding${padding[1]}={${padding[2]}}`, 'padding')
+        }
+      }
+    })
+
+  return violations
+}
+
+const collectSources = (dir: string, out: string[] = []): string[] => {
+  for (const name of readdirSync(dir).sort()) {
+    const full = join(dir, name)
+
+    if (statSync(full).isDirectory()) {
+      if (name !== 'node_modules' && name !== 'dist') {
+        collectSources(full, out)
+      }
+    } else if (name.endsWith('.ts') || name.endsWith('.tsx')) {
+      out.push(full)
+    }
+  }
+
+  return out
+}
+
+interface AllowlistEntry {
+  /** Path relative to `ui-tui/src`. */
+  path: string
+  /** `'*'` allows every literal in that file. */
+  literals: string[]
+  /** WHY this hit is not chrome. An entry without a reason is itself a bug. */
+  reason: string
+}
+
+const ALLOWLIST: AllowlistEntry[] = [
+  {
+    path: 'design.ts',
+    literals: ['*'],
+    reason:
+      'The DEFAULT_GLYPHS / DEFAULT_BORDERS table itself. This file is the canonical home of ' +
+      'the literal characters; every other file must read them as tokens.'
+  },
+  {
+    path: 'app/createGatewayEventHandler.ts',
+    literals: ['\u2713'],
+    reason:
+      "Echoes the BACKEND's goal-line protocol: the gateway writes '\u2713 <goal>' lines and the " +
+      "TUI matches startsWith to derive the status line. The mark belongs to the wire format, " +
+      'not the chrome, so it cannot move to a token until the producer does.'
+  },
+  {
+    path: 'content/faces.ts',
+    literals: ['\u2022', '\u25c9'],
+    reason:
+      'Kaomoji faces are user-visible CONTENT (the face the user picks for the agent), not chrome.'
+  },
+  {
+    path: 'lib/mathUnicode.ts',
+    literals: ['\u2022'],
+    reason: 'LaTeX-to-Unicode translation table: a mathematical symbol mapping, not chrome.'
+  },
+  {
+    path: '__tests__/text.test.ts',
+    literals: ['\u2713', '\u2717'],
+    reason:
+      'Pins the PERSISTED tool-trail wire format. The producing marks (TOOL_TRAIL_OK/ERR) are ' +
+      'deliberately pinned to the built-in glyphs so a design switch cannot break parsing of ' +
+      'lines already in the transcript; asserting them through the live token would be ' +
+      'tautological.'
+  },
+  {
+    path: 'lib/text.test.ts',
+    literals: ['\u2713'],
+    reason: 'Ask-preview fixture: the preview string is built from TOOL_TRAIL_OK, a pinned wire mark.'
+  },
+  {
+    path: 'lib/liveProgress.test.ts',
+    literals: ['\u2713'],
+    reason: 'Tool-trail wire-format fixture (the shelf groups trail lines by their result mark).'
+  },
+  {
+    path: 'lib/messages.test.ts',
+    literals: ['\u2713'],
+    reason: 'Tool-trail wire-format fixture (transcript merge groups by result mark).'
+  },
+  {
+    path: '__tests__/createGatewayEventHandler.test.ts',
+    literals: ['\u2713'],
+    reason:
+      'Gateway payload fixtures: backend goal-line and credits copy plus tool-trail marks, i.e. ' +
+      'wire data the TUI receives, not chrome it draws.'
+  },
+  {
+    path: '__tests__/appChromeStatusRule.test.tsx',
+    literals: ['\u2713'],
+    reason:
+      'Credits-notice text arrives from the gateway as payload (the fixture echoes exactly what ' +
+      'the backend sends).'
+  },
+  {
+    path: '__tests__/turnControllerNotice.test.ts',
+    literals: ['\u2022'],
+    reason: 'Credits-notice text arrives from the gateway as payload.'
+  },
+  {
+    path: '__tests__/markdown.test.ts',
+    literals: ['\u2713'],
+    reason:
+      'Markdown table-cell payload fixture: arbitrary cell CONTENT passed through the renderer, ' +
+      'not a chrome marker.'
+  },
+  {
+    path: '__tests__/design.test.ts',
+    literals: ['\u2500\u2500'],
+    reason:
+      'Deliberately INVALID input: a two-character rule must be rejected and fall back to ' +
+      'DEFAULT_DESIGN.borders. The literal is the thing under test.'
+  }
+]
+
+const allows = (violation: Violation, entry: AllowlistEntry): boolean =>
+  entry.path === violation.file &&
+  (entry.literals.includes('*') || entry.literals.includes(violation.literal))
+
+const report = (violations: Violation[]): string =>
+  [
+    `Hardcoded presentation literal(s) found — TUI chrome must come from design tokens (${violations.length}):`,
+    '',
+    ...violations.map(
+      v => `  ${v.file}:${v.line}  ${JSON.stringify(v.literal)}  [${v.kind}]  ${v.text}`
+    ),
+    '',
+    'How to fix:',
+    '  1. Use the token: t.design.glyphs.<name>, t.design.borders.<panel|alert|rule>,',
+    '     or t.design.spacing.<name>.',
+    '  2. No token fits? Add one, in this order:',
+    '       ui-tui/src/design.ts            (DesignGlyphs interface + DEFAULT_GLYPHS)',
+    "       shiina_cli/design_cmd.py        (_DESIGN_KEYS: 'design.glyphs.<name>')",
+    '       shiina_cli/designs/README.md    (the design.glyphs: block)',
+    '     ...then read it from the component.',
+    '  3. Genuinely not chrome (wire protocol, backend payload, a fixture pinning one)?',
+    '     Add an entry to ALLOWLIST in this file WITH THE REASON STATED.',
+    '     An entry without a reason is itself a bug.'
+  ].join('\n')
+
+const SOURCES = collectSources(SRC_ROOT)
+
+const allViolations = SOURCES.flatMap(full =>
+  scan(readFileSync(full, 'utf8'), relative(SRC_ROOT, full).split(sep).join('/'))
+)
+
+describe('design literal guard', () => {
+  it('detects every literal kind the guard exists for', () => {
+    // The fixtures below spell `=` as `\u003d` and the glyphs as `\uNNNN` so
+    // this file contains no literal itself — it is scanned like any other.
+    const source = [
+      `const mark = '\u25b8'`,
+      'const box = <Box borderStyle\u003d"round" />',
+      'const rule = \'\u2500\u2500\u2500\u2500\'',
+      'const pad = <Box paddingX\u003d{3} paddingY\u003d{1} />'
+    ].join('\n')
+
+    expect(scan(source, 'src/synthetic.tsx').map(v => [v.kind, v.literal])).toEqual([
+      ['glyph', '\u25b8'],
+      ['borderStyle', 'borderStyle\u003d"'],
+      ['boxDrawing', '\u2500\u2500\u2500\u2500'],
+      ['padding', 'paddingX\u003d{3}'],
+      ['padding', 'paddingY\u003d{1}']
+    ])
+  })
+
+  it('ignores a literal that only appears in a comment', () => {
+    const source = [
+      '// \u2500\u2500 header \u2500\u2500',
+      '/* \u2713 done @ paddingX\u003d{4} */',
+      'const label = {\'\u2022\': x}',
+      "const t = '\u2713'"
+    ].join('\n')
+
+    expect(scan(source, 'src/synthetic.ts')).toEqual([
+      { file: 'src/synthetic.ts', line: 3, literal: '\u2022', kind: 'glyph', text: "const label = {'\u2022': x}" },
+      { file: 'src/synthetic.ts', line: 4, literal: '\u2713', kind: 'glyph', text: "const t = '\u2713'" }
+    ])
+  })
+
+  it('ignores explicit zero padding (a reset, not a styling value)', () => {
+    const source = ['<Box paddingX\u003d{0} paddingY\u003d{0} />', '<Box paddingX\u003d{2} />'].join('\n')
+
+    expect(scan(source, 'src/synthetic.tsx').map(v => v.literal)).toEqual(['paddingX\u003d{2}'])
+  })
+
+  it('scans the whole TUI source tree, not an empty list', () => {
+    expect(SOURCES.length).toBeGreaterThan(200)
+    expect(SOURCES.some(f => f.endsWith('components/appChrome.tsx'))).toBe(true)
+    expect(SOURCES.some(f => f.endsWith('design.ts'))).toBe(true)
+  })
+
+  it('has no unexplained allowlist entry', () => {
+    expect(ALLOWLIST.filter(e => e.reason.trim().length === 0).map(e => e.path)).toEqual([])
+    expect(ALLOWLIST.filter(e => e.literals.length === 0).map(e => e.path)).toEqual([])
+  })
+
+  it('has no stale allowlist entry', () => {
+    const stale = ALLOWLIST.filter(e => !allViolations.some(v => allows(v, e))).map(e => e.path)
+
+    expect(stale, 'allowlist entry matches nothing any more — delete it').toEqual([])
+  })
+
+  it('finds no hardcoded presentation literal in ui-tui/src', () => {
+    const unexplained = allViolations.filter(v => !ALLOWLIST.some(e => allows(v, e)))
+
+    expect(unexplained.length, report(unexplained)).toBe(0)
+  })
+})
