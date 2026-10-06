@@ -370,7 +370,7 @@ export function useMainApp(gw: GatewayClient) {
   )
 
   const detailsLayoutKey = useMemo(() => {
-    const layoutDefaults = layoutSections(ui.layout)
+    const layoutDefaults = layoutSections(ui.layout, ui.design?.layout?.sections)
     const thinking = sectionMode('thinking', ui.detailsMode, ui.sections, ui.detailsModeCommandOverride, layoutDefaults)
     const tools = sectionMode('tools', ui.detailsMode, ui.sections, ui.detailsModeCommandOverride, layoutDefaults)
 
@@ -1232,7 +1232,10 @@ export function useMainApp(gw: GatewayClient) {
   // between the user's explicit `sections` and the built-in defaults. `minimal`
   // folds the trail away, `timeline` keeps steps open; both resolve here so the
   // quiet-mode gate agrees with what ToolTrail actually paints.
-  const layoutDefaults = useMemo(() => layoutSections(ui.layout), [ui.layout])
+  const layoutDefaults = useMemo(
+    () => layoutSections(ui.layout, ui.design?.layout?.sections),
+    [ui.layout, ui.design]
+  )
 
   const anyPanelVisible = SECTION_NAMES.some(
     s => sectionMode(s, ui.detailsMode, ui.sections, ui.detailsModeCommandOverride, layoutDefaults) !== 'hidden'

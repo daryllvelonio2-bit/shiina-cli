@@ -7,6 +7,7 @@ import type { StreamDeltaPayload, SubagentStatus, Usage } from '@shiina/shared/g
 
 import { STARTUP_IMAGE, STARTUP_QUERY } from '../config/env.js'
 import { STREAM_BATCH_MS } from '../config/timing.js'
+import { resolveDesignSpec } from '../domain/designSpec.js'
 import { buildSetupRequiredSections, SETUP_REQUIRED_TITLE } from '../content/setup.js'
 import type {
   AnyGatewayEvent,
@@ -196,6 +197,11 @@ const paintTerminalDefaults = (theme: Theme) => {
 const applySkin = (s: GatewaySkin) => {
   lastSkin = s
   const theme = themeForSkin(s)
+
+  // The design rides the skin payload, so it commits here — BEFORE the theme,
+  // because commitTheme's recompute reads the design already in state and would
+  // otherwise wear the previous one for a frame.
+  patchUiState({ design: resolveDesignSpec(s.design), designs: s.designs ?? [] })
 
   commitTheme(theme)
   paintTerminalDefaults(theme)

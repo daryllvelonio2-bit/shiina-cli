@@ -421,6 +421,7 @@ from shiina_cli.subcommands.import_cmd import build_import_cmd_parser
 from shiina_cli.subcommands.import_agent import build_import_agent_parser
 from shiina_cli.subcommands.config import build_config_parser
 from shiina_cli.subcommands.skin import build_skin_parser
+from shiina_cli.subcommands.design import build_design_parser
 from shiina_cli.subcommands.console import build_console_parser
 from shiina_cli.subcommands.update import build_update_parser
 from shiina_cli.subcommands.uninstall import build_uninstall_parser
@@ -1971,6 +1972,8 @@ cmd_doctor = _forward_command("cmd_doctor", "shiina_cli.doctor", "run_doctor", d
 cmd_dump = _forward_command("cmd_dump", "shiina_cli.dump", "run_dump", doc='Dump setup summary for support/debugging.')
 cmd_debug = _forward_command("cmd_debug", "shiina_cli.debug", "run_debug", doc='Debug tools (share report, etc.).')
 cmd_skin = _forward_command("cmd_skin", "shiina_cli.skin_cmd", "skin_command", doc='Skin management (list / use / set).')
+cmd_design = _forward_command("cmd_design", "shiina_cli.design_cmd", "design_command",
+                              doc='TUI design management (list / use / show / path / init / keys).')
 cmd_import = _forward_command("cmd_import", "shiina_cli.backup", "run_import", doc='Restore a Shiina backup from a zip file.')
 cmd_dashboard_register = _forward_command("cmd_dashboard_register", "shiina_cli.dashboard_register", "cmd_dashboard_register", doc='Register a self-hosted dashboard OAuth client with Shiina Portal.')
 cmd_gateway_enroll = _forward_command("cmd_gateway_enroll", "shiina_cli.gateway_enroll", "cmd_gateway_enroll", doc='Enroll a self-hosted gateway with a relay connector.')
@@ -2801,7 +2804,7 @@ _BUILTIN_SUBCOMMANDS = frozenset(
     {
         "acp", "approvals", "auth", "backup", "bundles", "checkpoints", "claw", "completion",
         "computer-use",
-        "config", "console", "cron", "curator", "dashboard", "serve", "debug", "doctor",
+        "config", "console", "cron", "curator", "dashboard", "design", "serve", "debug", "doctor",
         "dump", "egress", "fallback", "gateway", "hooks", "import", "import-agent", "insights",
         "gui", "desktop", "kanban", "login", "logout", "logs", "lsp", "mcp", "memory", "migrate", "moa",
         "journey", "memory-graph", "learning",
@@ -3481,6 +3484,7 @@ _CLI_SUBPARSER_BUILDERS: tuple[tuple[tuple[str, ...], Callable], ...] = (
     (("import-agent",), lambda s, p: build_import_agent_parser(s, cmd_import_agent=cmd_import_agent)),
     (("config",), lambda s, p: build_config_parser(s, cmd_config=cmd_config)),
     (("skin",), lambda s, p: build_skin_parser(s, cmd_skin=cmd_skin)),
+    (("design",), lambda s, p: build_design_parser(s, cmd_design=cmd_design)),
     (("console",), lambda s, p: build_console_parser(s, cmd_console=cmd_console)),
     (("pairing",), lambda s, p: build_pairing_parser(s, cmd_pairing=cmd_pairing)),
     (("skills",), lambda s, p: build_skills_parser(s, cmd_skills=cmd_skills)),

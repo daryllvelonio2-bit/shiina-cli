@@ -162,9 +162,16 @@ export const parseLayout = (raw: string): LayoutId | null => {
 
 export const layoutSpec = (id: LayoutId): LayoutSpec => SPECS[id] ?? SPECS[DEFAULT_LAYOUT]
 
-/** Default progress visibility for a layout — the layer that sits between the
- *  user's explicit `display.sections.*` and the global details mode. */
-export const layoutSections = (id: LayoutId): SectionVisibility => layoutSpec(id).sections
+/** Default per-section progress visibility for a layout.
+ *
+ *  ``override`` is a design's `layout.sections` block and wins key-by-key, so a
+ *  design can say "this one opens the tool trail" without restating the rest.
+ *  Absent keys still fall through to the global details mode. */
+export const layoutSections = (id: LayoutId, override?: SectionVisibility): SectionVisibility => {
+  const spec = layoutSpec(id).sections
+
+  return override ? { ...spec, ...override } : spec
+}
 
 /** Next layout in the cycle — bare `/layout` walks this order. */
 export const cycleLayout = (id: LayoutId): LayoutId => LAYOUT_IDS[(LAYOUT_IDS.indexOf(id) + 1) % LAYOUT_IDS.length]
@@ -193,6 +200,46 @@ export interface LayoutOptions {
   /** Inline mode (native scrollback) and phone PTYs: panes and reserved rails
    *  fight the host terminal, so degrade to the single-column arrangement. */
   singleColumn?: boolean
+  /** A design's `layout.regions` block. Boolean keys win over the built-in
+   *  spec, so a design file can rearrange the chrome with no code change. */
+  regions?: Record<string, boolean>
+}
+
+// The region flags a design may override. Anything outside this list is ignored
+// rather than written onto the spec, so a typo cannot mount a phantom region.
+const REGION_KEYS = [
+  'agentsDock',
+  'dock',
+  'fileChanges',
+  'ledger',
+  'pet',
+  'rails',
+  'scrollbar',
+  'sideColumn',
+  'statusRule',
+  'stickyPrompt',
+  'todoUnderPrompt'
+] as const
+
+/** Fold a design's region overrides onto a layout spec before the derived
+ *  fallbacks run, so "the design asked for no side column" behaves exactly like
+ *  the layout itself declaring it. */
+const withRegionOverrides = (spec: LayoutSpec, over?: Record<string, boolean>): LayoutSpec => {
+  if (!over) {
+    return spec
+  }
+
+  let out = spec
+
+  for (const key of REGION_KEYS) {
+    const value = over[key]
+
+    if (typeof value === 'boolean' && out[key] !== value) {
+      out = { ...out, [key]: value }
+    }
+  }
+
+  return out
 }
 
 /** Resolve a layout id + terminal width into the regions to render. The
@@ -200,7 +247,7 @@ export interface LayoutOptions {
  *  side column cannot be afforded (narrow or single-column hosts) its
  *  instruments fall back to the workbench placement instead of vanishing. */
 export const layoutRegions = (id: LayoutId, cols: number, opts: LayoutOptions = {}): LayoutRegions => {
-  const spec = layoutSpec(id)
+  const spec = withRegionOverrides(layoutSpec(id), opts.regions)
   const sideWidth = !opts.singleColumn && spec.sideColumn ? studioSideWidth(cols) : 0
   const sideActive = sideWidth > 0
   const fallback = spec.sideColumn && !sideActive

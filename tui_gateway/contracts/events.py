@@ -50,6 +50,15 @@ class SkinPayload(OpenPayload):
     # borders, status-rule segment order). Producer-owned shape: the renderer
     # validates each token, so this stays an open dict.
     tui: dict = Field(default_factory=dict)
+    # The resolved TUI design (`shiina_cli/design_engine.py`): colours, glyphs,
+    # borders, prompt, animations and the structural arrangement. `{}` for the
+    # built-in look. Producer-owned like `tui`: the renderer validates each key
+    # (see ui-tui/src/domain/design.ts), so a half-authored design still renders
+    # rather than being rejected here.
+    design: dict = Field(default_factory=dict)
+    # Names of every available design, so a client can offer them (the TUI's
+    # `/design`) without shelling out. Sorted; user files and built-ins alike.
+    designs: list[str] = Field(default_factory=list)
 
 
 class GatewayReadyPayload(Payload):

@@ -1,7 +1,7 @@
 import { DEFAULT_DESIGN, DENSITY_SCALES } from '../design.js'
 import type { Theme, ThemeColors } from '../theme.js'
 
-import type { DesignSpec } from './design.js'
+import type { DesignSpec } from './designSpec.js'
 
 /**
  * Wear a design on the theme.

@@ -243,11 +243,11 @@ const TranscriptPane = memo(function TranscriptPane({
                   detailsMode={ui.detailsMode}
                   detailsModeCommandOverride={ui.detailsModeCommandOverride}
                   msg={row.msg}
-                  layoutSections={layoutSections(ui.layout)}
+                  layoutSections={layoutSections(ui.layout, ui.design?.layout?.sections)}
                   prev={prevRenderedMsg(i => transcript.virtualRows[i]?.msg, row.index, {
                     commandOverride: ui.detailsModeCommandOverride,
                     detailsMode: ui.detailsMode,
-                    layoutDefaults: layoutSections(ui.layout),
+                    layoutDefaults: layoutSections(ui.layout, ui.design?.layout?.sections),
                     sections: ui.sections
                   })}
                   sections={ui.sections}
@@ -590,8 +590,8 @@ export const AppLayout = memo(function AppLayout({
     // alone does not degrade — primary-buffer rendering on a wide terminal
     // keeps the same regions, and `layoutRegions` already drops studio's side
     // column when the width cannot afford it.
-    () => layoutRegions(ui.layout, composer.cols, { singleColumn: TERMUX_TUI_MODE }),
-    [ui.layout, composer.cols]
+    () => layoutRegions(ui.layout, composer.cols, { regions: ui.design?.layout?.regions, singleColumn: TERMUX_TUI_MODE }),
+    [ui.layout, ui.design, composer.cols]
   )
   // An open agents/journey overlay owns the screen: rails, side column, prompt
   // and composer all step aside.

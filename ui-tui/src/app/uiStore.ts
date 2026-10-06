@@ -49,6 +49,7 @@ const buildUiState = (): UiState => ({
   // loaded the two are the same object.
   baseTheme: seed,
   design: null,
+  designs: [],
   theme: seed,
   usage: ZERO
 })

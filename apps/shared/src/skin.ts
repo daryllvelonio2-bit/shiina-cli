@@ -114,4 +114,15 @@ export interface ShiinaSkin {
    * the terminal chrome (desktop/dashboard pick what they need).
    */
   tui?: Record<string, unknown>
+  /**
+   * The resolved TUI design (`shiina_cli/design_engine.py` → the design folder
+   * at `~/.shiina/designs/`): colours, glyph overrides, borders, prompt symbol,
+   * spinner animation sets and the structural arrangement. `{}` (or absent) is
+   * the built-in look. Resolved by the TUI's `domain/design.ts`; ignored by
+   * surfaces that don't render the terminal chrome.
+   */
+  design?: Record<string, unknown>
+  /** Every available design name, so a client can offer them (the TUI's
+   *  `/design`). Sorted; user files and built-ins alike. */
+  designs?: string[]
 }

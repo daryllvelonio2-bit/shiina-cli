@@ -9,6 +9,31 @@ from .method_ctx import HandlerRegistry, bind_module
 _registry = HandlerRegistry()
 
 
+def resolve_design() -> dict:
+    """The active TUI design in wire shape, or ``{}`` for the built-in look.
+
+    Rides the skin payload rather than announcing itself: a design and a skin are
+    the same repaint from the renderer's side, and one payload means one code path
+    in every consumer. ``{}`` (not an empty object) so the renderer leaves
+    ``ui.theme`` referentially stable when no design is worn.
+    """
+    try:
+        from shiina_cli.design_engine import init_design_from_config, resolve_design_payload
+        init_design_from_config(_load_cfg())
+        return resolve_design_payload()
+    except Exception:
+        return {}
+
+
+def resolve_design_catalog() -> list:
+    """Every available design name — what the TUI's ``/design`` offers."""
+    try:
+        from shiina_cli.design_engine import list_designs
+        return [str(entry["name"]) for entry in list_designs()]
+    except Exception:
+        return []
+
+
 def resolve_skin() -> dict:
     try:
         from shiina_cli.skin_engine import init_skin_from_config, get_active_skin
@@ -28,7 +53,13 @@ def resolve_skin() -> dict:
             "banner_hero": skin.banner_hero, "tool_prefix": skin.tool_prefix,
             "help_header": (skin.branding or {}).get("help_header", ""),
             # Chrome design tokens for the TUI (`tui:` in the skin YAML).
-            "tui": getattr(skin, "tui", {}) or {}}
+            "tui": getattr(skin, "tui", {}) or {},
+            # The active design: colours, glyphs, borders, prompt, animations and
+            # the structural arrangement. `{}` when it is the built-in look.
+            "design": resolve_design(),
+            # Every design name, so `/design` can offer them. Order is the
+            # engine's (sorted), which is also the order `shiina design list` prints.
+            "designs": resolve_design_catalog()}
     except Exception:
         return {}
 
@@ -62,16 +93,23 @@ def _newest_mtime_ns(paths) -> int | None:
 
 
 def _skin_sig() -> tuple:
-    """(active skin name, its user-file mtime, its desktop-scheme generation). Built-ins have no
-    file, so only their name moves; a user skin's mtime lets an in-place color edit repaint too,
-    and a dynamic skin's scheme mtime repaints when the wallpaper changes the palette."""
+    """(active skin name, its user-file mtime, its desktop-scheme generation, the active design
+    signature). Built-ins have no file, so only their name moves; a user skin's mtime lets an
+    in-place color edit repaint too, and a dynamic skin's scheme mtime repaints when the wallpaper
+    changes the palette. The design signature rides along because a design edit is the same repaint
+    from the renderer's side — one payload, one code path."""
     name = str((_load_cfg().get("display") or {}).get("skin") or "default")
     dynamic = ()
     with contextlib.suppress(Exception):
         from shiina_cli.skin_dynamic import DYNAMIC_SKIN_NAMES, scheme_generation
         if name in DYNAMIC_SKIN_NAMES:
             dynamic = scheme_generation()
-    return name, _watcher_mtime_ns(_watcher_home() / "skins" / f"{name}.yaml"), dynamic
+    design = ()
+    with contextlib.suppress(Exception):
+        from shiina_cli.design_engine import design_signature, init_design_from_config
+        init_design_from_config(_load_cfg())
+        design = design_signature()
+    return name, _watcher_mtime_ns(_watcher_home() / "skins" / f"{name}.yaml"), dynamic, design
 
 
 def _note_skin_broadcast() -> None:

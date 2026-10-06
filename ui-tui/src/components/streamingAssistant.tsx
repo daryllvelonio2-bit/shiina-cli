@@ -64,7 +64,7 @@ export const StreamingAssistant = memo(function StreamingAssistant({
   }
 
   // Stable identity (the spec table is module-level), so the trail memo holds.
-  const layoutDefaults = layoutSections(ui.layout)
+  const layoutDefaults = layoutSections(ui.layout, ui.design?.layout?.sections)
   const detailsCtx = { commandOverride: detailsModeCommandOverride, detailsMode, layoutDefaults, live: true, sections }
   let prev = prevMsg
 

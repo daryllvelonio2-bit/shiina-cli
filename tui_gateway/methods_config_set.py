@@ -325,9 +325,26 @@ def _set_reasoning(rid, params, key, value, session):
     return _kv(rid, key, arg)
 
 
+def _design_names() -> set:
+    """Every available design name — the accepted set for `config.set design`.
+
+    Resolved per call rather than frozen at import: designs are data files in
+    ``~/.shiina/designs/``, so dropping a new YAML in makes it valid immediately
+    with no restart. A design engine failure yields ``{"default"}`` so the key
+    stays settable (and never rejects everything).
+    """
+    try:
+        from shiina_cli.design_engine import design_names
+        names = set(design_names())
+        return names or {"default"}
+    except Exception:
+        return {"default"}
+
+
 def _word_setters() -> dict:
     """key -> (normaliser, accepted words, error template, apply(word)); the reported value is the
     accepted word. Built per call: the specs reference server.py globals (rebound at install)."""
+    designs = _design_names()
     return {
         "busy": (_word, {"queue", "steer", "interrupt"}, "unknown busy mode: {value}",
                  lambda w: _write_config_key("display.busy_input_mode", w)),
@@ -348,6 +365,11 @@ def _word_setters() -> dict:
         # Structural TUI layout; the renderer mirrors these words (ui-tui/src/domain/layout.ts).
         "layout": (_word, set(LAYOUT_IDS), "unknown layout: {value}; pick one of " + "|".join(LAYOUT_IDS),
                    lambda w: _write_config_key("display.layout", w)),
+        # Visual TUI design (colours, glyphs, borders, prompt, animations, structure).
+        # `shiina_cli/design_engine.py` resolves it and the change watcher repaints
+        # every live surface over skin.changed within ~1s.
+        "design": (_word, designs, "unknown design: {value}; pick one of " + "|".join(sorted(designs)),
+                   lambda w: _write_config_key("display.design", w)),
         # Which engine the desktop voice button mounts; applies to the NEXT conversation.
         "voice.voice_chat_mode": (_word, {"chained", "gpt-live"}, "unknown voice chat mode: {value}; pick chained|gpt-live",
                                   lambda w: _write_config_key("voice.voice_chat_mode", w))}
@@ -465,6 +487,7 @@ _CONFIG_SETTERS = {
     "reasoning": _set_reasoning, "details_mode": _set_word, "thinking_mode": _set_word,
     "density": _set_toggle, "battery": _set_toggle, "theme": _set_word,
     "statusbar": _set_toggle, "mouse": _set_toggle, "indicator": _set_word, "layout": _set_word,
+    "design": _set_word,
     "voice.voice_chat_mode": _set_word,
     "cwd": _set_cwd, "terminal.cwd": _set_cwd, "workdir": _set_cwd,
     "prompt": _set_prompt, "personality": _set_personality, "skin": _set_skin}

@@ -125,6 +125,23 @@ def _display_word(key: str, default: str, allowed) -> str:
     return raw if raw in allowed else default
 
 
+def _design_word() -> str:
+    """Normalised ``display.design``; unknown names read back as ``default``.
+
+    Unlike ``_display_word`` the accepted set is the LIVE design folder, so a
+    design dropped in while the gateway runs reads back as itself instead of the
+    default. Not lowercased — a user file may be named anything — and an engine
+    failure returns the raw name rather than pretending it is the default.
+    """
+    raw = _display_raw().get("design")
+    name = raw.strip() if isinstance(raw, str) and raw.strip() else "default"
+    try:
+        from shiina_cli.design_engine import design_names
+        return name if name in set(design_names()) else "default"
+    except Exception:
+        return name
+
+
 _THINKING_MODES = frozenset({"collapsed", "truncated", "full"})
 
 
@@ -218,6 +235,7 @@ _CONFIG_GETTERS = {
     "theme": lambda params: {"value": _display_word("tui_theme", "auto", {"auto", "light", "dark"})},
     "statusbar": lambda params: {"value": _coerce_statusbar(_display_cfg().get("tui_statusbar", "top"))},
     "layout": lambda params: {"value": _display_word("layout", DEFAULT_LAYOUT, set(LAYOUT_IDS))},
+    "design": lambda params: {"value": _design_word()},
     "focus": lambda params: {"value": "on" if bool(_display_cfg().get("focus_view", False)) else "off",
                              "tool_progress": _load_tool_progress_mode()},
     "mouse": lambda params: {"value": _display_mouse_tracking(_load_cfg().get("display"))},

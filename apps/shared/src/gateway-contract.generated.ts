@@ -3858,6 +3858,8 @@ export interface SkinPayload {
   tool_prefix?: string
   help_header?: string
   tui?: Record<string, unknown>
+  design?: Record<string, unknown>
+  designs?: string[]
   [key: string]: unknown
 }
 /** ``shiina_cli/free_tier_bootstrap.py::SetupRecord.as_payload``. */

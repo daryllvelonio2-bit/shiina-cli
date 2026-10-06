@@ -321,6 +321,40 @@ export const coreCommands: SlashCommand[] = [
   },
 
   {
+    help: 'switch the visual design (colours, glyphs, borders, prompt, animation)',
+    name: 'design',
+    run: (arg, ctx) => {
+      const { gateway, transcript, ui } = ctx
+      const catalog = ui.designs
+      const word = arg.trim().toLowerCase()
+
+      // Bare `/design` reports; it never switches. The active name comes from
+      // the gateway (the resolved spec), not from anything cached here.
+      if (!word) {
+        const list = catalog.length ? catalog.join(' | ') : 'none found — run `shiina design list`'
+
+        return transcript.sys(`design ${ui.design?.name ?? 'default'} · available: ${list}`)
+      }
+
+      const next =
+        word === 'cycle' || word === 'toggle'
+          ? catalog[(catalog.indexOf(ui.design?.name ?? 'default') + 1) % catalog.length]
+          : word
+
+      if (!next) {
+        return transcript.sys('usage: /design <name> | cycle')
+      }
+
+      // Persist only: the gateway's change watcher resolves the design and
+      // repaints over skin.changed, so the resolved spec (colours included)
+      // always comes from the engine rather than being guessed here.
+      gateway.rpc<ConfigSetResponse>('config.set', { key: 'design', value: next }).catch(() => {})
+
+      queueMicrotask(() => transcript.sys(`design ${next} (applies within ~1s)`))
+    }
+  },
+
+  {
     aliases: ['detail'],
     help: 'control agent detail visibility (global or per-section)',
     name: 'details',

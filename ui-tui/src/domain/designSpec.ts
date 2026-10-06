@@ -76,6 +76,12 @@ const colorMap = (value: unknown): Record<string, string> | undefined => {
  * Tolerant by construction: an unparseable or partial payload yields a spec
  * with fewer fields rather than an error, because a malformed design file must
  * degrade to the built-in look — never blank the UI or crash the frame.
+ *
+ * Returns **null** when the payload carries nothing that would change the
+ * appearance. That is not a shortcut: `uiStore` recomputes the theme whenever
+ * the design object identity moves, so handing back a fresh empty spec every
+ * watcher tick would rebuild `ui.theme` per tick and churn every `memo()`
+ * boundary keyed on it.
  */
 export const resolveDesignSpec = (raw: unknown): DesignSpec | null => {
   if (!isRecord(raw)) {
@@ -95,7 +101,7 @@ export const resolveDesignSpec = (raw: unknown): DesignSpec | null => {
 
   const segments = statusBar?.segments
 
-  return {
+  const spec: DesignSpec = {
     name,
     colors: colorMap(raw.colors),
     description: str(raw.description),
@@ -126,4 +132,22 @@ export const resolveDesignSpec = (raw: unknown): DesignSpec | null => {
     prompt: str(raw.prompt),
     spinner: spinner ? { think: strList(spinner.think), tool: strList(spinner.tool) } : undefined
   }
+
+  return designChangesAnything(spec) ? spec : null
 }
+
+/** Does wearing this spec actually alter the built-in appearance? */
+const designChangesAnything = (spec: DesignSpec): boolean =>
+  Boolean(
+    (spec.colors && Object.keys(spec.colors).length) ||
+      spec.prompt ||
+      spec.spinner?.think?.length ||
+      spec.spinner?.tool?.length ||
+      spec.design?.density ||
+      spec.design?.panel ||
+      spec.design?.rule ||
+      (spec.design?.glyphs && Object.keys(spec.design.glyphs).length) ||
+      spec.design?.status_bar ||
+      (spec.layout?.regions && Object.keys(spec.layout.regions).length) ||
+      (spec.layout?.sections && Object.keys(spec.layout.sections).length)
+  )

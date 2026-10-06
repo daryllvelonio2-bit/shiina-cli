@@ -18,7 +18,7 @@ import type { QueueItem } from '../hooks/useQueue.js'
 import type { ParsedVoiceRecordKey } from '../lib/platform.js'
 import type { RpcResult } from '../lib/rpc.js'
 import type { ActiveWidget } from '../sdk/types.js'
-import type { DesignSpec } from '../domain/design.js'
+import type { DesignSpec } from '../domain/designSpec.js'
 import type { Theme } from '../theme.js'
 import type {
   ApprovalReq,
@@ -368,6 +368,8 @@ export interface UiState {
   baseTheme: Theme
   /** The resolved design from the design folder, or null for the built-in look. */
   design: DesignSpec | null
+  /** Every available design name (gateway catalog) — what `/design` offers. */
+  designs: string[]
   // `display.timestamps` — dim [HH:MM] labels on user/assistant transcript
   // rows, the same config key the classic CLI honors (#41531).
   timestamps: boolean

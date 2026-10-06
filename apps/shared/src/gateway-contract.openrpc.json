@@ -28392,6 +28392,18 @@
             "additionalProperties": true,
             "title": "Tui",
             "type": "object"
+          },
+          "design": {
+            "additionalProperties": true,
+            "title": "Design",
+            "type": "object"
+          },
+          "designs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Designs",
+            "type": "array"
           }
         },
         "title": "SkinPayload",
