@@ -391,3 +391,6 @@ core.*
 *.apk
 *.aab
 
+# QA gate reports (scripts/qa_gate.py)
+.qa/
+
