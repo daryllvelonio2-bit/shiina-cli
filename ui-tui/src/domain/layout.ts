@@ -34,14 +34,6 @@ export type LayoutId = (typeof LAYOUT_IDS)[number]
 
 export const DEFAULT_LAYOUT: LayoutId = 'workbench'
 
-/** Design hints a layout carries so its *look* moves with its structure.
- *  Density/borders feed the theme's chrome tokens; `statusRule` below still
- *  owns whether the rule mounts at all. */
-export interface LayoutDesign {
-  density: 'compact' | 'normal' | 'roomy'
-  panel: 'single' | 'round' | 'double' | 'bold'
-}
-
 export interface LayoutSpec {
   /** Ambient corner-widget rails reserve columns beside the transcript. */
   rails: boolean
@@ -68,8 +60,6 @@ export interface LayoutSpec {
   /** Default per-section progress visibility. Absent keys fall through to the
    *  global details mode, matching the pre-layout behaviour. */
   sections: SectionVisibility
-  /** Chrome design tokens this layout leads with. */
-  design: LayoutDesign
 }
 
 const SPECS: Record<LayoutId, LayoutSpec> = {
@@ -77,7 +67,6 @@ const SPECS: Record<LayoutId, LayoutSpec> = {
   // section: the transcript is the point, not the instrument panel.
   minimal: {
     agentsDock: false,
-    design: { density: 'compact', panel: 'single' },
     dock: false,
     fileChanges: false,
     ledger: false,
@@ -95,7 +84,6 @@ const SPECS: Record<LayoutId, LayoutSpec> = {
   // through to the global mode), so an existing user sees no change at all.
   workbench: {
     agentsDock: true,
-    design: { density: 'normal', panel: 'round' },
     dock: true,
     fileChanges: true,
     ledger: false,
@@ -112,7 +100,6 @@ const SPECS: Record<LayoutId, LayoutSpec> = {
   // stream open too — the pane is where a delegation is watched.
   studio: {
     agentsDock: false,
-    design: { density: 'normal', panel: 'round' },
     dock: true,
     fileChanges: true,
     ledger: false,
@@ -130,7 +117,6 @@ const SPECS: Record<LayoutId, LayoutSpec> = {
   // line instead of a wall of prose.
   timeline: {
     agentsDock: false,
-    design: { density: 'compact', panel: 'single' },
     dock: true,
     fileChanges: true,
     ledger: true,
@@ -179,8 +165,6 @@ export const layoutSpec = (id: LayoutId): LayoutSpec => SPECS[id] ?? SPECS[DEFAU
 /** Default progress visibility for a layout — the layer that sits between the
  *  user's explicit `display.sections.*` and the global details mode. */
 export const layoutSections = (id: LayoutId): SectionVisibility => layoutSpec(id).sections
-
-export const layoutDesign = (id: LayoutId): LayoutDesign => layoutSpec(id).design
 
 /** Next layout in the cycle — bare `/layout` walks this order. */
 export const cycleLayout = (id: LayoutId): LayoutId => LAYOUT_IDS[(LAYOUT_IDS.indexOf(id) + 1) % LAYOUT_IDS.length]

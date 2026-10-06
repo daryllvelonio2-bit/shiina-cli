@@ -1,0 +1,80 @@
+# studio — deep indigo, panelled furniture.
+#
+# Two panes: a reserved right-hand column holds the live instruments for the
+# whole session beside the transcript. Rounder marks and an unhurried animation
+# so the frame reads as boxed furniture rather than a flat column.
+
+name: studio
+description: "Panelled studio — indigo palette, side column of live instruments."
+extends: default
+
+colors:
+  accent: "#818cf8"
+  border: "#4f46e5"
+  completionBg: "#1e1b4b"
+  completionCurrentBg: "#312e81"
+  completionMetaBg: "#1e1b4b"
+  completionMetaCurrentBg: "#312e81"
+  error: "#fb7185"
+  label: "#a5b4fc"
+  muted: "#6366f1"
+  ok: "#34d399"
+  primary: "#6366f1"
+  prompt: "#a5b4fc"
+  selectionBg: "#312e81"
+  sessionBorder: "#4338ca"
+  sessionLabel: "#a5b4fc"
+  shellDollar: "#c084fc"
+  statusBad: "#fb7185"
+  statusBg: "#1e1b4b"
+  statusCritical: "#f43f5e"
+  statusFg: "#e0e7ff"
+  statusGood: "#34d399"
+  statusWarn: "#fbbf24"
+  syntaxComment: "#6366f1"
+  syntaxKeyword: "#c084fc"
+  syntaxNumber: "#a5b4fc"
+  syntaxString: "#34d399"
+  text: "#e0e7ff"
+  thinking: "#818cf8"
+  tool: "#a5b4fc"
+  warn: "#fbbf24"
+
+prompt: "❯"
+
+design:
+  density: normal
+  panel: round
+  rule: "─"
+  glyphs:
+    active: "▸"
+    bullet: "◆"
+    chevronClosed: "▸"
+    chevronOpen: "▾"
+    separator: " │ "
+    statusHead: "─ "
+  status_bar:
+    segments: null
+
+spinner:
+  think: [orbit, breathe]
+  tool: [cascade, diagswipe]
+
+layout:
+  regions:
+    agentsDock: false
+    dock: true
+    fileChanges: true
+    ledger: false
+    pet: true
+    rails: true
+    scrollbar: true
+    sideColumn: true
+    statusRule: true
+    stickyPrompt: true
+    todoUnderPrompt: false
+  sections:
+    activity: hidden
+    subagents: expanded
+    thinking: expanded
+    tools: expanded

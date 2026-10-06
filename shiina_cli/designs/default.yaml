@@ -1,0 +1,83 @@
+# default — the built-in look, unchanged.
+#
+# This file declares NOTHING, on purpose. `default` IS the built-in appearance
+# and it is what every other design inherits from, so an empty (or absent)
+# default means "whatever the TUI already does".
+#
+# In particular it declares no `colors:` — the palette stays whatever the active
+# SKIN resolves it to. That is what keeps a dynamic wallpaper setup (Caelestia)
+# working: `display.design: default` + `display.skin: caelestia` follows the
+# live desktop, and nothing here fights it.
+#
+# Copy this file to start your own, then uncomment only what you change.
+# Every key is documented in full in README.md next to it.
+
+name: default
+description: "Built-in Shiina — the long-standing look. Colours come from the active skin."
+
+# ── Colour (omit entirely to inherit the skin's palette) ─────────────────
+# colors:
+#   accent: "#38bdf8"
+#   border: "#334155"
+#   text: "#e2e8f0"
+#   muted: "#64748b"
+#   ok: "#4ade80"
+#   warn: "#fbbf24"
+#   error: "#f87171"
+#   tool: "#38bdf8"
+#   thinking: "#64748b"
+
+# Take the palette live from the desktop scheme instead of pinning one.
+# Individual `colors:` keys still win over the live values.
+# dynamic: false
+
+# ── Chrome identity ──────────────────────────────────────────────────────
+# prompt: "❯"
+# design:
+#   density: normal          # compact | normal | roomy
+#   panel: round             # single | round | double | bold
+#   rule: "─"
+#   glyphs:
+#     chevronClosed: "▸"
+#     chevronOpen: "▾"
+#     bullet: "●"
+#     check: "✓"
+#     pending: "·"
+#     active: "▸"
+#     separator: " │ "
+#     statusHead: "─ "
+#     chain: "⛓"
+#     cache: "◎"
+#     latency: "◷"
+#     tps: "↑"
+#     focus: "◉"
+#     idle: "✓"
+#     resume: "↩"
+#   status_bar:
+#     segments: null         # null = built-in order and allowlist
+
+# ── Motion ───────────────────────────────────────────────────────────────
+# Lists — one is picked per session, giving the design a vocabulary rather
+# than a single loop. Names are listed in README.md.
+# spinner:
+#   think: [helix, breathe, orbit, dna, waverows, snake, pulse]
+#   tool: [cascade, scan, diagswipe, fillsweep, rain, columns, sparkle]
+
+# ── Structure (omit to keep the layout's own profile) ────────────────────
+# layout:
+#   regions:
+#     rails: true
+#     dock: true
+#     pet: true
+#     statusRule: true
+#     fileChanges: true
+#     agentsDock: true
+#     todoUnderPrompt: true
+#     stickyPrompt: true
+#     scrollbar: true
+#     sideColumn: false
+#     ledger: false
+#   sections:
+#     thinking: expanded
+#     tools: expanded
+#     activity: hidden

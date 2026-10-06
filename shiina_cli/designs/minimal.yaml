@@ -1,0 +1,89 @@
+# minimal — quiet, low-ink, greyscale.
+#
+# The reading surface. Near-monochrome so the transcript text is the only thing
+# that draws the eye, a plain ASCII-ish glyph set, a single calm animation, and
+# a status rule trimmed to what a reader actually checks.
+
+name: minimal
+description: "Quiet reading surface — greyscale, low-ink glyphs, progress folded away."
+extends: default
+
+colors:
+  accent: "#d4d4d8"
+  border: "#52525b"
+  completionBg: "#27272a"
+  completionCurrentBg: "#3f3f46"
+  completionMetaBg: "#27272a"
+  completionMetaCurrentBg: "#3f3f46"
+  error: "#f87171"
+  label: "#a1a1aa"
+  muted: "#71717a"
+  ok: "#a1a1aa"
+  primary: "#e4e4e7"
+  prompt: "#d4d4d8"
+  selectionBg: "#3f3f46"
+  sessionBorder: "#3f3f46"
+  sessionLabel: "#a1a1aa"
+  shellDollar: "#a1a1aa"
+  statusBad: "#f87171"
+  statusBg: "#18181b"
+  statusCritical: "#ef4444"
+  statusFg: "#e4e4e7"
+  statusGood: "#a1a1aa"
+  statusWarn: "#d4d4d8"
+  syntaxComment: "#71717a"
+  syntaxKeyword: "#d4d4d8"
+  syntaxNumber: "#a1a1aa"
+  syntaxString: "#a1a1aa"
+  text: "#e4e4e7"
+  thinking: "#71717a"
+  tool: "#a1a1aa"
+  warn: "#d4d4d8"
+
+prompt: ">"
+
+design:
+  density: compact
+  panel: single
+  rule: "-"
+  glyphs:
+    active: ">"
+    bullet: "-"
+    cache: "c"
+    chain: "+"
+    check: "x"
+    chevronClosed: ">"
+    chevronOpen: "v"
+    focus: "o"
+    idle: "ok"
+    latency: "t"
+    pending: "."
+    resume: "<"
+    separator: " | "
+    statusHead: "- "
+    tps: "^"
+  status_bar:
+    segments: [model, cwd, tokens]
+
+spinner:
+  think: [pulse]
+  tool: [scanline]
+
+layout:
+  regions:
+    agentsDock: false
+    dock: false
+    fileChanges: false
+    ledger: false
+    pet: false
+    rails: false
+    scrollbar: false
+    sideColumn: false
+    statusRule: true
+    stickyPrompt: false
+    todoUnderPrompt: false
+  sections:
+    activity: hidden
+    subagents: hidden
+    thinking: collapsed
+    tools: collapsed

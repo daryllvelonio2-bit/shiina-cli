@@ -7,12 +7,12 @@
 import { describe, expect, it } from 'vitest'
 
 import { detailsRequested, sectionMode } from '../domain/details.js'
+import type { LayoutId } from '../domain/layout.js'
 import {
   cycleLayout,
   DEFAULT_LAYOUT,
   LAYOUT_IDS,
   LAYOUT_SPECS,
-  layoutDesign,
   layoutRegions,
   layoutSections,
   layoutSpec,
@@ -44,7 +44,7 @@ describe('layout selection', () => {
   it('cycles through every layout and returns to the start', () => {
     expect(cycleLayout('minimal')).not.toBe('minimal')
 
-    let id = LAYOUT_IDS[0]
+    let id: LayoutId = LAYOUT_IDS[0]
 
     for (let i = 0; i < LAYOUT_IDS.length; i++) {
       id = cycleLayout(id)
@@ -185,12 +185,6 @@ describe('layout progress defaults', () => {
     expect(layoutSections('minimal').thinking).toBe('collapsed')
     expect(layoutSections('timeline').tools).toBe('expanded')
     expect(layoutSections('studio').subagents).toBe('expanded')
-  })
-
-  it('carries design tokens so the look moves with the structure', () => {
-    expect(layoutDesign('minimal').density).toBe('compact')
-    expect(layoutDesign('workbench').density).toBe('normal')
-    expect(layoutDesign('timeline').panel).toBe('single')
   })
 
   it('layers under the user, never over them', () => {

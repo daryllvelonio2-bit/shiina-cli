@@ -1,8 +1,10 @@
 import { Box, NoSelect, Text } from '@shiina/ink'
 import { compactNumber } from '@shiina/shared/format'
+import { useStore } from '@nanostores/react'
 import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import spinners, { type BrailleSpinnerName } from 'unicode-animations'
 
+import { $uiState } from '../app/uiStore.js'
 import { THINKING_COT_MAX, THINKING_TRAIL_MAX_CHARS, THINKING_TRAIL_MAX_LINES } from '../config/limits.js'
 import { sectionMode } from '../domain/details.js'
 import {
@@ -152,11 +154,17 @@ function TreeNode({
 }
 
 export function Spinner({ color, variant = 'think' }: { color: string; variant?: 'think' | 'tool' }) {
+  // The active design picks the animation set. Motion is a large part of why
+  // two TUIs read as different apps — the same frame with a different spinner
+  // vocabulary reads as a different product.
+  const frames = useStore($uiState).design?.spinner?.[variant === 'tool' ? 'tool' : 'think']
+
   const spin = useMemo(() => {
-    const raw = spinners[pick(variant === 'tool' ? TOOL : THINK)]
+    const chosen = frames?.length ? (frames as BrailleSpinnerName[]) : variant === 'tool' ? TOOL : THINK
+    const raw = spinners[pick(chosen)]
 
     return { ...raw, frames: raw.frames.map(f => [...f][0] ?? '⠀') }
-  }, [variant])
+  }, [frames, variant])
 
   const [frame, setFrame] = useState(0)
 
