@@ -901,6 +901,9 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
         if (p.kind === 'goal') {
           sys(p.text)
 
+          // The backend's goal lines carry their own leading mark (`✓`/`↻`/`⏸`).
+          // The state brief echoes that protocol rather than rendering chrome,
+          // so it stays paired with the producer's mark, not a design token.
           const brief = p.text.startsWith('✓')
             ? '✓ goal complete'
             : p.text.startsWith('↻')

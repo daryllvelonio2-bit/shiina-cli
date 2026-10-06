@@ -665,10 +665,10 @@ export function useMainApp(gw: GatewayClient) {
 
   const marker =
     overlay.approval || overlay.sudo || overlay.secret || overlay.vaultUnlock || overlay.clarify
-      ? '⚠'
+      ? ui.theme.design.glyphs.alert
       : ui.busy
-        ? '⏳'
-        : '✓'
+        ? ui.theme.design.glyphs.busy
+        : ui.theme.design.glyphs.idle
 
   const tabCwd = ui.info?.cwd
 

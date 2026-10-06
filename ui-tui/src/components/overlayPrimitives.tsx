@@ -122,7 +122,7 @@ export function MenuRow({ active, index, label, t }: { active: boolean; index: n
         bold={active}
         color={active ? (row.color ?? t.color.label) : t.color.muted}
       >
-        {active ? '▸ ' : '  '}
+        {active ? `${t.design.glyphs.active} ` : '  '}
         {index}. {label}
       </Text>
     </Text>
@@ -133,7 +133,7 @@ export function MenuRow({ active, index, label, t }: { active: boolean; index: n
 export function ActionRow({ active, label, color, t }: { active: boolean; label: string; color?: string; t: Theme }) {
   return (
     <Text>
-      <Text color={active ? t.color.accent : t.color.muted}>{active ? '▸ ' : '  '}</Text>
+      <Text color={active ? t.color.accent : t.color.muted}>{active ? `${t.design.glyphs.active} ` : '  '}</Text>
       <Text bold={active} color={active ? (color ?? t.color.text) : t.color.muted}>
         {label}
       </Text>

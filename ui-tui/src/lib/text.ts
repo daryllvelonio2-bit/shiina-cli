@@ -9,9 +9,25 @@ import {
   VERBOSE_TRAIL_MAX_LINES
 } from '../config/limits.js'
 import { VERBS } from '../content/verbs.js'
+import { DEFAULT_BORDERS, DEFAULT_GLYPHS } from '../design.js'
 import type { ThinkingMode } from '../types.js'
 
 const WS_RE = /\s+/g
+
+// The tool-trail LINE PROTOCOL. A trail line is built once, persisted with the
+// transcript, and parsed back out of it (`isToolTrailResultLine`,
+// `parseToolTrailResultLine`, `sameToolTrailGroup`), so these marks are pinned
+// to the BUILT-IN glyphs rather than the live design: a design that restyles
+// `check`/`cross` must not break parsing of lines written before the switch.
+// Chrome that renders a trail line reads `t.design.glyphs` for its own marks.
+// (`MARK_DOT` / `MARK_RAIL` are preview text, same reasoning.)
+export const TOOL_TRAIL_OK = DEFAULT_GLYPHS.check
+export const TOOL_TRAIL_ERR = DEFAULT_GLYPHS.cross
+const MARK_PENDING = DEFAULT_GLYPHS.pending
+const MARK_DOT = DEFAULT_GLYPHS.dot
+const MARK_RAIL = DEFAULT_GLYPHS.railVertical
+/** The code-fence label's rule (`rows` math mirrors what `markdown.tsx` paints). */
+const FENCE_RULE = DEFAULT_BORDERS.rule
 
 const renderEstimateLine = (line: string) => {
   const trimmed = line.trim()
@@ -36,10 +52,10 @@ const renderEstimateLine = (line: string) => {
     .replace(/==(.+?)==/g, '$1')
     .replace(/\[\^([^\]]+)\]/g, '[$1]')
     .replace(/^#{1,6}\s+/, '')
-    .replace(/^\s*[-*+]\s+\[( |x|X)\]\s+/, (_m, checked: string) => `• [${checked.toLowerCase() === 'x' ? 'x' : ' '}] `)
-    .replace(/^\s*[-*+]\s+/, '• ')
+    .replace(/^\s*[-*+]\s+\[( |x|X)\]\s+/, (_m, checked: string) => `${MARK_DOT} [${checked.toLowerCase() === 'x' ? 'x' : ' '}] `)
+    .replace(/^\s*[-*+]\s+/, `${MARK_DOT} `)
     .replace(/^\s*(\d+)\.\s+/, '$1. ')
-    .replace(/^\s*(?:>\s*)+/, '│ ')
+    .replace(/^\s*(?:>\s*)+/, `${MARK_RAIL} `)
 }
 
 export const compactPreview = (s: string, max: number) => {
@@ -283,7 +299,7 @@ export const buildToolTrailLine = (
   const detail = compactPreview(note ?? '', 72)
   const took = duration !== undefined ? ` (${duration.toFixed(1)}s)` : ''
 
-  return `${formatToolCall(name, context)}${took}${detail ? ` :: ${detail}` : ''} ${error ? '✗' : '✓'}`
+  return `${formatToolCall(name, context)}${took}${detail ? ` :: ${detail}` : ''} ${error ? TOOL_TRAIL_ERR : TOOL_TRAIL_OK}`
 }
 
 const verboseToolBlock = (label: string, text?: string) => {
@@ -315,17 +331,18 @@ export const buildVerboseToolTrailLine = (
 
   const took = duration !== undefined ? ` (${duration.toFixed(1)}s)` : ''
 
-  return `${formatToolCall(name, context)}${took}${detail ? ` :: ${detail}` : ''} ${error ? '✗' : '✓'}`
+  return `${formatToolCall(name, context)}${took}${detail ? ` :: ${detail}` : ''} ${error ? TOOL_TRAIL_ERR : TOOL_TRAIL_OK}`
 }
 
-export const isToolTrailResultLine = (line: string) => line.endsWith(' ✓') || line.endsWith(' ✗')
+export const isToolTrailResultLine = (line: string) =>
+  line.endsWith(` ${TOOL_TRAIL_OK}`) || line.endsWith(` ${TOOL_TRAIL_ERR}`)
 
 export const parseToolTrailResultLine = (line: string) => {
   if (!isToolTrailResultLine(line)) {
     return null
   }
 
-  const mark = line.endsWith(' ✗') ? '✗' : '✓'
+  const mark = line.endsWith(` ${TOOL_TRAIL_ERR}`) ? TOOL_TRAIL_ERR : TOOL_TRAIL_OK
   const body = line.slice(0, -2)
   const sep = body.indexOf(' :: ')
 
@@ -351,8 +368,8 @@ export const splitToolDuration = (call: string) => {
 export const isTransientTrailLine = (line: string) => line.startsWith('drafting ') || line === 'analyzing tool output…'
 
 export const sameToolTrailGroup = (label: string, entry: string) =>
-  entry === `${label} ✓` ||
-  entry === `${label} ✗` ||
+  entry === `${label} ${TOOL_TRAIL_OK}` ||
+  entry === `${label} ${TOOL_TRAIL_ERR}` ||
   entry.startsWith(`${label}(`) ||
   entry.startsWith(`${label} ::`) ||
   entry.startsWith(`${label}:`)
@@ -383,7 +400,7 @@ export const estimateRows = (text: string, w: number, compact = false) => {
         fence = { char: marker[0] as '`' | '~', len: marker.length }
 
         if (lang) {
-          rows += Math.ceil((`─ ${lang}`.length || 1) / w)
+          rows += Math.ceil((`${FENCE_RULE} ${lang}`.length || 1) / w)
         }
       } else if (marker[0] === fence.char && marker.length >= fence.len) {
         fence = null
@@ -440,7 +457,7 @@ export const formatAbandonedClarifyBatch = (
   const lines = questions.map(q => {
     const answer = answers[q.qid]
 
-    return answer ? `  ✓ ${q.question} → ${answer}` : `  · ${q.question} (no answer)`
+    return answer ? `  ${TOOL_TRAIL_OK} ${q.question} → ${answer}` : `  ${MARK_PENDING} ${q.question} (no answer)`
   })
 
   return [`ask (${questions.length} questions)`, ...lines, `  (${reason})`].join('\n')

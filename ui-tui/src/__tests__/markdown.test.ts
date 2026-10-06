@@ -244,8 +244,8 @@ describe('Md wrapping', () => {
       )
     )
 
-    expect(lines).toContain('  • nested bullet')
-    expect(lines).toContain('  │ nested quote')
+    expect(lines).toContain(`  ${DEFAULT_THEME.design.glyphs.dot} nested bullet`)
+    expect(lines).toContain(`  ${DEFAULT_THEME.design.glyphs.railVertical} nested quote`)
   })
 
   it('preserves original inline-code edge spaces', () => {

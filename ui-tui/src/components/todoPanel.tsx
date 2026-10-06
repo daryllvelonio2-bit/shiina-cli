@@ -57,7 +57,7 @@ export const TodoPanel = memo(function TodoPanel({
     <Box flexDirection="column" marginBottom={1}>
       <Box onClick={handleToggle}>
         <Text color={t.color.muted}>
-          <Text color={t.color.accent}>{effectiveCollapsed ? '▸ ' : '▾ '}</Text>
+          <Text color={t.color.accent}>{`${effectiveCollapsed ? t.design.glyphs.chevronClosed : t.design.glyphs.chevronOpen} `}</Text>
           <Text bold color={t.color.accent}>
             Todo
           </Text>{' '}

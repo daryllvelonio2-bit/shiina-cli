@@ -545,9 +545,12 @@ function TreeLine({ active, palette, row, t }: { active: boolean; palette: Starm
     <ListRow
       active={active}
       cells={[
-        { color: t.color.muted, text: ` ${last ? '└─' : '├─'} ` },
+        {
+          color: t.color.muted,
+          text: ` ${last ? t.design.glyphs.railElbow : t.design.glyphs.railTee}${t.design.borders.rule} `
+        },
         { color: fadeInk(palette, node.style, 1), text: `${node.glyph} ${node.fullLabel || node.label}` },
-        { color: t.color.muted, text: `  ${node.meta}${node.body ? '  ›' : ''}` }
+        { color: t.color.muted, text: `  ${node.meta}${node.body ? `  ${t.design.glyphs.chevronClosed}` : ''}` }
       ]}
       t={t}
     />

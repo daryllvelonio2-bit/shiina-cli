@@ -139,7 +139,9 @@ const SYMBOLS: Record<string, string> = {
   '\\nmid': '∤',
   '\\divides': '∣',
 
-  // Common standalone glyphs
+  // Common standalone glyphs. This is a LaTeX→Unicode TRANSLATION table for
+  // maths the user types: the output mirrors the source meaning, so the
+  // characters here are never chrome and take no design token.
   '\\blacksquare': '■',
   '\\square': '□',
   '\\Box': '□',

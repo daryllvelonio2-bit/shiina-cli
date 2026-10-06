@@ -23,7 +23,7 @@ export function AgentsPanelView({
     return null
   }
 
-  const summary = `▸ ${running} live agents`
+  const summary = `${t.design.glyphs.chevronClosed} ${running} live agents`
   const hints = ' · Ctrl+T expand · F7 restore'
   const activityWidth = cols - stringWidth(summary + hints) - 3
   const activity = rows[0]?.detail && activityWidth >= 12 ? ` · ${compactPreview(rows[0].detail, activityWidth)}` : ''
@@ -38,7 +38,7 @@ export function AgentsPanelView({
       <Text bold color={t.color.accent} wrap="truncate-end">
         {collapsed
           ? summary + activity + hints
-          : `▾ ${running} live agents${hidden ? ` · +${hidden} more` : ''} · Ctrl+T expand · F7 collapse`}
+          : `${t.design.glyphs.chevronOpen} ${running} live agents${hidden ? ` · +${hidden} more` : ''} · Ctrl+T expand · F7 collapse`}
       </Text>
       {!collapsed &&
         rows.map(row => (

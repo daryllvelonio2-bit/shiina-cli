@@ -463,11 +463,11 @@ function OverviewScreen({ onClose, onPatch, overlay, t }: ScreenProps) {
       {trans && (
         <Box flexDirection="column" marginBottom={1}>
           <Text bold color={t.color.warn}>
-            ⏳ Scheduled change
+            {t.design.glyphs.busy} Scheduled change
           </Text>
           <Box>
             <Text color={t.color.text}>{currentName} </Text>
-            <Text color={t.color.warn}>──▶ </Text>
+            <Text color={t.color.warn}>{`${t.design.borders.rule.repeat(2)}${t.design.glyphs.progress} `}</Text>
             <Text color={t.color.text}>{trans.to}</Text>
             <Text color={t.color.muted}> · {trans.when}</Text>
           </Box>

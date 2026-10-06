@@ -377,7 +377,7 @@ function SpawnHud({ t }: { t: Theme }) {
 
   return (
     <Text color={color}>
-      {atCap ? ' │ ⚠ ' : ' │ '}
+      {atCap ? `${t.design.glyphs.separator}${t.design.glyphs.alert} ` : t.design.glyphs.separator}
       {pieces.join(' ')}
     </Text>
   )
@@ -484,7 +484,7 @@ export function StatusRule({
   const showBattery = !!battery && battery.available && battery.percent != null && ok('battery')
   const batteryText = showBattery ? batteryLabel(battery!) : ''
   const batteryColorVal = showBattery ? batteryColor(battery!, t) : ''
-  const batteryWidth = showBattery ? stringWidth(`${batteryText} │ `) : 0
+  const batteryWidth = showBattery ? stringWidth(`${batteryText}${t.design.glyphs.separator}`) : 0
 
   // A credits notice replaces the status/verb slot, but only when idle —
   // while busy the FaceTicker always wins (R1 render priority). The notice
@@ -513,10 +513,10 @@ export function StatusRule({
   // on the RIGHT ahead of the title/cwd label, so it is reserved out of the
   // right side (see usageRightText below) instead of the left essentials.
   const essentialWidth =
-    stringWidth('─ ') +
+    stringWidth(t.design.glyphs.statusHead) +
     batteryWidth +
     slotWidth +
-    stringWidth(' │ ') +
+    stringWidth(t.design.glyphs.separator) +
     stringWidth(modelText)
 
   const rightLabel = sessionTitle && ok('title') ? ` ${sessionTitle} ` : cwdLabel
@@ -525,7 +525,8 @@ export function StatusRule({
   // tail budget) so the label yields first on narrow terminals while usage
   // stays visible. Previously the bar consumed left tail budget via `fits`.
   const usageBarText = !!bar ? `[${bar}]${pct != null ? ` ${contextMark}${pct}%` : ''}` : ''
-  const usageRightText = `${ctxLabel ? ` │ ${ctxLabel}` : ''}${usageBarText ? ` │ ${usageBarText}` : ''}`
+  const sep = t.design.glyphs.separator
+  const usageRightText = `${ctxLabel ? `${sep}${ctxLabel}` : ''}${usageBarText ? `${sep}${usageBarText}` : ''}`
   const { leftWidth, rightWidth, separatorWidth } = statusRuleWidths(
     cols,
     `${usageRightText}${rightLabel}`,
@@ -537,7 +538,7 @@ export function StatusRule({
   // descending priority order — bar, duration, compressions, voice, session
   // count, bg, cost. Lower-priority segments drop first and nothing truncates
   // mid-segment, so status/model/context are never crushed.
-  const SEP = stringWidth(' │ ')
+  const SEP = stringWidth(sep)
   let tailBudget = Math.max(0, leftWidth - essentialWidth)
 
   const fits = (w: number) => {
@@ -606,11 +607,11 @@ export function StatusRule({
             renders as a separate shrinkable box below so a long notice
             ellipsizes instead of crushing model │ ctx (R3-M7). */}
         <Box flexDirection="row" flexShrink={0}>
-          <Text color={t.color.border}>{'─ '}</Text>
+          <Text color={t.color.border}>{t.design.glyphs.statusHead}</Text>
           {showBattery ? (
             <Text color={batteryColorVal}>
               {batteryText}
-              <Text color={t.color.muted}>{' │ '}</Text>
+              <Text color={t.color.muted}>{sep}</Text>
             </Text>
           ) : null}
           {busy ? (
@@ -645,7 +646,7 @@ export function StatusRule({
             </Text>
           ) : null}
           <Text color={t.color.muted} wrap="truncate-end">
-            {' │ '}
+            {sep}
             {modelText}
           </Text>
         </Box>
@@ -673,13 +674,13 @@ export function StatusRule({
               )
             })()
           ) : (
-            <Text color={t.color.border}>{separatorWidth >= 3 ? ' ─ ' : ' '}</Text>
+            <Text color={t.color.border}>{separatorWidth >= 3 ? ` ${t.design.borders.rule} ` : ' '}</Text>
           )}
           <Box flexDirection="row" flexShrink={0} width={rightWidth} overflow="hidden">
             {ctxLabel ? (
               <Box flexShrink={0}>
                 <Text color={t.color.muted} wrap="truncate-end">
-                  {' │ '}
+                  {sep}
                   {ctxLabel}
                 </Text>
               </Box>
@@ -687,7 +688,7 @@ export function StatusRule({
             {usageBarText ? (
               <Box flexShrink={0}>
                 <Text color={t.color.muted} wrap="truncate-end">
-                  {' │ '}
+                  {sep}
                   <Text color={barColor}>[{bar}]</Text>
                   {pct != null ? <Text color={barColor}>{` ${contextMark}${pct}%`}</Text> : null}
                 </Text>
@@ -751,6 +752,8 @@ export function TranscriptScrollbar({ scrollRef, t }: TranscriptScrollbarProps) 
   const travel = Math.max(1, vp - thumb)
   const thumbTop = scrollable ? Math.round((pos / Math.max(1, total - vp)) * travel) : 0
   const { thumb: thumbColor, track: trackColor } = scrollbarColors(t, hover, grab !== null)
+  const track = t.design.glyphs.railVertical
+  const bar = t.design.glyphs.scrollThumb
 
   const jump = (row: number, offset: number) => {
     if (!s || !scrollable) {
@@ -788,15 +791,13 @@ export function TranscriptScrollbar({ scrollRef, t }: TranscriptScrollbarProps) 
       {!scrollable ? null : (
         <>
           {thumbTop > 0 ? (
-            <Text color={trackColor}>{`${'│\n'.repeat(Math.max(0, thumbTop - 1))}${thumbTop > 0 ? '│' : ''}`}</Text>
+            <Text color={trackColor}>{`${`${track}\n`.repeat(Math.max(0, thumbTop - 1))}${track}`}</Text>
           ) : null}
           {thumb > 0 ? (
-            <Text color={thumbColor}>{`${'┃\n'.repeat(Math.max(0, thumb - 1))}${thumb > 0 ? '┃' : ''}`}</Text>
+            <Text color={thumbColor}>{`${`${bar}\n`.repeat(Math.max(0, thumb - 1))}${bar}`}</Text>
           ) : null}
           {vp - thumbTop - thumb > 0 ? (
-            <Text
-              color={trackColor}
-            >{`${'│\n'.repeat(Math.max(0, vp - thumbTop - thumb - 1))}${vp - thumbTop - thumb > 0 ? '│' : ''}`}</Text>
+            <Text color={trackColor}>{`${`${track}\n`.repeat(Math.max(0, vp - thumbTop - thumb - 1))}${track}`}</Text>
           ) : null}
         </>
       )}

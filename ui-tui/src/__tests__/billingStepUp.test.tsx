@@ -171,8 +171,10 @@ describe('BillingOverlay — auto-reload card divergence', () => {
       })
     })
 
-    expect(out).toContain('Auto-refill is charging Visa ••9999 — not your card on file')
-    expect(out).toContain('authorize Nous Research to charge Visa ••9999')
+    const maskedCard = `Visa ${DEFAULT_THEME.design.glyphs.dot.repeat(2)}9999`
+
+    expect(out).toContain(`Auto-refill is charging ${maskedCard} — not your card on file`)
+    expect(out).toContain(`authorize Nous Research to charge ${maskedCard}`)
     expect(out).toContain('Use your card on file — manage on portal')
   })
 

@@ -556,7 +556,7 @@ export function ModelPicker({
 
   // ── Key entry stage ──────────────────────────────────────────────────
   if (stage === 'key' && provider) {
-    const masked = keyInput ? '•'.repeat(Math.min(keyInput.length, 40)) : ''
+    const masked = keyInput ? t.design.glyphs.dot.repeat(Math.min(keyInput.length, 40)) : ''
 
     return (
       <Box flexDirection="column" width={width}>
@@ -696,7 +696,7 @@ export function ModelPicker({
                 key={p?.slug ?? `row-${idx}`}
                 wrap="truncate-end"
               >
-                {providerIdx === idx ? '▸ ' : '  '}
+                {providerIdx === idx ? `${t.design.glyphs.active} ` : '  '}
                 {idx + 1}. {row}
               </Text>
             ) : (
@@ -739,7 +739,7 @@ export function ModelPicker({
             key={row.value || 'keep'}
             wrap="truncate-end"
           >
-            {reasoningIdx === idx ? '▸ ' : '  '}
+            {reasoningIdx === idx ? `${t.design.glyphs.active} ` : '  '}
             {idx + 1}. {row.label}
           </Text>
         ))}
@@ -792,7 +792,7 @@ export function ModelPicker({
           )
         }
 
-        const prefix = modelIdx === idx ? '▸ ' : row === currentModel ? '* ' : '  '
+        const prefix = modelIdx === idx ? `${t.design.glyphs.active} ` : row === currentModel ? `${t.design.glyphs.selected} ` : '  '
 
         return (
           <Text

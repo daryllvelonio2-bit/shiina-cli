@@ -292,7 +292,7 @@ describe('SubscriptionOverlay — overview', () => {
     expect(out).toContain('Manage on portal')
   })
 
-  it('downgrade-pending: leads with a Pro ──▶ Free banner + status echo', () => {
+  it('downgrade-pending: leads with a Pro → Free banner + status echo', () => {
     const out = render(
       overlay(
         state({
@@ -312,7 +312,7 @@ describe('SubscriptionOverlay — overview', () => {
     )
 
     expect(out).toContain('Scheduled change')
-    expect(out).toContain('──▶')
+    expect(out).toContain(`${DEFAULT_THEME.design.borders.rule.repeat(2)}${DEFAULT_THEME.design.glyphs.progress}`)
     expect(out).toContain('Free')
     expect(out).toContain('Jul 15, 2026')
     // the status line itself echoes the transition

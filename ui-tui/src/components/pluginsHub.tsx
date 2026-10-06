@@ -217,7 +217,7 @@ export function PluginsHub({ gw, maxWidth, onClose, t }: PluginsHubProps) {
             key={effectiveRows[lineIdx]?.name ?? row}
             wrap="truncate-end"
           >
-            {active ? '▸ ' : '  '}
+            {active ? `${t.design.glyphs.active} ` : '  '}
             {i + 1}. {row}
           </Text>
         )

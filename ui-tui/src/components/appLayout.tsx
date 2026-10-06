@@ -224,7 +224,7 @@ const TranscriptPane = memo(function TranscriptPane({
             <Box flexDirection="column" key={row.key} ref={transcript.virtualHistory.measureRef(row.key)}>
               {row.msg.role === 'user' && firstUserIdx >= 0 && row.index > firstUserIdx && (
                 <Box marginTop={1}>
-                  <Text color={ui.theme.color.border}>───</Text>
+                  <Text color={ui.theme.color.border}>{ui.theme.design.borders.rule.repeat(3)}</Text>
                 </Box>
               )}
 

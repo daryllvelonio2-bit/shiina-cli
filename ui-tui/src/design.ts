@@ -87,28 +87,70 @@ export interface DesignGlyphs {
   waiting: string
   /** A warning marker. */
   warn: string
+  /** Attention: an approval, a destructive confirm, a crashed widget. */
+  alert: string
+  /** A refused / rejected request. */
+  blocked: string
+  /** Work in progress: the busy tab marker, a scheduled change. */
+  busy: string
+  /** A checked checklist item. */
+  checkboxOn: string
+  /** An unchecked checklist item. */
+  checkboxOff: string
+  /** Opens a collapsible block that is not an `Accordion` (`<summary>`). */
+  disclosure: string
+  /** A filled dot: markdown list items, masked input. */
+  dot: string
+  /** Interrupted / cancelled. */
+  halt: string
+  /** Partially complete (a subagent finalizing). */
+  partial: string
+  /** Timed out. */
+  timeout: string
+  /** A vertical chrome line: tree rails, the blockquote rail, a scroll track. */
+  railVertical: string
+  /** A tree rail that continues below this row. */
+  railTee: string
+  /** A tree rail that ends at this row. */
+  railElbow: string
+  /** The scrollbar's thumb (a heavier vertical than the track). */
+  scrollThumb: string
 }
 
 export const DEFAULT_GLYPHS: DesignGlyphs = {
   active: '▸',
+  alert: '⚠',
+  blocked: '⊘',
   bullet: '●',
+  busy: '⏳',
   cache: '◎',
   chain: '⛓',
   check: '✓',
+  checkboxOff: '☐',
+  checkboxOn: '☑',
   chevronClosed: '▸',
   chevronOpen: '▾',
   cross: '✗',
+  disclosure: '▶',
+  dot: '•',
   ellipsis: '…',
   focus: '◉',
+  halt: '■',
   idle: '✓',
   latency: '◷',
   off: '○',
+  partial: '◐',
   pending: '·',
   progress: '▶',
+  railElbow: '└',
+  railTee: '├',
+  railVertical: '│',
   resume: '↩',
+  scrollThumb: '┃',
   selected: '*',
   separator: ' │ ',
   statusHead: '─ ',
+  timeout: '⌛',
   tps: '↑',
   waiting: '?',
   warn: '!'

@@ -701,7 +701,7 @@ export function ActiveSessionSwitcher({
 
       <Box backgroundColor={newRowStyle?.backgroundColor} flexDirection="row" onClick={handleRowClick(0)} width="100%">
         <Text bold={newSelectedRow} color={newRowTextColor ?? t.color.muted}>
-          {newSelectedRow ? '▸ ' : '  '}
+          {newSelectedRow ? `${t.design.glyphs.active} ` : '  '}
         </Text>
 
         <Box {...fixedSessionColumnStyle()} width={5}>
@@ -763,7 +763,7 @@ export function ActiveSessionSwitcher({
               width="100%"
             >
               <Text bold={selected} color={rowTextColor ?? t.color.muted}>
-                {selected ? '▸ ' : '  '}
+                {selected ? `${t.design.glyphs.active} ` : '  '}
               </Text>
 
               <Box {...fixedSessionColumnStyle()} width={5}>
@@ -817,7 +817,7 @@ export function ActiveSessionSwitcher({
             width="100%"
           >
             <Text bold={selected} color={rowTextColor ?? t.color.muted}>
-              {selected ? '▸ ' : '  '}
+              {selected ? `${t.design.glyphs.active} ` : '  '}
             </Text>
 
             <Box {...fixedSessionColumnStyle()} width={5}>
@@ -868,7 +868,7 @@ export function ActiveSessionSwitcher({
       {newSelected ? (
         <>
           <Box marginTop={1}>
-            <Text color={t.color.label}>prompt › </Text>
+            <Text color={t.color.label}>prompt {t.design.glyphs.chevronClosed} </Text>
             <TextInput
               color={t.color.text}
               columns={promptColumns}

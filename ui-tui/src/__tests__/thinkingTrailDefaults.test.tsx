@@ -60,7 +60,7 @@ describe('a settled trail stays closed', () => {
     const out = trail.text()
 
     expect(out).toContain('Tool calls')
-    expect(out).toContain('▸')
+    expect(out).toContain(DEFAULT_THEME.design.glyphs.chevronClosed)
     // The tool rows themselves are not rendered while collapsed.
     expect(out).not.toMatch(/terminal/i)
 

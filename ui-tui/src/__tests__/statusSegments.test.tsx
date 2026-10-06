@@ -142,7 +142,7 @@ describe('StatusRule honours the segment tokens', () => {
 
     await flush()
 
-    expect(rule.text()).toContain(' │ ')
+    expect(rule.text()).toContain(DEFAULT_THEME.design.glyphs.separator)
     expect(rule.text()).toContain('2 bg')
     rule.cleanup()
   })

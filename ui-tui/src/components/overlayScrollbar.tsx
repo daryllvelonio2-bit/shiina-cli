@@ -39,8 +39,10 @@ export function OverlayScrollbar({
   const thumbTop = scrollable ? Math.round((pos / Math.max(1, total - vp)) * travel) : 0
   const below = Math.max(0, vp - thumbTop - thumb)
 
-  const vBar = (n: number) => (n > 0 ? `${'│\n'.repeat(n - 1)}│` : '')
-  const thumbBody = `${'┃\n'.repeat(Math.max(0, thumb - 1))}┃`
+  const track = t.design.glyphs.railVertical
+  const bar = t.design.glyphs.scrollThumb
+  const vBar = (n: number) => (n > 0 ? `${`${track}\n`.repeat(n - 1)}${track}` : '')
+  const thumbBody = `${`${bar}\n`.repeat(Math.max(0, thumb - 1))}${bar}`
   const { thumb: thumbColor, track: trackColor } = scrollbarColors(t, hover, grab !== null)
 
   const jump = (row: number, offset: number) => {

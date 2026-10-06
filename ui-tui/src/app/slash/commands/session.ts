@@ -262,7 +262,7 @@ export const sessionCommands: SlashCommand[] = [
             }
 
             if (r.summary?.headline) {
-              const prefix = r.summary.noop ? '' : '✓ '
+              const prefix = r.summary.noop ? '' : `${ctx.ui.theme.design.glyphs.check} `
 
               ctx.transcript.sys(`${prefix}${r.summary.headline}`)
 

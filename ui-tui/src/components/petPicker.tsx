@@ -157,7 +157,7 @@ export function PetPicker({ gw, maxWidth, onClose, t }: PetPickerProps) {
 
           return (
             <Text color={t.color.muted} {...chipRowProps(t, at)} key={pet.slug} wrap="truncate-end">
-              {at ? '▸ ' : '  '}
+              {at ? `${t.design.glyphs.active} ` : '  '}
               {mark} {pet.displayName}
               <Text color={at ? t.color.accent : t.color.muted}>
                 {' '}

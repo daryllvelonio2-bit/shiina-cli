@@ -27,6 +27,7 @@ import {
   pick,
   splitToolDuration,
   thinkingPreview,
+  TOOL_TRAIL_ERR,
   toolTrailLabel
 } from '../lib/text.js'
 import type { Theme } from '../theme.js'
@@ -54,8 +55,13 @@ type TreeRails = readonly boolean[]
 
 const nextTreeRails = (rails: TreeRails, branch: TreeBranch) => [...rails, branch === 'mid']
 
-const treeLead = (rails: TreeRails, branch: TreeBranch) =>
-  `${rails.map(on => (on ? '│ ' : '  ')).join('')}${branch === 'mid' ? '├─ ' : '└─ '}`
+const treeLead = (rails: TreeRails, branch: TreeBranch, t: Theme) => {
+  const g = t.design.glyphs
+  const vertical = `${g.railVertical} `
+  const corner = `${branch === 'mid' ? g.railTee : g.railElbow}${t.design.borders.rule} `
+
+  return `${rails.map(on => (on ? vertical : '  ')).join('')}${corner}`
+}
 
 // ── Primitives ───────────────────────────────────────────────────────
 
@@ -74,7 +80,7 @@ function TreeRow({
   stemDim?: boolean
   t: Theme
 }) {
-  const lead = treeLead(rails, branch)
+  const lead = treeLead(rails, branch, t)
 
   return (
     <Box>
@@ -271,7 +277,7 @@ function Chevron({
   return (
     <Box onClick={(e: any) => onClick(!!e?.shiftKey || !!e?.ctrlKey)}>
       <Text bold color={color}>
-        {open ? '▾ ' : '▸ '}
+        {`${open ? t.design.glyphs.chevronOpen : t.design.glyphs.chevronClosed} `}
         {title}
         {typeof count === 'number' ? <Text color={t.color.muted}> ({count})</Text> : ''}
         {suffix ? (
@@ -484,7 +490,7 @@ function SubagentAccordion({
               color={t.color.text}
               content={
                 <>
-                  <Text color={t.color.tool}>● </Text>
+                  <Text color={t.color.tool}>{t.design.glyphs.bullet} </Text>
                   {line}
                 </>
               }
@@ -961,7 +967,7 @@ export const ToolTrail = memo(function ToolTrail({
 
     if (parsed) {
       groups.push({
-        color: parsed.mark === '✗' ? t.color.error : t.color.text,
+        color: parsed.mark === TOOL_TRAIL_ERR ? t.color.error : t.color.text,
         content: parsed.call,
         details: [],
         key: `tr-${i}`,
@@ -970,9 +976,9 @@ export const ToolTrail = memo(function ToolTrail({
 
       if (parsed.detail) {
         pushDetail({
-          color: parsed.mark === '✗' ? t.color.error : t.color.muted,
+          color: parsed.mark === TOOL_TRAIL_ERR ? t.color.error : t.color.muted,
           content: parsed.detail,
-          dimColor: parsed.mark !== '✗',
+          dimColor: parsed.mark !== TOOL_TRAIL_ERR,
           key: `tr-${i}-d`
         })
       }
@@ -1184,7 +1190,7 @@ export const ToolTrail = memo(function ToolTrail({
           }}
         >
           <Text color={t.color.muted} dim={!thinkingLive}>
-            <Text color={t.color.accent}>{openThinking ? '▾ ' : '▸ '}</Text>
+            <Text color={t.color.accent}>{`${openThinking ? t.design.glyphs.chevronOpen : t.design.glyphs.chevronClosed} `}</Text>
             {thinkingLive ? (
               <Text bold color={t.color.accent}>
                 Thinking
@@ -1258,7 +1264,7 @@ export const ToolTrail = memo(function ToolTrail({
                   color={group.color}
                   content={
                     <>
-                      <Text color={t.color.tool}>● </Text>
+                      <Text color={t.color.tool}>{t.design.glyphs.bullet} </Text>
                       {toolLabel(group)}
                       {isDelegateGroup ? (
                         <Text color={t.color.statusFg} dim>

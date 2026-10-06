@@ -50,7 +50,9 @@ const mountTrail = (props: { busy: boolean; reasoningActive?: boolean; sections?
     stdout: stdout as unknown as NodeJS.WriteStream
   })
 
-  const finalChevronOpen = () => stripAnsi(output).lastIndexOf('▾ ') > stripAnsi(output).lastIndexOf('▸ ')
+  const finalChevronOpen = () =>
+    stripAnsi(output).lastIndexOf(`${DEFAULT_THEME.design.glyphs.chevronOpen} `) >
+    stripAnsi(output).lastIndexOf(`${DEFAULT_THEME.design.glyphs.chevronClosed} `)
 
   return { finalChevronOpen, instance, node }
 }

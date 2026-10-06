@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { wakeCommands } from '../app/slash/commands/wake.js'
 import { isWakeUserDisabled, setWakeUserDisabled } from '../app/wakeState.js'
+import { DEFAULT_THEME } from '../theme.js'
 
 const wakeCommand = wakeCommands.find(cmd => cmd.name === 'wake')!
 
@@ -25,7 +26,10 @@ const buildCtx = (results: Record<string, unknown>) => {
     guardedErr: vi.fn(),
     sid: 'sid-1',
     stale: () => false,
-    transcript: { page: vi.fn(), sys }
+    // The status line renders the active design's alert glyph, so the fake
+    // carries the real (default) theme like the live SlashRunCtx does.
+    transcript: { page: vi.fn(), sys },
+    ui: { theme: DEFAULT_THEME }
   }
 
   const run = async (arg: string) => {

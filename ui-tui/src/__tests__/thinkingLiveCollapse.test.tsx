@@ -49,13 +49,16 @@ const mountTrail = (reasoningActive: boolean, sections?: Record<string, string>)
   // The PassThrough accumulates every repaint, and a collapsed panel stops
   // repainting entirely once settled — so assert on the FINAL chevron state
   // in the accumulated output rather than the tail after a clear().
-  const finalChevronOpen = () => stripAnsi(output).lastIndexOf('▾ ') > stripAnsi(output).lastIndexOf('▸ ')
+  const openMark = `${DEFAULT_THEME.design.glyphs.chevronOpen} `
+  const closedMark = `${DEFAULT_THEME.design.glyphs.chevronClosed} `
+  const finalChevronOpen = () =>
+    stripAnsi(output).lastIndexOf(openMark) > stripAnsi(output).lastIndexOf(closedMark)
 
   return { finalChevronOpen, instance }
 }
 
 describe('ToolTrail — collapsed mode auto-expands while reasoning is live', () => {
-  it('opens (▾) when reasoningActive is true under sections.thinking: collapsed', async () => {
+  it('opens when reasoningActive is true under sections.thinking: collapsed', async () => {
     const { finalChevronOpen, instance } = mountTrail(true)
 
     await flushEffects()
@@ -66,7 +69,7 @@ describe('ToolTrail — collapsed mode auto-expands while reasoning is live', ()
     instance.cleanup()
   })
 
-  it('collapses (▸) when reasoningActive is false under sections.thinking: collapsed', async () => {
+  it('collapses when reasoningActive is false under sections.thinking: collapsed', async () => {
     const { finalChevronOpen, instance } = mountTrail(false)
 
     await flushEffects()

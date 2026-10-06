@@ -5,6 +5,7 @@ import { Component, type ReactNode } from 'react'
 import { $overlayState, patchOverlayState } from '../app/overlayStore.js'
 import { $uiTheme } from '../app/uiStore.js'
 import { recordParentLifecycle } from '../lib/parentLog.js'
+import type { Theme } from '../theme.js'
 
 import { getWidgetApp } from './registry.js'
 import type { ActiveWidget, AmbientZone, WidgetApp, WidgetInput } from './types.js'
@@ -137,7 +138,7 @@ export function dispatchWidgetInput(input: WidgetInput): boolean {
  *  card for a compact error chip and logs; the app stays registered so a
  *  hot-reloaded fix re-renders on the next state change. */
 class WidgetBoundary extends Component<
-  { appId: string; children: ReactNode; errorColor: string },
+  { appId: string; children: ReactNode; errorColor: string; glyph: string },
   { message: null | string }
 > {
   override state: { message: null | string } = { message: null }
@@ -156,7 +157,7 @@ class WidgetBoundary extends Component<
     if (this.state.message !== null) {
       return (
         <Text color={this.props.errorColor} wrap="truncate-end">
-          ⚠ /{this.props.appId}: {this.state.message}
+          {this.props.glyph} /{this.props.appId}: {this.state.message}
         </Text>
       )
     }
@@ -178,6 +179,10 @@ const useRenderCtx = (): RenderCtx => {
   return { cols: stdout?.columns ?? 80, rows: stdout?.rows ?? 24, t: t as never }
 }
 
+/** `RenderCtx.t` is typed `never` to keep the host outside the theme's type
+ *  graph; the value IS the resolved Theme. */
+const themeOf = (ctx: RenderCtx): Theme => ctx.t as unknown as Theme
+
 const renderApp = (active: ActiveWidget, ctx: RenderCtx) => {
   const app = getWidgetApp(active.appId)
 
@@ -185,10 +190,13 @@ const renderApp = (active: ActiveWidget, ctx: RenderCtx) => {
     return null
   }
 
+  const theme = themeOf(ctx)
+
   return (
     <WidgetBoundary
       appId={active.appId}
-      errorColor={(ctx.t as { color: { error: string } }).color.error}
+      errorColor={theme.color.error}
+      glyph={theme.design.glyphs.alert}
       key={active.appId}
     >
       {app.render({ ...ctx, state: active.state as never })}
@@ -276,7 +284,7 @@ export function AmbientRail({ side }: { side: 'left' | 'right' }): ReactNode {
       flexDirection="column"
       flexShrink={0}
       justifyContent="space-between"
-      paddingX={1}
+      paddingX={themeOf(ctx).design.spacing.insetPadX}
       width={ambientRailWidth(side, overlay.ambient)}
     >
       <CardStack apps={apps.filter(active => zoneOf(active).startsWith('top'))} ctx={ctx} />

@@ -50,12 +50,12 @@ describe('ToolTrail — MoA reference panel visibility (#64701)', () => {
     instance.unmount()
     instance.cleanup()
 
-    // Open chevron (▾) means the panel is still expanded once effects have
+    // The open chevron means the panel is still expanded once effects have
     // settled, as the reasoningAlwaysVisible-seeded useState value intends.
-    // A collapsed (▸) render here means the re-sync effect fired on mount
-    // and clobbered it — the exact #64701 regression.
-    expect(frame).toContain('▾ ')
+    // A collapsed render here means the re-sync effect fired on mount and
+    // clobbered it — the exact #64701 regression.
+    expect(frame).toContain(`${DEFAULT_THEME.design.glyphs.chevronOpen} `)
     expect(frame).toContain('Thinking')
-    expect(frame).not.toContain('▸ ')
+    expect(frame).not.toContain(`${DEFAULT_THEME.design.glyphs.chevronClosed} `)
   })
 })

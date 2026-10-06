@@ -284,7 +284,7 @@ function OverlaySection({
     <Box flexDirection="column" marginTop={1}>
       <Box onClick={() => toggleOverlaySection(title, defaultOpen)}>
         <Text color={t.color.label}>
-          <Text color={t.color.accent}>{open ? '▾ ' : '▸ '}</Text>
+          <Text color={t.color.accent}>{`${open ? t.design.glyphs.chevronOpen : t.design.glyphs.chevronClosed} `}</Text>
           {title}
           {typeof count === 'number' ? ` (${count})` : ''}
         </Text>

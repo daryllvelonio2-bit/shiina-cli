@@ -155,6 +155,20 @@ design:
     focus: "◉"            # focus-view badge
     idle: "✓"             # idle clock / turn finished
     resume: "↩"           # "resumes when the subagent finishes" hint
+    alert: "⚠"            # attention: an approval, a destructive confirm
+    blocked: "⊘"          # a refused / rejected request
+    busy: "⏳"             # work in progress: the busy tab, a scheduled change
+    checkboxOn: "☑"       # a checked checklist item
+    checkboxOff: "☐"      # an unchecked checklist item
+    disclosure: "▶"       # opens a collapsible block (`<summary>`)
+    dot: "•"              # a markdown list item / masked input
+    halt: "■"             # interrupted / cancelled
+    partial: "◐"          # partially complete (a subagent finalizing)
+    timeout: "⌛"          # timed out
+    railVertical: "│"     # a vertical line: tree rails, blockquote rail, scroll track
+    railTee: "├"          # a tree rail that continues below the row
+    railElbow: "└"        # a tree rail that ends at the row
+    scrollThumb: "┃"      # the scrollbar thumb (a heavier vertical than the track)
 
   status_bar:
     # Order AND allowlist. Omit the key (or set null) for the built-in set.

@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { DEFAULT_GLYPHS } from '../design.js'
 import { composeTabTitle, fmtCwdBranch, fmtProjectCwdBranch, shortCwd, shortProject } from '../domain/paths.js'
+
+// The tab-title markers the app passes in (`useMainApp` reads the same tokens),
+// so the fixtures move with the built-in vocabulary instead of pinning it.
+const IDLE_MARK = DEFAULT_GLYPHS.idle
+const BUSY_MARK = DEFAULT_GLYPHS.busy
 
 describe('shortCwd', () => {
   const origHome = process.env.HOME
@@ -105,40 +111,44 @@ describe('fmtProjectCwdBranch', () => {
 
 describe('composeTabTitle', () => {
   it('joins marker, name, model, and cwd in order', () => {
-    expect(composeTabTitle('✓', 'auth refactor', 'opus-4', '~/proj')).toBe('✓ auth refactor · opus-4 · ~/proj')
+    expect(composeTabTitle(IDLE_MARK, 'auth refactor', 'opus-4', '~/proj')).toBe(
+      `${IDLE_MARK} auth refactor · opus-4 · ~/proj`
+    )
   })
 
   it('glues the marker to the first segment with a space, not a separator', () => {
-    expect(composeTabTitle('⏳', 'my session', 'opus-4', '~/proj').startsWith('⏳ my session')).toBe(true)
+    const out = composeTabTitle(BUSY_MARK, 'my session', 'opus-4', '~/proj')
+
+    expect(out.startsWith(`${BUSY_MARK} my session`)).toBe(true)
   })
 
   it('omits the session name when empty (matches the pre-name format)', () => {
-    expect(composeTabTitle('✓', '', 'opus-4', '~/proj')).toBe('✓ opus-4 · ~/proj')
+    expect(composeTabTitle(IDLE_MARK, '', 'opus-4', '~/proj')).toBe(`${IDLE_MARK} opus-4 · ~/proj`)
   })
 
   it('treats a whitespace-only name as absent', () => {
-    expect(composeTabTitle('✓', '   ', 'opus-4', '~/proj')).toBe('✓ opus-4 · ~/proj')
+    expect(composeTabTitle(IDLE_MARK, '   ', 'opus-4', '~/proj')).toBe(`${IDLE_MARK} opus-4 · ~/proj`)
   })
 
   it('omits the cwd when empty', () => {
-    expect(composeTabTitle('✓', 'my session', 'opus-4', '')).toBe('✓ my session · opus-4')
+    expect(composeTabTitle(IDLE_MARK, 'my session', 'opus-4', '')).toBe(`${IDLE_MARK} my session · opus-4`)
   })
 
   it('falls back to just the marker when only the marker is present', () => {
-    expect(composeTabTitle('✓', '', '', '')).toBe('✓')
+    expect(composeTabTitle(IDLE_MARK, '', '', '')).toBe(IDLE_MARK)
   })
 
   it('truncates an over-long session name with an ellipsis', () => {
     const long = 'a'.repeat(40)
-    const out = composeTabTitle('✓', long, 'opus-4', '', 28)
-    const namePart = out.slice('✓ '.length).split(' · ')[0]
+    const out = composeTabTitle(IDLE_MARK, long, 'opus-4', '', 28)
+    const namePart = out.slice(`${IDLE_MARK} `.length).split(' · ')[0]
     expect(namePart.endsWith('…')).toBe(true)
     expect(namePart.length).toBe(28)
   })
 
   it('keeps a name at the boundary length intact', () => {
     const name = 'b'.repeat(28)
-    const out = composeTabTitle('✓', name, 'opus-4', '', 28)
-    expect(out).toBe(`✓ ${name} · opus-4`)
+    const out = composeTabTitle(IDLE_MARK, name, 'opus-4', '', 28)
+    expect(out).toBe(`${IDLE_MARK} ${name} · opus-4`)
   })
 })

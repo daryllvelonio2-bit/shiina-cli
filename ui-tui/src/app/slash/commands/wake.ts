@@ -27,7 +27,7 @@ const startFailureLine = (r: WakeStartResponse): string => {
   return `wake: not started — ${base}${owner}${hint}`
 }
 
-const statusLine = (r: WakeStatusResponse): string => {
+const statusLine = (r: WakeStatusResponse, warn: string): string => {
   const phrase = r.phrase ? ` for “${r.phrase}”` : ''
   const provider = r.provider ? ` · ${r.provider}` : ''
 
@@ -35,7 +35,7 @@ const statusLine = (r: WakeStatusResponse): string => {
     if (r.audio_silent) {
       const hint = r.hint?.trim() ? ` — ${r.hint.trim()}` : ''
 
-      return `wake: listening${phrase}${provider} · ⚠ mic delivers only silence${hint}`
+      return `wake: listening${phrase}${provider} · ${warn} mic delivers only silence${hint}`
     }
 
     return `wake: listening${phrase}${provider}`
@@ -104,7 +104,7 @@ const runOff = (ctx: SlashRunCtx): void => {
 const runStatus = (ctx: SlashRunCtx): void => {
   ctx.gateway
     .rpc<WakeStatusResponse>('wake.status', {})
-    .then(ctx.guarded<WakeStatusResponse>(r => ctx.transcript.sys(statusLine(r))))
+    .then(ctx.guarded<WakeStatusResponse>(r => ctx.transcript.sys(statusLine(r, ctx.ui.theme.design.glyphs.alert))))
     .catch(ctx.guardedErr)
 }
 
