@@ -20097,6 +20097,63 @@ def test_get_usage_perf_readouts_guard_negative_latency():
     assert "avg_tps" not in usage
 
 
+# ── _get_usage limits_label (TUI status-bar provider-quota parity) ────────
+# The Ink status rule renders the classic CLI bar's provider-quota read-out
+# (`5h 0% (1m) · w 17% (13h 33m)`) in its ctx slot. Source of truth is the SAME
+# non-blocking TTL cache the CLI bar reads (`shiina_cli.status_bar_limits`), so
+# the two surfaces can never disagree; the field rides the existing `usage`.
+
+
+def _limits_agent(**kw):
+    class _A:
+        model = "gpt-5"
+        provider = "openai"
+        base_url = "https://api.openai.com/v1"
+        api_key = "sk-x"
+
+    for key, value in kw.items():
+        setattr(_A, key, value)
+    return _A()
+
+
+def test_get_usage_limits_label_present_when_cached(monkeypatch):
+    """A cached snapshot renders its plain-text label verbatim (styled=False)."""
+    from shiina_cli import status_bar_limits as sbl
+
+    snapshot = object()
+    monkeypatch.setattr(sbl, "resolve_provider_for_model", lambda *_a, **_k: "openai")
+    monkeypatch.setattr(sbl, "get_cached_account_limits", lambda *_a, **_k: snapshot)
+    monkeypatch.setattr(sbl, "format_limits_compact", lambda *_a, **_k: ([], "5h 70% (1m) · w 17% (13h 33m)"))
+
+    assert server._get_usage(_limits_agent())["limits_label"] == "5h 70% (1m) · w 17% (13h 33m)"
+
+
+def test_get_usage_limits_label_omitted_without_provider_or_label(monkeypatch):
+    """No resolvable provider, no cached snapshot, or an empty label omits the key."""
+    from shiina_cli import status_bar_limits as sbl
+
+    monkeypatch.setattr(sbl, "resolve_provider_for_model", lambda *_a, **_k: None)
+    assert "limits_label" not in server._get_usage(_limits_agent(provider=None))
+
+    monkeypatch.setattr(sbl, "resolve_provider_for_model", lambda *_a, **_k: "openai")
+    monkeypatch.setattr(sbl, "get_cached_account_limits", lambda *_a, **_k: None)
+    monkeypatch.setattr(sbl, "format_limits_compact", lambda *_a, **_k: ([], ""))
+    assert "limits_label" not in server._get_usage(_limits_agent())
+
+
+def test_get_usage_limits_label_fails_open(monkeypatch):
+    """A limits failure must never break usage reporting (status-bar readout)."""
+    from shiina_cli import status_bar_limits as sbl
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("quota endpoint down")
+
+    monkeypatch.setattr(sbl, "resolve_provider_for_model", _boom)
+    usage = server._get_usage(_limits_agent())
+    assert "limits_label" not in usage
+    assert usage["model"] == "gpt-5"
+
+
 def test_get_usage_includes_active_subagents(monkeypatch):
     import tools.async_delegation as ad_mod
     monkeypatch.setattr(ad_mod, "active_count", lambda: 4)

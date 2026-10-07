@@ -634,6 +634,7 @@ export interface Usage {
   dev_credits_spent_micros?: number | null
   cost_usd?: number | null
   cost_status?: string | null
+  limits_label?: string | null
   [key: string]: unknown
 }
 export interface McpServerStatus {
@@ -2819,6 +2820,7 @@ export interface SessionUsageResult {
   dev_credits_spent_micros?: number | null
   cost_usd?: number | null
   cost_status?: string | null
+  limits_label?: string | null
   credits_lines?: string[] | null
   [key: string]: unknown
 }

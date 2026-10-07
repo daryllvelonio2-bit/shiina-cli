@@ -40,6 +40,7 @@ class Usage(OpenModel):
     dev_credits_spent_micros: int | None = None
     cost_usd: float | None = None
     cost_status: str | None = None
+    limits_label: str | None = None
 
 
 class ProjectRef(Result):

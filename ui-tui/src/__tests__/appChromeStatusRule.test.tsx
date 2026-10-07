@@ -567,3 +567,50 @@ describe('StatusRule perf read-outs (cache hit / latency / tps)', () => {
     expect(textContent(element)).not.toContain('weekly-digest')
   })
 })
+
+// The ctx slot renders the provider-quota read-out (classic-CLI parity,
+// `shiina_cli.status_bar_limits.format_limits_compact`) when the backend
+// supplies one, and the context-window read-out otherwise. Only the value in
+// the slot swaps — the fill bar and its percentage keep the window's numbers.
+describe('StatusRule provider-quota ctx slot', () => {
+  const LIMITS = '5h 70% (1m) · w 17% (13h 33m)'
+
+  it('replaces the context-window read-out with the quota label', () => {
+    const element = StatusRule({ ...baseProps, cols: 160, usage: { ...baseProps.usage, limits_label: LIMITS } })
+    const rendered = textContent(element)
+
+    expect(rendered).toContain(LIMITS)
+    expect(rendered).not.toContain('50k/200k')
+    // The bar + its % stay the window's own occupancy (25% of 200k).
+    expect(rendered).toContain('25%')
+  })
+
+  it('falls back to the context-window read-out without a label', () => {
+    const rendered = textContent(StatusRule({ ...baseProps, cols: 160 }))
+
+    expect(rendered).toContain('50k/200k')
+    expect(rendered).toContain('25%')
+  })
+
+  it('ignores the label on the compact tier, where the bar is dropped too', () => {
+    const rendered = textContent(
+      StatusRule({ ...baseProps, cols: 60, usage: { ...baseProps.usage, limits_label: LIMITS } })
+    )
+
+    expect(rendered).not.toContain(LIMITS)
+    expect(rendered).toContain('50k tok')
+  })
+
+  it('honors the fields filter that hides the ctx slot', () => {
+    const rendered = textContent(
+      StatusRule({
+        ...baseProps,
+        cols: 160,
+        statusBarFields: new Set(['model']),
+        usage: { ...baseProps.usage, limits_label: LIMITS }
+      })
+    )
+
+    expect(rendered).not.toContain(LIMITS)
+  })
+})

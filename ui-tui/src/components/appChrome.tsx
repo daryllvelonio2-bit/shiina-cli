@@ -470,16 +470,23 @@ export function StatusRule({
 
   // On narrow terminals the context read-out collapses to a bare token count
   // (`12k tok`) and the visual fill bar is dropped entirely.
-  const ctxLabel =
-    ok('context_detail') || ok('context_pct')
-      ? usage.context_max
-        ? segs.compactCtx
-          ? `${contextMark}${compactNumber(usage.context_used ?? 0)} tok`
-          : `${contextMark}${compactNumber(usage.context_used ?? 0)}/${compactNumber(usage.context_max ?? 0)}`
-        : (usage.total ?? 0) > 0
-          ? `${compactNumber(usage.total)} tok`
-          : ''
+  //
+  // The value itself is the provider-quota read-out when one is cached
+  // (classic-CLI parity: `5h 0% (1m) · w 17% (13h 33m)`, from
+  // `shiina_cli.status_bar_limits.format_limits_compact`), else the context
+  // window read-out. Only the value swaps — the bar and its % below keep
+  // rendering the window's own numbers.
+  const ctxSlotOn = ok('context_detail') || ok('context_pct')
+  const limitsLabel =
+    ctxSlotOn && !segs.compactCtx && typeof usage.limits_label === 'string' ? usage.limits_label.trim() : ''
+  const windowLabel = usage.context_max
+    ? segs.compactCtx
+      ? `${contextMark}${compactNumber(usage.context_used ?? 0)} tok`
+      : `${contextMark}${compactNumber(usage.context_used ?? 0)}/${compactNumber(usage.context_max ?? 0)}`
+    : (usage.total ?? 0) > 0
+      ? `${compactNumber(usage.total)} tok`
       : ''
+  const ctxLabel = !ctxSlotOn ? '' : limitsLabel || windowLabel
 
   const bar = !segs.compactCtx && usage.context_max && ok('context_pct') ? ctxBar(pct, t.design.glyphs) : ''
   const modelText = modelLabel(model, modelReasoningEffort, modelFast)

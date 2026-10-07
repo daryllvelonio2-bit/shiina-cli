@@ -1954,6 +1954,22 @@ def _get_usage(agent) -> dict:
             spent = agent.get_credits_spent_micros()
             if spent is not None:
                 usage["dev_credits_spent_micros"] = int(spent)
+    # Provider quota limits + reset times (classic-CLI status-bar parity): the same non-blocking
+    # TTL cache the CLI bar reads, so the TUI shows `5h 0% (1m) · w 17% (13h 33m)` instead of
+    # only the context-window read-out. Never blocks: a cold cache renders nothing for a tick
+    # and the daemon thread's `on_update` repaints when fresh data lands.
+    with contextlib.suppress(Exception):
+        from shiina_cli.status_bar_limits import get_cached_account_limits, format_limits_compact, resolve_provider_for_model
+        provider = resolve_provider_for_model(getattr(agent, "provider", None), getattr(agent, "model", None))
+        if provider:
+            snap = get_cached_account_limits(
+                provider, model=getattr(agent, "model", None),
+                base_url=getattr(agent, "base_url", None), api_key=getattr(agent, "api_key", None),
+                account_id=getattr(agent, "_credential_pool_entry_id", None),
+            )
+            label = (format_limits_compact(snap, model=getattr(agent, "model", None), styled=False)[1] or "").strip()
+            if label:
+                usage["limits_label"] = label
     return usage
 
 
