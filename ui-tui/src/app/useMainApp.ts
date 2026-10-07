@@ -358,6 +358,68 @@ export function useMainApp(gw: GatewayClient) {
     return next
   }, [])
 
+  // Dynamic windowing of history rows:
+  // Show the last 10 conversation turns initially so the viewport stays snappy and uncluttered.
+  // When the user scrolls near the top of the loaded window, dynamically expand by 20 more turns.
+  const INITIAL_TURNS = 10
+  const EXPAND_TURNS = 20
+  const [loadedTurns, setLoadedTurns] = useState(INITIAL_TURNS)
+
+  // Identify conversation turn start boundaries (user messages or top-level commands)
+  const turnIndices = useMemo(() => {
+    const indices: number[] = []
+    for (let i = 0; i < historyItems.length; i++) {
+      const msg = historyItems[i]!
+      if (msg.role === 'user' || (msg.kind && msg.kind !== 'intro')) {
+        indices.push(i)
+      }
+    }
+    return indices
+  }, [historyItems])
+
+  // Subscribe to scroll position to dynamically expand loaded turns when scrolling near the top
+  useEffect(() => {
+    const s = scrollRef.current
+    if (!s) return
+
+    return s.subscribe(() => {
+      if (s.isSticky()) return
+      const top = s.getScrollTop()
+      // If user scrolls within 5 rows of top and we have more older turns, load 20 more
+      if (top <= 5 && turnIndices.length > loadedTurns) {
+        setLoadedTurns(prev => Math.min(turnIndices.length, prev + EXPAND_TURNS))
+      }
+    })
+  }, [loadedTurns, turnIndices])
+
+  // Reset or cap loadedTurns when history items change significantly
+  useEffect(() => {
+    if (turnIndices.length <= INITIAL_TURNS && loadedTurns !== INITIAL_TURNS) {
+      setLoadedTurns(INITIAL_TURNS)
+    }
+  }, [turnIndices.length, loadedTurns])
+
+  const visibleHistoryItems = useMemo(() => {
+    if (turnIndices.length <= loadedTurns) {
+      return historyItems
+    }
+    // Take the start index of the earliest turn within the window
+    const turnIndexToKeep = turnIndices[turnIndices.length - loadedTurns] ?? 0
+    return historyItems.slice(turnIndexToKeep)
+  }, [historyItems, loadedTurns, turnIndices])
+
+  // Reset loadedTurns back to INITIAL_TURNS when user returns to sticky bottom
+  useEffect(() => {
+    const s = scrollRef.current
+    if (!s) return
+
+    return s.subscribe(() => {
+      if (s.isSticky() && loadedTurns > INITIAL_TURNS) {
+        setLoadedTurns(INITIAL_TURNS)
+      }
+    })
+  }, [loadedTurns])
+
   // Wrapped row heights are width-dependent. Cached layout outlives a resize
   // and lands sticky-scroll at the stale max, cutting off the tail. The
   // hook's "scale heights by oldCols/newCols" path is too approximate for
@@ -365,8 +427,8 @@ export function useMainApp(gw: GatewayClient) {
   // off live geometry. Cost: per-row local state (e.g. systemOpen toggles)
   // resets on resize; small UX hit for a hard correctness win.
   const virtualRows = useMemo<TranscriptRow[]>(
-    () => historyItems.map((msg, index) => ({ index, key: `${messageId(msg)}:c${cols}`, msg })),
-    [cols, historyItems, messageId]
+    () => visibleHistoryItems.map((msg, index) => ({ index, key: `${messageId(msg)}:c${cols}`, msg })),
+    [cols, visibleHistoryItems, messageId]
   )
 
   const detailsLayoutKey = useMemo(() => {
