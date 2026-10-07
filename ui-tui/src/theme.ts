@@ -310,17 +310,17 @@ export interface ThemeSeeds {
 }
 
 const DIFF_DARK = {
-  diffAdded: 'rgb(220,255,220)',
-  diffRemoved: 'rgb(255,220,220)',
-  diffAddedWord: 'rgb(36,138,61)',
-  diffRemovedWord: 'rgb(207,34,46)'
+  diffAdded: 'rgb(28,46,36)',
+  diffRemoved: 'rgb(50,29,36)',
+  diffAddedWord: 'rgb(134,239,172)',
+  diffRemovedWord: 'rgb(252,165,165)'
 }
 
 const DIFF_LIGHT = {
-  diffAdded: 'rgb(200,240,200)',
-  diffRemoved: 'rgb(240,200,200)',
-  diffAddedWord: 'rgb(27,94,32)',
-  diffRemovedWord: 'rgb(183,28,28)'
+  diffAdded: 'rgb(220,245,225)',
+  diffRemoved: 'rgb(254,226,226)',
+  diffAddedWord: 'rgb(22,101,52)',
+  diffRemovedWord: 'rgb(153,27,27)'
 }
 
 export function buildPalette(seeds: ThemeSeeds, isLight: boolean): ThemeColors {

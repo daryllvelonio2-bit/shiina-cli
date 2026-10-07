@@ -826,6 +826,7 @@ function MdImpl({ cols, compact, t, text }: MdProps) {
               return (
                 <Text
                   backgroundColor={add ? t.color.diffAdded : del ? t.color.diffRemoved : undefined}
+                  bold={add || del}
                   color={add ? t.color.diffAddedWord : del ? t.color.diffRemovedWord : hunk ? t.color.muted : undefined}
                   dimColor={isDiff && !add && !del && !hunk && l.startsWith(' ')}
                   key={j}
