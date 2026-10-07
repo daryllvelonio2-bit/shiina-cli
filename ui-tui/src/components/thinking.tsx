@@ -828,16 +828,10 @@ export const ToolTrail = memo(function ToolTrail({
   )
 
   const thinkingDefaultExpanded =
-    visible.thinking === 'expanded' && (preferExpandedThinking || commandOverride || sections?.thinking === 'expanded')
+    commandOverride || sections?.thinking === 'expanded'
 
-  // Tool panels get the same live-only gate reasoning has. Before, `visible.tools`
-  // resolved to 'expanded' for EVERY row (SECTION_DEFAULTS), so every past message
-  // in the conversation rendered its whole tool list open — that is the clutter.
-  // Only the set being worked on opens; a settled set stays behind its chevron,
-  // and closing it when the next set starts is then automatic (each settled set is
-  // its own row with `preferExpandedThinking` false, so it mounts collapsed).
   const toolsDefaultExpanded =
-    visible.tools === 'expanded' && (preferExpandedThinking || commandOverride || sections?.tools === 'expanded')
+    commandOverride || sections?.tools === 'expanded'
 
   // An explicit `/details` expand or design maxLines=null/0 shows the whole chain of thought;
   // otherwise respect the design's maxLines (defaults to undefined = full/unlimited).
@@ -850,6 +844,7 @@ export const ToolTrail = memo(function ToolTrail({
         : designMaxLines ?? undefined
 
   const [now, setNow] = useState(() => Date.now())
+  const [userToggledOpen, setUserToggledOpen] = useState<boolean | null>(null)
   // Local toggles own the open state once mounted.  Init from the resolved
   // section visibility so default-expanded sections (thinking/tools) render
   // open on first paint; the useEffect below re-syncs when the user mutates
@@ -927,7 +922,7 @@ export const ToolTrail = memo(function ToolTrail({
     if (visible.tools !== 'collapsed') return
     if (tools.length > 0 && busy) {
       setOpenTools(true)
-    } else if (!busy) {
+    } else {
       setOpenTools(false)
     }
   }, [visible.tools, tools.length, busy])
@@ -935,26 +930,19 @@ export const ToolTrail = memo(function ToolTrail({
     const finished = wasBusy.current && !busy
     wasBusy.current = busy
 
+    if (finished) {
+      setUserToggledOpen(null)
+    }
+
     if (!finished) {
       return
     }
 
-    if (thinkingAuto || !thinkingDefaultExpanded) {
-      setOpenThinking(false)
-    }
-
-    if (!toolsDefaultExpanded) {
-      setOpenTools(false)
-    }
-
-    if (visible.subagents !== 'expanded') {
-      setOpenSubagents(false)
-      setDeepSubagents(false)
-    }
-
-    if (visible.activity !== 'expanded') {
-      setOpenMeta(false)
-    }
+    setOpenThinking(false)
+    setOpenTools(false)
+    setOpenSubagents(false)
+    setDeepSubagents(false)
+    setOpenMeta(false)
   }, [busy, thinkingAuto, visible])
 
   const cot = useMemo(() => thinkingPreview(reasoning, 'full', THINKING_COT_MAX), [reasoning])
@@ -1393,16 +1381,19 @@ export const ToolTrail = memo(function ToolTrail({
     })
   }
 
-  if (panels.length > 0) {
-    const isSingleSetOpen = openThinking || openTools || openSubagents || openMeta
+  if (panels.length === 0) {
+    return null
+  }
+  const isSingleSetOpen =
+    userToggledOpen !== null
+      ? userToggledOpen
+      : busy
+        ? openThinking || openTools || openSubagents || openMeta
+        : false
 
-    const toggleUnified = () => {
-      const next = !isSingleSetOpen
-      if (hasThinking) setOpenThinking(next)
-      if (hasTools) setOpenTools(next)
-      if (hasSubagents) setOpenSubagents(next)
-      if (activity.length > 0) setOpenMeta(next)
-    }
+  const toggleUnified = () => {
+    setUserToggledOpen(prev => !(prev !== null ? prev : isSingleSetOpen))
+  }
 
     const unifiedSummary = [
       hasThinking ? (thinkingTokensLabel || 'Thinking') : null,
@@ -1421,67 +1412,41 @@ export const ToolTrail = memo(function ToolTrail({
       return busy ? 'In progress' : 'Steps'
     })()
 
-    return (
-      <Box flexDirection="column">
-        <TreeNode
-          branch="last"
-          header={
-            <Box onClick={toggleUnified}>
-              <Text color={t.color.muted} dim={!busy}>
-                <Text color={t.color.accent}>
-                  {headerLead(t.design.header, isSingleSetOpen, t.design.glyphs)}
-                </Text>
-                <Text {...headerEmphasis(t.design.header)} color={t.color.accent}>
-                  {headerLabel(t.design.header, unifiedTitle)}
-                </Text>
-                {unifiedSummary ? (
-                  <Text color={t.color.statusFg} dim>
-                    {'  '}({unifiedSummary})
-                  </Text>
-                ) : null}
-              </Text>
-            </Box>
-          }
-          key="unified-set"
-          open={isSingleSetOpen}
-          t={t}
-        >
-          {rails => (
-            <Box flexDirection="column">
-              {panels.map(panel => (
-                <Box flexDirection="column" key={panel.key}>
-                  {panel.render(rails)}
-                </Box>
-              ))}
-            </Box>
-          )}
-        </TreeNode>
-        {outcome ? (
-          <Box marginTop={1}>
-            <Text color={t.color.muted} dim>
-              {t.design.glyphs.dotSeparator.trim()} {outcome}
-            </Text>
-          </Box>
-        ) : null}
-      </Box>
-    )
-  }
-
-  const topCount = panels.length
-
   return (
     <Box flexDirection="column">
-      {panels.map((panel, index) => (
-        <TreeNode
-          branch={index === topCount - 1 ? 'last' : 'mid'}
-          header={panel.header}
-          key={panel.key}
-          open={panel.open}
-          t={t}
-        >
-          {panel.render}
-        </TreeNode>
-      ))}
+      <TreeNode
+        branch="last"
+        header={
+          <Box onClick={toggleUnified}>
+            <Text color={t.color.muted} dim={!busy}>
+              <Text color={t.color.accent}>
+                {headerLead(t.design.header, isSingleSetOpen, t.design.glyphs)}
+              </Text>
+              <Text {...headerEmphasis(t.design.header)} color={t.color.accent}>
+                {headerLabel(t.design.header, unifiedTitle)}
+              </Text>
+              {unifiedSummary ? (
+                <Text color={t.color.statusFg} dim>
+                  {'  '}({unifiedSummary})
+                </Text>
+              ) : null}
+            </Text>
+          </Box>
+        }
+        key="unified-set"
+        open={isSingleSetOpen}
+        t={t}
+      >
+        {rails => (
+          <Box flexDirection="column">
+            {panels.map(panel => (
+              <Box flexDirection="column" key={panel.key}>
+                {panel.render(rails)}
+              </Box>
+            ))}
+          </Box>
+        )}
+      </TreeNode>
       {outcome ? (
         <Box marginTop={1}>
           <Text color={t.color.muted} dim>
