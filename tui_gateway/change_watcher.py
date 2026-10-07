@@ -18,7 +18,8 @@ def resolve_design() -> dict:
     ``ui.theme`` referentially stable when no design is worn.
     """
     try:
-        from shiina_cli.design_engine import init_design_from_config, resolve_design_payload
+        from shiina_cli.design_engine import init_design_from_config, reset_cache, resolve_design_payload
+        reset_cache()
         init_design_from_config(_load_cfg())
         return resolve_design_payload()
     except Exception:
@@ -109,7 +110,8 @@ def _skin_sig() -> tuple:
         from shiina_cli.design_engine import design_signature, init_design_from_config
         init_design_from_config(_load_cfg())
         design = design_signature()
-    return name, _watcher_mtime_ns(_watcher_home() / "skins" / f"{name}.yaml"), dynamic, design
+        return name, _watcher_mtime_ns(_watcher_home() / "skins" / f"{name}.yaml"), dynamic, design
+    return name, _watcher_mtime_ns(_watcher_home() / "skins" / f"{name}.yaml"), dynamic, ()
 
 
 def _note_skin_broadcast() -> None:

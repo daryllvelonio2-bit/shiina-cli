@@ -433,6 +433,12 @@ def design_signature() -> Tuple[str, Optional[int]]:
             stamps.append(path.stat().st_mtime_ns)
         except OSError:
             pass
+    builtin_path = _builtin_designs_dir() / f"{name}.yaml"
+    if builtin_path.is_file():
+        try:
+            stamps.append(builtin_path.stat().st_mtime_ns)
+        except OSError:
+            pass
     try:
         stamps.append(_designs_dir().stat().st_mtime_ns)
     except OSError:

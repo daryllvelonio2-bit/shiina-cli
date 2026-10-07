@@ -2369,6 +2369,30 @@ class CLICommandsMixin:
         if self._apply_tui_skin_style():
             print("  Prompt + TUI colors updated.")
 
+    def _handle_design_command(self, cmd: str):
+        """Handle /design [name] — show or change the active TUI design."""
+        from shiina_cli.design_engine import list_designs, set_active_design, get_active_design_name, reset_cache
+        new_design = _command_arg(cmd).lower()
+        if not new_design:
+            current = get_active_design_name()
+            _pr(f"\n  Current design: {current}", "  Available designs:")
+            for d in list_designs():
+                marker = " ●" if d["name"] == current else "  "
+                source = f" ({d['source']})" if d.get("source") == "user" else ""
+                print(f"   {marker} {d['name']}{source} — {d.get('description', '')}")
+            return _pr("\n  Usage: /design <name>",
+                       f"  Custom designs: drop a YAML file in {display_shiina_home()}/designs/\n")
+        available = {d["name"] for d in list_designs()}
+        if new_design not in available:
+            return _pr(f"  Unknown design: {new_design}",
+                       f"  Available: {', '.join(sorted(available))}")
+        reset_cache()
+        set_active_design(new_design)
+        saved = " (saved)" if _save("display.design", new_design) else ""
+        _pr(f"  Design set to: {new_design}{saved}")
+        if self._apply_tui_skin_style():
+            print("  Prompt + TUI style updated.")
+
     def _compose_in_editor(self, initial_text: str = "") -> str:
         """Open ``$VISUAL``/``$EDITOR`` on a temp markdown file and return the saved buffer with
         ``#!`` comment lines stripped; "" if the editor failed or the buffer was left empty.

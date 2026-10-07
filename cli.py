@@ -3261,6 +3261,7 @@ class ShiinaCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         "history": ("show_history", False), "title": ("_cmd_title", True), "name": ("_cmd_title", True), "new": ("_cmd_new", True),
         "model": ("_handle_model_switch", True), "codex-runtime": ("_handle_codex_runtime", True),
         "retry": ("_cmd_retry", True), "prompt": ("_handle_prompt_compose_command", True),
+ "design": ("_handle_design_command", True),
         "undo": ("_cmd_undo", True), "save": ("save_conversation", True), "skills": ("_cmd_skills", True),
         "platforms": ("_show_gateway_status", False), "status": ("_show_session_status", False),
         "context": ("_show_context_breakdown", True), "egress": ("_cmd_egress", True),

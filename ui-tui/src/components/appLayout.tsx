@@ -429,7 +429,7 @@ const ComposerPane = memo(function ComposerPane({
                   )}
                 </Box>
 
-                <Text color={ui.theme.color.text}>{line || ' '}</Text>
+                <Text color={ui.theme.color.prompt}>{line || ' '}</Text>
               </Box>
             ))}
 
@@ -454,7 +454,7 @@ const ComposerPane = memo(function ComposerPane({
                 {/* Reserve the transcript scrollbar gutter too so typing never rewraps when the scrollbar column repaints. */}
                 <TextInput
                   accentColor={ui.theme.color.accent}
-                  color={ui.theme.color.text}
+                  color={ui.theme.color.prompt}
                   columns={inputColumns}
                   cursorSnapshotRef={cursorSnapshotRef}
                   mouseApiRef={inputMouseRef}

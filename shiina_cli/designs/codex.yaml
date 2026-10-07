@@ -22,8 +22,8 @@ colors:
   label: "#8fd694"
   muted: "#8b8b8b"           # genuinely dim — Codex leans on this hard
   ok: "#8fd694"
-  primary: "#8fd694"
-  prompt: "#8fd694"
+  primary: ""
+  prompt: ""
   selectionBg: "#3a3a3a"
   sessionBorder: "#4b4b4b"
   sessionLabel: "#9ca3af"
