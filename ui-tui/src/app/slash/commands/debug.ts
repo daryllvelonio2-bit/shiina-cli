@@ -39,7 +39,7 @@ export const debugCommands: SlashCommand[] = [
           ...errors.map(e => `${e.file}: ${e.message}`)
         ]
 
-        ctx.transcript.sys(`widgets — ${parts.join(' · ')}`)
+        ctx.transcript.sys(`widgets — ${parts.join(ctx.ui.theme.design.glyphs.dotSeparator)}`)
       })
     }
   },

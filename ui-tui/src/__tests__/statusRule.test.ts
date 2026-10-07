@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import { DEFAULT_GLYPHS } from '../design.js'
 import type { StatusBarSegments } from '../components/appChrome.js'
 import { busyIndicatorWidth, statusBarSegments, statusRuleWidths } from '../components/appChrome.js'
+
+const SEP = DEFAULT_GLYPHS.dotSeparator
 
 describe('statusRuleWidths', () => {
   it('keeps the status rule within the terminal width', () => {
@@ -119,13 +122,13 @@ describe('busyIndicatorWidth', () => {
   it('reserves a bare spinner for the verb-less unicode style', () => {
     // unicode is a 1-col braille spinner with no verb; far slimmer than the
     // kaomoji face which carries a wide glyph + rotating verb.
-    expect(busyIndicatorWidth('unicode', false)).toBeLessThan(busyIndicatorWidth('kaomoji', false))
-    expect(busyIndicatorWidth('unicode', false)).toBe(1)
+    expect(busyIndicatorWidth('unicode', false, SEP)).toBeLessThan(busyIndicatorWidth('kaomoji', false, SEP))
+    expect(busyIndicatorWidth('unicode', false, SEP)).toBe(1)
   })
 
   it('reserves room for the elapsed-time tail only when a turn is timed', () => {
     for (const style of ['kaomoji', 'emoji', 'ascii', 'unicode'] as const) {
-      expect(busyIndicatorWidth(style, true)).toBeGreaterThan(busyIndicatorWidth(style, false))
+      expect(busyIndicatorWidth(style, true, SEP)).toBeGreaterThan(busyIndicatorWidth(style, false, SEP))
     }
   })
 })

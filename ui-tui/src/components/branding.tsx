@@ -412,10 +412,10 @@ export function SessionPanel({ info, maxWidth, sid, t }: SessionPanelProps) {
 
       <Text color={t.color.text}>
         {/* Lazy boot: never print "0 tools · 0 skills" while counts load. */}
-        {info.lazy && !toolsTotal ? '… ' : `${toolsTotal} `}tools{' · '}
+        {info.lazy && !toolsTotal ? '… ' : `${toolsTotal} `}tools{t.design.glyphs.dotSeparator}
         {info.lazy && !skillsTotal ? '… ' : `${skillsTotal} `}skills
-        {mcpConnected ? ` · ${mcpConnected} MCP` : ''}
-        {' · '}
+        {mcpConnected ? `${t.design.glyphs.dotSeparator}${mcpConnected} MCP` : ''}
+        {t.design.glyphs.dotSeparator}
         <Text color={t.color.muted}>/help for commands</Text>
       </Text>
 

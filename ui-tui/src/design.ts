@@ -57,6 +57,15 @@ export interface DesignGlyphs {
   active: string
   /** Status-rule segment separator (includes its own spacing). */
   separator: string
+  /** Inline separator between display segments — compact meta lines, list
+   *  joins (`d2 · 7 agents`). Includes its own spacing, like `separator`. */
+  dotSeparator: string
+  /** A filled meter cell (usage / context bars). */
+  barFill: string
+  /** The unfilled remainder of a meter. */
+  barEmpty: string
+  /** Major tick on a timeline ruler. */
+  rulerTick: string
   /** Leading status-rule dash (includes its trailing space). */
   statusHead: string
   /** Subagent/delegation count. */
@@ -120,6 +129,8 @@ export interface DesignGlyphs {
 export const DEFAULT_GLYPHS: DesignGlyphs = {
   active: '▸',
   alert: '⚠',
+  barEmpty: '░',
+  barFill: '█',
   blocked: '⊘',
   bullet: '●',
   busy: '⏳',
@@ -133,6 +144,7 @@ export const DEFAULT_GLYPHS: DesignGlyphs = {
   cross: '✗',
   disclosure: '▶',
   dot: '•',
+  dotSeparator: ' · ',
   ellipsis: '…',
   focus: '◉',
   halt: '■',
@@ -146,6 +158,7 @@ export const DEFAULT_GLYPHS: DesignGlyphs = {
   railTee: '├',
   railVertical: '│',
   resume: '↩',
+  rulerTick: '┼',
   scrollThumb: '┃',
   selected: '*',
   separator: ' │ ',

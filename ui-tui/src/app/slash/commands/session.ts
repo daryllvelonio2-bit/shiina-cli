@@ -282,7 +282,7 @@ export const sessionCommands: SlashCommand[] = [
             }
 
             ctx.transcript.sys(
-              `compressed ${r.removed} messages${r.usage?.total ? ` · ${compactNumber(r.usage.total)} tok` : ''}`
+              `compressed ${r.removed} messages${r.usage?.total ? `${ctx.ui.theme.design.glyphs.dotSeparator}${compactNumber(r.usage.total)} tok` : ''}`
             )
           })
         )
@@ -685,7 +685,7 @@ export const sessionCommands: SlashCommand[] = [
         // dollar usage model (two-bar view, dollars-only); fall back to the
         // legacy text lines only when the model is unavailable.
         const usageModel = r?.usage
-        const barLines = usageBarsText(usageModel)
+        const barLines = usageBarsText(usageModel, ctx.ui.theme.design.glyphs)
         let showedBalance = false
 
         if (usageModel?.available && (barLines.length || usageModel.status === 'free')) {

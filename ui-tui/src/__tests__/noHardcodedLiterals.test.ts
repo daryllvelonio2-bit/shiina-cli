@@ -18,6 +18,17 @@
  * Deliberately NOT detected: a single box-drawing character (`\u2500`). Alone
  * it is a token definition (design.ts) or a legitimate token override in a
  * fixture; the regression this guards is chrome DRAWN inline, i.e. a run.
+ *
+ * The second family — the inline separator (`\u00b7`), the meter cells (`\u2588`,
+ * `\u2591`) and the ruler tick (`\u253c`) — needs a SHAPE rule rather than a
+ * `line.includes`, for the same reason: a mid-dot is also the punctuation inside
+ * ~130 sentences of hint copy (a key-hint line like `select \u00b7 Enter open`),
+ * and a design token cannot be spliced into arbitrary prose without rewriting
+ * every one of those lines. So only a literal whose VALUE is the chrome is
+ * flagged: a whole-separator value, a template that opens with it, a lone
+ * separator as JSX text, or a literal made of meter cells. A separator embedded
+ * inside a longer string of copy stays literal — by decision, and therefore
+ * outside this guard's vocabulary.
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -48,7 +59,17 @@ const BORDER_STYLE_RE = /borderStyle\s*=\s*["']/
 const BOX_DRAWING_RE = /[\u2500\u2501]{2,}/g
 const PADDING_RE = /padding([XY])\s*=\s*\{\s*(\d+)\s*\}/g
 
-type LiteralKind = 'glyph' | 'borderStyle' | 'boxDrawing' | 'padding'
+/** Chrome whose character cannot be matched bare (see the header): the shapes.
+ *  Each captures only the chrome character so the allowlist keys stay stable. */
+const SEPARATOR_RE = /['"`][ \t]*(\u00b7)[ \t]*['"`]/g
+const SEPARATOR_HEAD_RE = /['"`][ \t]*(\u00b7)[ \t]*\$\{/g
+const SEPARATOR_JSX_RE = /(?:^|[}>])[ \t]*(\u00b7)[ \t]*(?:\{|<|$)/g
+/** A literal made only of METER cells. The eighth-block ramps/heat markers are
+ *  a data encoding, not the meter (see ALLOWLIST). */
+const CELL_RE = /['"`][ \t]*([\u2588\u2591]+)[ \t]*['"`]/g
+const RULER_RE = /['"`][ \t]*(\u253c)[ \t]*['"`]/g
+
+type LiteralKind = 'glyph' | 'borderStyle' | 'boxDrawing' | 'padding' | 'separator' | 'cell' | 'ruler'
 
 interface Violation {
   /** Path relative to `ui-tui/src`, posix separators. */
@@ -270,6 +291,20 @@ const scan = (source: string, file: string): Violation[] => {
           push(`padding${padding[1]}={${padding[2]}}`, 'padding')
         }
       }
+
+      const shapes: [RegExp, LiteralKind][] = [
+        [SEPARATOR_RE, 'separator'],
+        [SEPARATOR_HEAD_RE, 'separator'],
+        [SEPARATOR_JSX_RE, 'separator'],
+        [CELL_RE, 'cell'],
+        [RULER_RE, 'ruler']
+      ]
+
+      for (const [rule, kind] of shapes) {
+        for (const match of line.matchAll(rule)) {
+          push(match[1]!, kind)
+        }
+      }
     })
 
   return violations
@@ -383,6 +418,56 @@ const ALLOWLIST: AllowlistEntry[] = [
     reason:
       'Deliberately INVALID input: a two-character rule must be rejected and fall back to ' +
       'DEFAULT_DESIGN.borders. The literal is the thing under test.'
+  },
+  {
+    path: '__tests__/design.test.ts',
+    literals: ['\u00b7'],
+    reason:
+      'The separator OVERRIDE is the thing under test (it must survive while an empty glyph ' +
+      'override falls back to the default) — a fixture, not chrome.'
+  },
+  {
+    path: 'lib/charts.ts',
+    literals: ['\u2588', '\u2591'],
+    reason:
+      'A chart cell encodes a NUMBER — the layer owns its own scale, so the gauge/hbar cells ' +
+      'are data-viz, not chrome. The chrome meters read barFill/barEmpty.'
+  },
+  {
+    path: 'lib/subagentTree.ts',
+    literals: ['\u2588'],
+    reason: 'The top cell of the sparkline ramp — a data encoding, not chrome.'
+  },
+  {
+    path: 'app/createGatewayEventHandler.ts',
+    literals: ['\u00b7'],
+    reason:
+      'The separator is baked into a spawn-tree LABEL that is POSTed to the backend ' +
+      '(`spawn_tree.save`) — wire data, not chrome a renderer draws.'
+  },
+  {
+    path: 'app/spawnHistoryStore.ts',
+    literals: ['\u00b7'],
+    reason:
+      'The same persisted snapshot label as `createGatewayEventHandler` (stored, replayed, sent ' +
+      'on the wire), so it cannot read a theme token.'
+  },
+  {
+    path: '__tests__/charts.test.ts',
+    literals: ['*'],
+    reason:
+      'Every literal in this file is a chart-layer OUTPUT expectation (sparkline / gauge / hbar ' +
+      'cells) — data-viz fixtures, not chrome.'
+  },
+  {
+    path: '__tests__/petPane.test.tsx',
+    literals: ['\u2588'],
+    reason: 'The pet sprite glyph set — rendered CONTENT (a pet’s pixels), not chrome.'
+  },
+  {
+    path: '__tests__/subagentTree.test.ts',
+    literals: ['\u2588'],
+    reason: 'Pins the sparkline ramp’s top cell — the data encoding, not chrome.'
   }
 ]
 
@@ -435,6 +520,36 @@ describe('design literal guard', () => {
       ['padding', 'paddingX\u003d{3}'],
       ['padding', 'paddingY\u003d{1}']
     ])
+  })
+
+  it('detects the separator, meter cell and ruler shapes', () => {
+    // Escape-written like every other fixture here: this file is scanned too.
+    const source = [
+      "const sep = ' \u00b7 '",
+      'const head = ` \u00b7 ${value}`',
+      'const lone = <Text> \u00b7 </Text>',
+      "const meter = '\u2588'.repeat(n) + '\u2591'.repeat(m)",
+      "const tick = '\u253c'",
+      "const prose = '\u2191/\u2193 select \u00b7 Enter open'"
+    ].join('\n')
+
+    expect(scan(source, 'src/synthetic.tsx').map(v => [v.kind, v.literal])).toEqual([
+      ['separator', '\u00b7'],
+      ['separator', '\u00b7'],
+      ['separator', '\u00b7'],
+      ['cell', '\u2588'],
+      ['cell', '\u2591'],
+      ['ruler', '\u253c']
+    ])
+  })
+
+  it('ignores a separator embedded in a sentence of copy', () => {
+    const source = [
+      "const hint = '\u2191/\u2193 select \u00b7 Enter confirm \u00b7 Esc cancel'",
+      "const notice = 'out of credits \u00b7 top up to continue'"
+    ].join('\n')
+
+    expect(scan(source, 'src/synthetic.ts')).toEqual([])
   })
 
   it('ignores a literal that only appears in a comment', () => {

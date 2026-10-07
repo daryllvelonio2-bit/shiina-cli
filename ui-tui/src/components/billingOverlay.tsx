@@ -145,7 +145,7 @@ function OverviewScreen({ ctx, onClose, onPatch, s, t }: ScreenProps) {
       {s.org_name && (
         <Text color={t.color.muted}>
           Org: {s.org_name}
-          {s.role ? ` · ${s.role}` : ''}
+          {s.role ? `${t.design.glyphs.dotSeparator}${s.role}` : ''}
         </Text>
       )}
       {/* The shared two-bar dollar usage (plan + top-up), same as /usage and

@@ -27,22 +27,22 @@ const startFailureLine = (r: WakeStartResponse): string => {
   return `wake: not started — ${base}${owner}${hint}`
 }
 
-const statusLine = (r: WakeStatusResponse, warn: string): string => {
+const statusLine = (r: WakeStatusResponse, warn: string, dot: string): string => {
   const phrase = r.phrase ? ` for “${r.phrase}”` : ''
-  const provider = r.provider ? ` · ${r.provider}` : ''
+  const provider = r.provider ? `${dot}${r.provider}` : ''
 
   if (r.listening) {
     if (r.audio_silent) {
       const hint = r.hint?.trim() ? ` — ${r.hint.trim()}` : ''
 
-      return `wake: listening${phrase}${provider} · ${warn} mic delivers only silence${hint}`
+      return `wake: listening${phrase}${provider}${dot}${warn} mic delivers only silence${hint}`
     }
 
     return `wake: listening${phrase}${provider}`
   }
 
   if (r.owner_surface && !r.owned_by_caller) {
-    return `wake: off here · listener owned by ${r.owner_surface}${phrase}${provider}`
+    return `wake: off here${dot}listener owned by ${r.owner_surface}${phrase}${provider}`
   }
 
   if (r.available === false) {
@@ -51,7 +51,7 @@ const statusLine = (r: WakeStatusResponse, warn: string): string => {
     return `wake: unavailable${hint}`
   }
 
-  return `wake: off${phrase}${provider} · /wake on to arm`
+  return `wake: off${phrase}${provider}${dot}/wake on to arm`
 }
 
 const runOn = (ctx: SlashRunCtx): void => {
@@ -69,7 +69,7 @@ const runOn = (ctx: SlashRunCtx): void => {
         }
 
         const phrase = r.phrase ? ` for “${r.phrase}”` : ''
-        const provider = r.provider ? ` · ${r.provider}` : ''
+        const provider = r.provider ? `${ctx.ui.theme.design.glyphs.dotSeparator}${r.provider}` : ''
         const saved = r.enabled_persisted ? ' · enabled in config' : ''
 
         ctx.transcript.sys(`wake: listening${phrase}${provider}${saved}`)
@@ -104,7 +104,11 @@ const runOff = (ctx: SlashRunCtx): void => {
 const runStatus = (ctx: SlashRunCtx): void => {
   ctx.gateway
     .rpc<WakeStatusResponse>('wake.status', {})
-    .then(ctx.guarded<WakeStatusResponse>(r => ctx.transcript.sys(statusLine(r, ctx.ui.theme.design.glyphs.alert))))
+    .then(
+      ctx.guarded<WakeStatusResponse>(r =>
+        ctx.transcript.sys(statusLine(r, ctx.ui.theme.design.glyphs.alert, ctx.ui.theme.design.glyphs.dotSeparator))
+      )
+    )
     .catch(ctx.guardedErr)
 }
 

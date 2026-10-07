@@ -84,6 +84,7 @@ function TokenStream({ height, t, width }: { height: number; t: Theme; width: nu
   return (
     <Text color={t.color.text} wrap="wrap">
       {words.join(' ')}
+      {/* Stream cursor — a demo/grid primitive (an eighth-block cell), not chrome. */}
       <Text color={t.color.primary}>▌</Text>
     </Text>
   )
@@ -284,7 +285,7 @@ function StreamPanel({
       <Text bold={focused} color={focused ? t.color.primary : t.color.label} wrap="truncate">
         {focused ? `${t.design.glyphs.active} ` : ''}
         {title}
-        {main ? ' ·' : ''}
+        {main ? t.design.glyphs.dotSeparator.trimEnd() : ''}
       </Text>
 
       <Box flexDirection="column" height={innerHeight} overflow="hidden" width={innerWidth}>

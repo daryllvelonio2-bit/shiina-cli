@@ -3,6 +3,7 @@ import { Text, useInput } from '@shiina/ink'
 import { mix } from '@shiina/shared/color'
 import { type ReactNode, useState } from 'react'
 
+import type { DesignGlyphs } from '../design.js'
 import type { UsageModelData } from '../gatewayTypes.js'
 import { liftForContrast } from '../lib/color.js'
 import type { Theme } from '../theme.js'
@@ -144,12 +145,12 @@ export function ActionRow({ active, label, color, t }: { active: boolean; label:
 export const BAR_CELLS = 10
 
 /** ratio in [0,1] -> { bar: '█…░…', pct: 0-100 } using `cells` cells. */
-export function barCells(ratio: number, cells: number = BAR_CELLS): { bar: string; pct: number } {
+export function barCells(ratio: number, glyphs: DesignGlyphs, cells: number = BAR_CELLS): { bar: string; pct: number } {
   const r = Math.max(0, Math.min(1, ratio))
 
   const filled = Math.round(r * cells)
 
-  return { bar: '█'.repeat(filled) + '░'.repeat(cells - filled), pct: Math.round(r * 100) }
+  return { bar: glyphs.barFill.repeat(filled) + glyphs.barEmpty.repeat(cells - filled), pct: Math.round(r * 100) }
 }
 
 /**
@@ -174,8 +175,8 @@ export function UsageBars({ model, t }: { model: undefined | UsageModelData; t: 
 
   if (model.plan_bar) {
     const b = model.plan_bar
-    const { bar } = barCells(b.fill_fraction)
-    const pct = b.pct_used == null ? '' : ` · ${b.pct_used}% used`
+    const { bar } = barCells(b.fill_fraction, t.design.glyphs)
+    const pct = b.pct_used == null ? '' : `${t.design.glyphs.dotSeparator}${b.pct_used}% used`
 
     rows.push(
       <Text color={t.color.text} key="plan">
@@ -190,7 +191,7 @@ export function UsageBars({ model, t }: { model: undefined | UsageModelData; t: 
 
   if (model.topup_bar) {
     const b = model.topup_bar
-    const { bar } = barCells(1)
+    const { bar } = barCells(1, t.design.glyphs)
 
     rows.push(
       <Text color={t.color.text} key="topup">
@@ -198,7 +199,7 @@ export function UsageBars({ model, t }: { model: undefined | UsageModelData; t: 
         <Text color={t.color.muted}>[</Text>
         <Text color={t.color.ok}>{bar}</Text>
         <Text color={t.color.muted}>]</Text>
-        {`  ${b.remaining_display} · never expires`}
+        {`  ${b.remaining_display}${t.design.glyphs.dotSeparator}never expires`}
       </Text>
     )
   }
@@ -215,7 +216,7 @@ export function UsageBars({ model, t }: { model: undefined | UsageModelData; t: 
  * /usage transcript panel). Returns one string per line: a plan bar, a top-up
  * bar, and a total-spendable summary, whichever apply. Dollars only.
  */
-export function usageBarsText(model: undefined | UsageModelData): string[] {
+export function usageBarsText(model: undefined | UsageModelData, glyphs: DesignGlyphs): string[] {
   if (!model || !model.available) {
     return []
   }
@@ -225,17 +226,17 @@ export function usageBarsText(model: undefined | UsageModelData): string[] {
 
   if (model.plan_bar) {
     const b = model.plan_bar
-    const { bar } = barCells(b.fill_fraction)
-    const pct = b.pct_used == null ? '' : ` · ${b.pct_used}% used`
+    const { bar } = barCells(b.fill_fraction, glyphs)
+    const pct = b.pct_used == null ? '' : `${glyphs.dotSeparator}${b.pct_used}% used`
 
     lines.push(`${planLabel}[${bar}]  ${b.remaining_display} left of ${b.total_display}${pct}`)
   }
 
   if (model.topup_bar) {
     const b = model.topup_bar
-    const { bar } = barCells(1)
+    const { bar } = barCells(1, glyphs)
 
-    lines.push(`top-up  [${bar}]  ${b.remaining_display} · never expires`)
+    lines.push(`top-up  [${bar}]  ${b.remaining_display}${glyphs.dotSeparator}never expires`)
   }
 
   if (model.total_spendable_display && model.has_topup) {

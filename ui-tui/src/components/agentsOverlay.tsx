@@ -180,18 +180,18 @@ function GanttStrip({
     const e = Math.min(barWidth, Math.ceil(((endAt - globalStart) / totalSpan) * barWidth))
     const fill = Math.max(1, e - s)
 
-    return ' '.repeat(s) + '█'.repeat(fill) + ' '.repeat(Math.max(0, barWidth - s - fill))
+    return ' '.repeat(s) + t.design.glyphs.barFill.repeat(fill) + ' '.repeat(Math.max(0, barWidth - s - fill))
   }
 
   const charStep = totalSeconds < 20 && barWidth > 20 ? 5 : 10
 
   const ruler = Array.from({ length: barWidth }, (_, i) => {
     if (i > 0 && i % 10 === 0) {
-      return '┼'
+      return t.design.glyphs.rulerTick
     }
 
     if (i > 0 && i % 5 === 0) {
-      return '·'
+      return t.design.glyphs.dotSeparator.trim()
     }
 
     return t.design.borders.rule
@@ -298,7 +298,7 @@ function OverlaySection({
 function Field({ name, t, value }: { name: string; t: Theme; value: ReactNode }) {
   return (
     <Text wrap="truncate-end">
-      <Text color={t.color.label}>{name} · </Text>
+      <Text color={t.color.label}>{name}{t.design.glyphs.dotSeparator}</Text>
       <Text color={t.color.text}>{value}</Text>
     </Text>
   )
@@ -354,7 +354,7 @@ function Detail({ id, node, t }: { id?: string; node: SubagentNode; t: Theme }) 
               value={
                 <>
                   {fmtTokens(inputTokens)} in · {fmtTokens(outputTokens)} out
-                  {item.reasoningTokens ? ` · ${fmtTokens(item.reasoningTokens)} reasoning` : ''}
+                  {item.reasoningTokens ? `${t.design.glyphs.dotSeparator}${fmtTokens(item.reasoningTokens)} reasoning` : ''}
                 </>
               }
             />
@@ -374,7 +374,7 @@ function Detail({ id, node, t }: { id?: string; node: SubagentNode; t: Theme }) 
 
           {filesRead.slice(0, 8).map((p, i) => (
             <Text color={t.color.text} key={`r-${i}`} wrap="truncate-end">
-              <Text color={t.color.muted}>·</Text> {p}
+              <Text color={t.color.muted}>{t.design.glyphs.dotSeparator.trim()}</Text> {p}
             </Text>
           ))}
 
@@ -386,7 +386,7 @@ function Detail({ id, node, t }: { id?: string; node: SubagentNode; t: Theme }) 
         <OverlaySection count={toolLines.length} defaultOpen t={t} title="Tool calls">
           {toolLines.map((line, i) => (
             <Text color={t.color.text} key={i} wrap="wrap">
-              <Text color={t.color.muted}>·</Text> {line}
+              <Text color={t.color.muted}>{t.design.glyphs.dotSeparator.trim()}</Text> {line}
             </Text>
           ))}
         </OverlaySection>
@@ -409,7 +409,7 @@ function Detail({ id, node, t }: { id?: string; node: SubagentNode; t: Theme }) 
         <OverlaySection count={item.notes.length} t={t} title="Progress">
           {item.notes.slice(-6).map((line, i) => (
             <Text color={t.color.text} key={i} wrap="wrap">
-              <Text color={t.color.label}>·</Text> {line}
+              <Text color={t.color.label}>{t.design.glyphs.dotSeparator.trim()}</Text> {line}
             </Text>
           ))}
         </OverlaySection>
@@ -447,12 +447,12 @@ function ListRow({
   const heatMarker = heatIdx >= 2 ? palette[heatIdx]! : null
 
   const goal = compactPreview(node.item.goal || 'subagent', width - 28 - node.item.depth * 2)
-  const toolsCount = node.aggregate.totalTools > 0 ? ` ·${node.aggregate.totalTools}t` : ''
-  const kids = node.children.length ? ` ·${node.children.length}↓` : ''
+  const toolsCount = node.aggregate.totalTools > 0 ? `${t.design.glyphs.dotSeparator.trimEnd()}${node.aggregate.totalTools}t` : ''
+  const kids = node.children.length ? `${t.design.glyphs.dotSeparator.trimEnd()}${node.children.length}↓` : ''
   const line = node.item.status === 'running' ? node.item.tools.at(-1) : undefined
   const paren = line ? line.indexOf('(') : -1
   const toolShort = line ? (paren > 0 ? line.slice(0, paren) : line).trim() : ''
-  const trailing = toolShort ? ` · ${compactPreview(toolShort, 14)}` : ''
+  const trailing = toolShort ? `${t.design.glyphs.dotSeparator}${compactPreview(toolShort, 14)}` : ''
   // Selection chip, not `inverse` — inverse swaps against the terminal's
   // unknowable defaults (black slab on transparent profiles).
   const row = listRowStyle(t, active)
@@ -499,7 +499,7 @@ function DiffPane({
 
       <Box marginTop={1}>
         <Text color={t.color.muted} wrap="truncate-end">
-          {formatSummary(totals)}
+          {formatSummary(totals, t.design.glyphs.dotSeparator)}
         </Text>
       </Box>
 
@@ -892,7 +892,7 @@ export function AgentsOverlay({ gw, initialHistoryIndex = 0, onClose, t }: Agent
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4)
     .map(([k, v]) => `${k}×${v}`)
-    .join(' · ')
+    .join(t.design.glyphs.dotSeparator)
 
   const capsLabel = delegation.maxSpawnDepth
     ? `caps d${delegation.maxSpawnDepth}/${delegation.maxConcurrentChildren ?? '?'}`
@@ -905,7 +905,14 @@ export function AgentsOverlay({ gw, initialHistoryIndex = 0, onClose, t }: Agent
         ).toLocaleTimeString()}`
       : `Spawn tree${delegation.paused ? ' · ⏸ paused' : ''}`
 
-  const metaLine = [formatSummary(totals), spark, capsLabel, mix ? `· ${mix}` : ''].filter(Boolean).join('  ')
+  const metaLine = [
+    formatSummary(totals, t.design.glyphs.dotSeparator),
+    spark,
+    capsLabel,
+    mix ? `${t.design.glyphs.dotSeparator.trimStart()}${mix}` : ''
+  ]
+    .filter(Boolean)
+    .join('  ')
 
   const controlsHint = replayMode
     ? ' · controls locked'

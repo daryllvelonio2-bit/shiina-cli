@@ -24,7 +24,8 @@ export function shimmerSegments(width: number, phase: number, band = BAND): [num
 }
 
 /** One shimmering run. Controlled: the parent owns `phase` so sibling rows
- *  stay in lockstep (offset it per row for the diagonal). */
+ *  stay in lockstep (offset it per row for the diagonal). The `char` default
+ *  is the `▁` data-viz cell (a loading bar), not chrome. */
 export function Shimmer({
   char = '▁',
   color,

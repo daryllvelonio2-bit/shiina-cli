@@ -414,7 +414,7 @@ function SubagentAccordion({
     }
   }
 
-  const suffix = rollupBits.join(' · ')
+  const suffix = rollupBits.join(t.design.glyphs.dotSeparator)
 
   const thinkingText = item.thinking.join('\n')
   const hasThinking = Boolean(thinkingText)
@@ -941,7 +941,10 @@ export const ToolTrail = memo(function ToolTrail({
   const spawnTotals = useMemo(() => treeTotals(spawnTree), [spawnTree])
   const spawnWidths = useMemo(() => widthByDepth(spawnTree), [spawnTree])
   const spawnSpark = useMemo(() => sparkline(spawnWidths), [spawnWidths])
-  const spawnSummaryLabel = useMemo(() => formatSpawnSummary(spawnTotals), [spawnTotals])
+  const spawnSummaryLabel = useMemo(
+    () => formatSpawnSummary(spawnTotals, t.design.glyphs.dotSeparator),
+    [spawnTotals, t.design.glyphs.dotSeparator]
+  )
 
   if (
     !busy &&
@@ -1394,7 +1397,7 @@ export const ToolTrail = memo(function ToolTrail({
       {outcome ? (
         <Box marginTop={1}>
           <Text color={t.color.muted} dim>
-            · {outcome}
+            {t.design.glyphs.dotSeparator.trim()} {outcome}
           </Text>
         </Box>
       ) : null}
