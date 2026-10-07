@@ -50,12 +50,13 @@ describe('ToolTrail — MoA reference panel visibility (#64701)', () => {
     instance.unmount()
     instance.cleanup()
 
-    // The open chevron means the panel is still expanded once effects have
-    // settled, as the reasoningAlwaysVisible-seeded useState value intends.
-    // A collapsed render here means the re-sync effect fired on mount and
-    // clobbered it — the exact #64701 regression.
-    expect(frame).toContain(`${DEFAULT_THEME.design.glyphs.chevronOpen} `)
-    expect(frame).toContain('Thinking')
-    expect(frame).not.toContain(`${DEFAULT_THEME.design.glyphs.chevronClosed} `)
+    // The reasoning body must stay visible once effects have settled, as
+    // the reasoningAlwaysVisible-seeded useState value intends. A render
+    // without the body means the re-sync effect fired on mount and
+    // clobbered it — the exact #64701 regression. (The codex header renders
+    // no chevron — marker: none — so content presence is the signal.)
+    expect(frame).toContain('Reference model output')
+    // Settled reasoning renders the title as "Thought" (not live).
+    expect(frame).toContain('Thought')
   })
 })

@@ -59,9 +59,10 @@ describe('a settled trail stays closed', () => {
 
     const out = trail.text()
 
-    expect(out).toContain('Tool calls')
-    expect(out).toContain(DEFAULT_THEME.design.glyphs.chevronClosed)
-    // The tool rows themselves are not rendered while collapsed.
+    // The unified step header carries the summary; the tool rows themselves
+    // are not rendered while collapsed. (The codex header renders no
+    // chevron — marker: none — so content is the signal.)
+    expect(out).toContain('Steps')
     expect(out).not.toMatch(/terminal/i)
 
     trail.instance.unmount()

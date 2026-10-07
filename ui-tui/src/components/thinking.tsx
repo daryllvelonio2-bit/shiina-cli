@@ -827,11 +827,13 @@ export const ToolTrail = memo(function ToolTrail({
     [commandOverride, detailsMode, layoutSections, sections]
   )
 
+  // Live gate: the in-progress turn's block (liveDetails → preferExpandedThinking)
+  // renders open; a settled row mounts collapsed to one line.
   const thinkingDefaultExpanded =
-    commandOverride || sections?.thinking === 'expanded'
+    visible.thinking === 'expanded' && (preferExpandedThinking || commandOverride || sections?.thinking === 'expanded')
 
   const toolsDefaultExpanded =
-    commandOverride || sections?.tools === 'expanded'
+    visible.tools === 'expanded' && (preferExpandedThinking || commandOverride || sections?.tools === 'expanded')
 
   // An explicit `/details` expand or design maxLines=null/0 shows the whole chain of thought;
   // otherwise respect the design's maxLines (defaults to undefined = full/unlimited).
@@ -844,7 +846,6 @@ export const ToolTrail = memo(function ToolTrail({
         : designMaxLines ?? undefined
 
   const [now, setNow] = useState(() => Date.now())
-  const [userToggledOpen, setUserToggledOpen] = useState<boolean | null>(null)
   // Local toggles own the open state once mounted.  Init from the resolved
   // section visibility so default-expanded sections (thinking/tools) render
   // open on first paint; the useEffect below re-syncs when the user mutates
@@ -906,12 +907,8 @@ export const ToolTrail = memo(function ToolTrail({
       return
     }
 
-    if (reasoningActive) {
-      setOpenThinking(true)
-    } else if (tools.length > 0 || trail.length > 0 || !busy) {
-      setOpenThinking(false)
-    }
-  }, [thinkingAuto, reasoningActive, tools.length, trail.length, busy])
+    setOpenThinking(reasoningActive)
+  }, [thinkingAuto, reasoningActive])
 
   // The loop finished: collapse every section (thinking, tools, subagents, activity) so the
   // whole process reads as one compact summary and only the final message is left in the
@@ -919,30 +916,29 @@ export const ToolTrail = memo(function ToolTrail({
   // never touched. The next set opens itself (it is the live one).
   const wasBusy = useRef(busy)
   useEffect(() => {
-    if (visible.tools !== 'collapsed') return
-    if (tools.length > 0 && busy) {
-      setOpenTools(true)
-    } else {
-      setOpenTools(false)
-    }
-  }, [visible.tools, tools.length, busy])
-  useEffect(() => {
     const finished = wasBusy.current && !busy
     wasBusy.current = busy
-
-    if (finished) {
-      setUserToggledOpen(null)
-    }
 
     if (!finished) {
       return
     }
 
-    setOpenThinking(false)
-    setOpenTools(false)
-    setOpenSubagents(false)
-    setDeepSubagents(false)
-    setOpenMeta(false)
+    if (thinkingAuto || !thinkingDefaultExpanded) {
+      setOpenThinking(false)
+    }
+
+    if (!toolsDefaultExpanded) {
+      setOpenTools(false)
+    }
+
+    if (visible.subagents !== 'expanded') {
+      setOpenSubagents(false)
+      setDeepSubagents(false)
+    }
+
+    if (visible.activity !== 'expanded') {
+      setOpenMeta(false)
+    }
   }, [busy, thinkingAuto, visible])
 
   const cot = useMemo(() => thinkingPreview(reasoning, 'full', THINKING_COT_MAX), [reasoning])
@@ -1382,17 +1378,22 @@ export const ToolTrail = memo(function ToolTrail({
   }
 
   if (panels.length === 0) {
-    return null
+    return outcome ? (
+      <Box marginTop={1}>
+        <Text color={t.color.muted} dim>
+          {t.design.glyphs.dotSeparator.trim()} {outcome}
+        </Text>
+      </Box>
+    ) : null
   }
-  const isSingleSetOpen =
-    userToggledOpen !== null
-      ? userToggledOpen
-      : busy
-        ? openThinking || openTools || openSubagents || openMeta
-        : false
+  const isSingleSetOpen = openThinking || openTools || openSubagents || openMeta
 
   const toggleUnified = () => {
-    setUserToggledOpen(prev => !(prev !== null ? prev : isSingleSetOpen))
+    const next = !isSingleSetOpen
+    if (hasThinking) setOpenThinking(next)
+    if (hasTools) setOpenTools(next)
+    if (hasSubagents) setOpenSubagents(next)
+    if (activity.length > 0) setOpenMeta(next)
   }
 
     const unifiedSummary = [

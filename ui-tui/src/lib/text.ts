@@ -345,31 +345,41 @@ export const isToolTrailResultLine = (line: string) =>
   line.endsWith(` ${TOOL_TRAIL_OK}`) || line.endsWith(` ${TOOL_TRAIL_ERR}`)
 
 export const parseToolTrailResultLine = (line: string) => {
+  // Verbose trail: the mark closes the LAST line and the detail (Args/Result
+  // blocks) spans the lines between the call and the mark.
+  if (isToolTrailResultLine(line)) {
+    const mark = line.endsWith(` ${TOOL_TRAIL_ERR}`) ? TOOL_TRAIL_ERR : TOOL_TRAIL_OK
+    const body = line.slice(0, -2)
+    const sep = body.indexOf(' :: ')
+
+    if (sep >= 0) {
+      return { call: body.slice(0, sep), detail: body.slice(sep + 4), mark }
+    }
+
+    const legacy = body.indexOf(': ')
+
+    if (legacy > 0) {
+      return { call: body.slice(0, legacy), detail: body.slice(legacy + 2), mark }
+    }
+
+    return { call: body, detail: '', mark }
+  }
+
+  // Combined tool + inline-diff trail: the mark closes the FIRST line and a
+  // ```diff block follows the call (patch comparison under the patch entry).
   const firstLine = line.split('\n')[0] ?? line
+
   if (!isToolTrailResultLine(firstLine)) {
     return null
   }
 
-  const diffPart = line.includes('\n') ? line.slice(firstLine.length + 1) : ''
+  const diffPart = line.slice(firstLine.length + 1)
   const mark = firstLine.endsWith(` ${TOOL_TRAIL_ERR}`) ? TOOL_TRAIL_ERR : TOOL_TRAIL_OK
   const body = firstLine.slice(0, -2)
   const sep = body.indexOf(' :: ')
+  const detail = sep >= 0 ? [body.slice(sep + 4), diffPart].filter(Boolean).join('\n') : diffPart
 
-  let parsedDetail = ''
-  let call = body
-  if (sep >= 0) {
-    call = body.slice(0, sep)
-    parsedDetail = body.slice(sep + 4)
-  } else {
-    const legacy = body.indexOf(': ')
-    if (legacy > 0) {
-      call = body.slice(0, legacy)
-      parsedDetail = body.slice(legacy + 2)
-    }
-  }
-
-  const detail = [parsedDetail, diffPart].filter(Boolean).join('\n')
-  return { call, detail, mark }
+  return { call: sep >= 0 ? body.slice(0, sep) : body, detail, mark }
 }
 
 export const splitToolDuration = (call: string) => {

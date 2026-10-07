@@ -33,7 +33,7 @@ const mountTrail = (reasoningActive: boolean, sections?: Record<string, string>)
 
   const instance = renderSync(
     <ToolTrail
-      reasoning="Live reasoning text."
+      reasoning="Parsing the widget sample."
       reasoningActive={reasoningActive}
       sections={sections ?? { thinking: 'collapsed' }}
       t={DEFAULT_THEME}
@@ -46,52 +46,58 @@ const mountTrail = (reasoningActive: boolean, sections?: Record<string, string>)
     }
   )
 
-  // The PassThrough accumulates every repaint, and a collapsed panel stops
-  // repainting entirely once settled — so assert on the FINAL chevron state
-  // in the accumulated output rather than the tail after a clear().
-  const openMark = `${DEFAULT_THEME.design.glyphs.chevronOpen} `
-  const closedMark = `${DEFAULT_THEME.design.glyphs.chevronClosed} `
-  const finalChevronOpen = () =>
-    stripAnsi(output).lastIndexOf(openMark) > stripAnsi(output).lastIndexOf(closedMark)
+  // The codex header renders no chevron (marker: none), so the real
+  // open/closed signal is whether the panel BODY (reasoning text) survives
+  // in the latest repaint's tail — a collapsed repaint rewrites that region
+  // without the body.
+  const bodyVisible = () => stripAnsi(output).slice(-240).includes('Parsing the widget')
 
-  return { finalChevronOpen, instance }
+  // For rerender transitions: measure only the repaints after a mark, since
+  // the accumulated stream keeps earlier frames' body text forever.
+  const mark = () => output.length
+  const since = (m: number) => output.slice(m)
+
+  return { bodyVisible, instance, mark, since }
 }
 
 describe('ToolTrail — collapsed mode auto-expands while reasoning is live', () => {
   it('opens when reasoningActive is true under sections.thinking: collapsed', async () => {
-    const { finalChevronOpen, instance } = mountTrail(true)
+    const { bodyVisible, instance } = mountTrail(true)
 
     await flushEffects()
 
-    expect(finalChevronOpen()).toBe(true)
+    expect(bodyVisible()).toBe(true)
 
     instance.unmount()
     instance.cleanup()
   })
 
   it('collapses when reasoningActive is false under sections.thinking: collapsed', async () => {
-    const { finalChevronOpen, instance } = mountTrail(false)
+    const { bodyVisible, instance } = mountTrail(false)
 
     await flushEffects()
 
-    expect(finalChevronOpen()).toBe(false)
+    expect(bodyVisible()).toBe(false)
 
     instance.unmount()
     instance.cleanup()
   })
 
   it('closes the panel when the reasoning phase ends mid-turn (rerender)', async () => {
-    const { finalChevronOpen, instance } = mountTrail(true)
+    const { bodyVisible, instance, mark, since } = mountTrail(true)
 
     await flushEffects()
 
-    expect(finalChevronOpen()).toBe(true)
+    expect(bodyVisible()).toBe(true)
 
     // Reasoning phase finished (final answer / tool call started) — the
-    // turn's reasoningActive drops and the panel must collapse.
+    // turn's reasoningActive drops and the panel must collapse. Measure
+    // only the post-rerender repaint (the accumulated stream keeps the
+    // earlier open frame's body text forever).
+    const m = mark()
     instance.rerender(
       <ToolTrail
-        reasoning="Live reasoning text."
+        reasoning="Parsing the widget sample."
         reasoningActive={false}
         sections={{ thinking: 'collapsed' }}
         t={DEFAULT_THEME}
@@ -100,20 +106,29 @@ describe('ToolTrail — collapsed mode auto-expands while reasoning is live', ()
 
     await flushEffects()
 
-    expect(finalChevronOpen()).toBe(false)
+    const post = since(m)
+
+    // The close repaint must have occurred, and it must not re-emit the body.
+    // The final painted frame (sync-output delimited) must be collapsed —
+    // the render-phase repaint before the collapse effect still shows the
+    // body, so only the LAST frame is authoritative.
+    expect(post.length).toBeGreaterThan(0)
+    const frames = post.split('\u001b[?2026h')
+    const lastFrame = stripAnsi(frames[frames.length - 1] ?? '')
+    expect(lastFrame.includes('Parsing the widget')).toBe(false)
 
     instance.unmount()
     instance.cleanup()
   })
 
   it('leaves expanded-mode panels fully manual (no forced collapse)', async () => {
-    const { finalChevronOpen, instance } = mountTrail(false, { thinking: 'expanded' })
+    const { bodyVisible, instance } = mountTrail(false, { thinking: 'expanded' })
 
     await flushEffects()
 
     // `expanded` is a manual preference: reasoningActive=false must NOT
     // force it closed (the auto behavior only applies to `collapsed`).
-    expect(finalChevronOpen()).toBe(true)
+    expect(bodyVisible()).toBe(true)
 
     instance.unmount()
     instance.cleanup()

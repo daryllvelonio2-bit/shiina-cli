@@ -21,8 +21,8 @@ export const SECTION_NAMES = ['thinking', 'tools', 'subagents', 'activity'] as c
 // Opt out of any of these with `display.sections.<name>` in config.yaml
 // or at runtime via `/details <name> collapsed|hidden`.
 const SECTION_DEFAULTS: SectionVisibility = {
-  thinking: 'collapsed',
-  tools: 'collapsed',
+  thinking: 'expanded',
+  tools: 'expanded',
   activity: 'hidden'
 }
 

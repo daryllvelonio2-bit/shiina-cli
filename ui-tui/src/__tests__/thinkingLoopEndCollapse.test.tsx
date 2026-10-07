@@ -36,7 +36,7 @@ const mountTrail = (props: { busy: boolean; reasoningActive?: boolean; sections?
   const node = (p: typeof props) => (
     <ToolTrail
       busy={p.busy}
-      reasoning="Live reasoning text."
+      reasoning="Parsing the widget sample."
       reasoningActive={p.reasoningActive ?? false}
       sections={p.sections ?? { thinking: 'collapsed' }}
       t={DEFAULT_THEME}
@@ -50,26 +50,42 @@ const mountTrail = (props: { busy: boolean; reasoningActive?: boolean; sections?
     stdout: stdout as unknown as NodeJS.WriteStream
   })
 
-  const finalChevronOpen = () =>
-    stripAnsi(output).lastIndexOf(`${DEFAULT_THEME.design.glyphs.chevronOpen} `) >
-    stripAnsi(output).lastIndexOf(`${DEFAULT_THEME.design.glyphs.chevronClosed} `)
+  // The codex header renders no chevron (marker: none); the open/closed
+  // signal is whether the panel BODY survives in the latest repaint tail.
+  const bodyVisible = () => stripAnsi(output).slice(-240).includes('Parsing the widget')
 
-  return { finalChevronOpen, instance, node }
+  // For rerender transitions: measure only the repaints after a mark, since
+  // the accumulated stream keeps earlier frames' body text forever.
+  const mark = () => output.length
+  const since = (m: number) => output.slice(m)
+
+  return { bodyVisible, instance, mark, node, since }
 }
 
 describe('ToolTrail — the loop finishing collapses every section', () => {
   it('collapses an auto thinking section when busy falls', async () => {
-    const { finalChevronOpen, instance, node } = mountTrail({ busy: true, reasoningActive: true })
+    const { bodyVisible, instance, mark, node, since } = mountTrail({ busy: true, reasoningActive: true })
 
     await flushEffects()
 
-    expect(finalChevronOpen()).toBe(true)
+    expect(bodyVisible()).toBe(true)
 
+    // Measure only the post-rerender repaint — the accumulated stream keeps
+    // the earlier open frame's body text forever.
+    const m = mark()
     instance.rerender(node({ busy: false, reasoningActive: false }))
 
     await flushEffects()
 
-    expect(finalChevronOpen()).toBe(false)
+    const post = since(m)
+
+    // The final painted frame (sync-output delimited) must be collapsed —
+    // the render-phase repaint before the collapse effect still shows the
+    // body, so only the LAST frame is authoritative.
+    expect(post.length).toBeGreaterThan(0)
+    const frames = post.split('\u001b[?2026h')
+    const lastFrame = stripAnsi(frames[frames.length - 1] ?? '')
+    expect(lastFrame.includes('Parsing the widget')).toBe(false)
 
     instance.unmount()
     instance.cleanup()
@@ -77,17 +93,17 @@ describe('ToolTrail — the loop finishing collapses every section', () => {
 
   it('leaves a section the user pinned expanded via /details alone', async () => {
     const pinned = { thinking: 'expanded' }
-    const { finalChevronOpen, instance, node } = mountTrail({ busy: true, sections: pinned })
+    const { bodyVisible, instance, node } = mountTrail({ busy: true, sections: pinned })
 
     await flushEffects()
 
-    expect(finalChevronOpen()).toBe(true)
+    expect(bodyVisible()).toBe(true)
 
     instance.rerender(node({ busy: false, sections: pinned }))
 
     await flushEffects()
 
-    expect(finalChevronOpen()).toBe(true)
+    expect(bodyVisible()).toBe(true)
 
     instance.unmount()
     instance.cleanup()
