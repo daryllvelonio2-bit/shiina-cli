@@ -21,8 +21,8 @@ const WS_RE = /\s+/g
 // `check`/`cross` must not break parsing of lines written before the switch.
 // Chrome that renders a trail line reads `t.design.glyphs` for its own marks.
 // (`MARK_DOT` / `MARK_RAIL` are preview text, same reasoning.)
-export const TOOL_TRAIL_OK = DEFAULT_GLYPHS.check
-export const TOOL_TRAIL_ERR = DEFAULT_GLYPHS.cross
+export const TOOL_TRAIL_OK = '✓'
+export const TOOL_TRAIL_ERR = '✗'
 const MARK_PENDING = DEFAULT_GLYPHS.pending
 const MARK_DOT = DEFAULT_GLYPHS.dot
 const MARK_RAIL = DEFAULT_GLYPHS.railVertical
@@ -108,8 +108,11 @@ export const isThinkingStatusLine = (line: string): boolean => STATUS_LINE_RE.te
 const THINKING_STATUS_RE = new RegExp(`^(?:${VERBS.join('|')})\\.{0,3}$`, 'i')
 const THINKING_STATUS_CHUNK_RE = new RegExp(`[^A-Za-z\n]+\\s*(?:${VERBS.join('|')})\\.{0,3}\\s*`, 'giu')
 
+const DSML_RE = /<[｜|]\s*DSML\s*[｜|][^>]*>/gi
+
 export const cleanThinkingText = (reasoning: string) =>
   reasoning
+    .replace(DSML_RE, '')
     .replace(STATUS_JOINED_RE, '$1\n\n$2')
     .split('\n')
     .map(line => line.replace(THINKING_STATUS_CHUNK_RE, '').trim())

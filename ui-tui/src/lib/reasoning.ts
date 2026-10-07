@@ -1,4 +1,12 @@
-const TAGS = ['think', 'reasoning', 'thinking', 'thought', 'REASONING_SCRATCHPAD'] as const
+const TAGS = [
+  'think',
+  'reasoning',
+  'thinking',
+  'thought',
+  'REASONING_SCRATCHPAD',
+  '｜DSML｜\\s*calls',
+  '\\|DSML\\|\\s*calls'
+] as const
 
 export interface SplitReasoning {
   reasoning: string
@@ -46,7 +54,7 @@ export function splitReasoning(input: string): SplitReasoning {
 
 export const hasReasoningTag = (input: string) => {
   for (const tag of TAGS) {
-    if (input.includes(`<${tag}>`)) {
+    if (new RegExp(`<${tag}>`, 'i').test(input)) {
       return true
     }
   }

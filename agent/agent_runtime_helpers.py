@@ -34,7 +34,15 @@ logger = logging.getLogger(__name__)
 
 # Cap same-entry OAuth refreshes on a persistent auth failure, else a single-entry pool re-mints forever.
 _MAX_AUTH_REFRESH_ATTEMPTS = 2
-_TOOL_CALL_TAG_NAMES = ("tool_call", "tool_calls", "tool_result", "function_call", "function_calls")
+_TOOL_CALL_TAG_NAMES = (
+    "tool_call",
+    "tool_calls",
+    "tool_result",
+    "function_call",
+    "function_calls",
+    r"｜DSML｜\s*calls",
+    r"\|DSML\|\s*calls",
+)
 _REASONING_BLOCK_PATTERNS = tuple(
     re.compile(rf"<{name}>.*?</{name}>", re.DOTALL | re.IGNORECASE) for name in THINK_TAG_NAMES
 )

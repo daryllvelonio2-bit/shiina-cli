@@ -347,6 +347,11 @@ interface AllowlistEntry {
 
 const ALLOWLIST: AllowlistEntry[] = [
   {
+    path: 'lib/text.ts',
+    literals: ['\u2713', '\u2717'],
+    reason: 'Pinned tool-trail wire protocol marks (TOOL_TRAIL_OK / TOOL_TRAIL_ERR) for transcript persistence.'
+  },
+  {
     path: 'design.ts',
     literals: ['*'],
     reason:
