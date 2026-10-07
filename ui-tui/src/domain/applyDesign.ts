@@ -45,10 +45,15 @@ export const applyDesign = (theme: Theme, spec: DesignSpec | null): Theme => {
   const indent = spec.design?.indent
   const spacing = spec.design?.spacing
   const statusBar = spec.design?.status_bar
+  const brand = {
+    ...theme.brand,
+    ...(spec.prompt ? { prompt: spec.prompt } : {}),
+    ...(spec.brand ? spec.brand : {})
+  }
 
   return {
     ...theme,
-    brand: spec.prompt ? { ...theme.brand, prompt: spec.prompt } : theme.brand,
+    brand,
     color: Object.keys(colors).length ? { ...theme.color, ...colors } : theme.color,
     design: {
       ...design,

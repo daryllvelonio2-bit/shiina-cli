@@ -7,6 +7,7 @@ import type {
   DesignIndent,
   DesignSpacing
 } from '../design.js'
+import type { ThemeBrand } from '../theme.js'
 import type { SectionVisibility } from '../types.js'
 
 /**
@@ -29,6 +30,7 @@ export interface DesignSpec {
   colors?: Record<string, string>
   /** Composer prompt symbol. */
   prompt?: string
+  brand?: Partial<ThemeBrand>
   design?: {
     density?: DesignDensity
     panel?: DesignBorders['panel']

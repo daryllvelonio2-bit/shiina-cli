@@ -86,7 +86,7 @@ function CompactBanner({ cols, t }: { cols: number; t: Theme }) {
 
   return (
     <Box flexDirection="column" height={2} marginBottom={1} width={w}>
-      <Text color={t.color.primary}>{ruleIn('shiinaaa', w, t)}</Text>
+      <Text color={t.color.primary}>{ruleIn(t.brand.name, w, t)}</Text>
       <Text color={t.color.primary}>{t.design.borders.rule.repeat(w)}</Text>
     </Box>
   )
@@ -136,7 +136,7 @@ export function Banner({ maxWidth, t }: { maxWidth?: number; t: Theme }) {
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Text bold color={t.color.primary} wrap="truncate-end">
-        {t.brand.icon} shiinaaa
+        {t.brand.icon} {t.brand.name}
       </Text>
     </Box>
   )
