@@ -21,6 +21,65 @@ interface Exposed {
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
+// The virtual window's mounted range is derived from the committed offsets, so
+// it only reaches its final value a couple of commits after a scroll or height
+// change. Tests that polled it after a fixed sleep raced that settle: under load
+// the row they targeted was still unmounted (or the compensation had not landed)
+// when the assertions ran. Wait on the observable state instead.
+const waitFor = async (condition: () => boolean, what: string, timeoutMs = 10_000) => {
+  const deadline = Date.now() + timeoutMs
+
+  while (!condition()) {
+    if (Date.now() > deadline) {
+      throw new Error(`timed out waiting for ${what}`)
+    }
+
+    await delay(5)
+  }
+}
+
+// Wait until the scroll box has stopped changing (window range, spacers, offset
+// edges, scrollTop, sticky) for a few consecutive ticks. Fixed sleeps assumed a
+// quiet runner: a busy box needs more turns for React's scheduler to flush the
+// commits these tests assert on, so the same sleep passed quiet and failed under
+// load. Waiting on the observable steady state removes that assumption.
+const settle = async (expose: { current: Exposed | null }, { ticks = 4, timeoutMs = 10_000 } = {}) => {
+  const deadline = Date.now() + timeoutMs
+  let last = ''
+  let stable = 0
+
+  for (;;) {
+    await delay(5)
+
+    const state = expose.current
+    const scroll = state?.scroll
+    const vh = state?.virtualHistory
+    const snapshot = [
+      vh?.start ?? -1,
+      vh?.end ?? -1,
+      vh?.topSpacer ?? -1,
+      vh?.bottomSpacer ?? -1,
+      vh ? (vh.offsets[vh.start] ?? -1) : -1,
+      vh ? (vh.offsets[vh.end] ?? -1) : -1,
+      scroll?.getScrollTop() ?? -1,
+      scroll?.isSticky() ?? 'x'
+    ].join('|')
+
+    if (snapshot === last) {
+      if (++stable >= ticks) {
+        return
+      }
+    } else {
+      last = snapshot
+      stable = 0
+    }
+
+    if (Date.now() > deadline) {
+      throw new Error('virtual history never settled')
+    }
+  }
+}
+
 const makeStreams = () => {
   const stdout = new PassThrough()
   const stdin = new PassThrough()
@@ -159,9 +218,9 @@ describe('useVirtualHistory offset cache reuse', () => {
     })
 
     try {
-      await delay(20)
+      await settle(expose)
       instance.rerender(React.createElement(Harness, { expose, height: 9, items, maxMounted: 80 }))
-      await delay(80)
+      await settle(expose)
 
       expect(viewportIsMounted(items, expose.current!.virtualHistory, expose.current!.scroll!)).toBe(true)
     } finally {
@@ -191,9 +250,9 @@ describe('useVirtualHistory offset cache reuse', () => {
     )
 
     try {
-      await delay(20)
+      await settle(expose)
       instance.rerender(React.createElement(Harness, { columns: 80, expose, height: 10, items, maxMounted: 80 }))
-      await delay(80)
+      await settle(expose)
 
       const resizedItems = items.map(item => ({ height: item.heightAfterResize!, key: item.key }))
 
@@ -220,9 +279,9 @@ describe('useVirtualHistory offset cache reuse', () => {
     )
 
     try {
-      await delay(20)
+      await settle(expose)
       instance.rerender(React.createElement(Harness, { columns: 120, expose, height: 36, items, maxMounted: 80 }))
-      await delay(80)
+      await settle(expose)
 
       const scroll = expose.current!.scroll!
 
@@ -252,11 +311,11 @@ describe('useVirtualHistory offset cache reuse', () => {
     })
 
     try {
-      await delay(20)
+      await settle(expose)
       expect(expose.current!.virtualHistory.offsets[tall.length]).toBe(18)
 
       instance.rerender(React.createElement(Harness, { expose, items: short }))
-      await delay(40)
+      await settle(expose)
 
       expect(expose.current!.virtualHistory.offsets[short.length]).toBe(6)
       expect(expose.current!.virtualHistory.bottomSpacer).toBe(0)
@@ -279,7 +338,7 @@ describe('useVirtualHistory offset cache reuse', () => {
     })
 
     try {
-      await delay(20)
+      await settle(expose)
       const scroll = expose.current!.scroll!
 
       scroll.scrollTo(3)
@@ -310,20 +369,20 @@ describe('useVirtualHistory offset cache reuse', () => {
     })
 
     try {
-      await delay(20)
+      await settle(expose)
       const scroll = expose.current!.scroll!
       const setClampBounds = vi.spyOn(scroll, 'setClampBounds')
 
       scroll.scrollTo(28)
-      await delay(20)
+      await settle(expose)
       instance.rerender(React.createElement(Harness, { expose, initialHeights, items: after }))
-      await delay(60)
+      await settle(expose)
 
       expect(scroll.isSticky()).toBe(false)
       expect(setClampBounds.mock.calls.some(([, max]) => max === Number.POSITIVE_INFINITY)).toBe(true)
 
       scroll.scrollTo(36)
-      await delay(20)
+      await settle(expose)
       expect(scroll.getScrollTop()).toBe(36)
     } finally {
       instance.unmount()
@@ -345,11 +404,11 @@ describe('useVirtualHistory offset cache reuse', () => {
     })
 
     try {
-      await delay(20)
+      await settle(expose)
       const scroll = expose.current!.scroll!
 
       scroll.scrollTo(5)
-      await delay(20)
+      await settle(expose)
       const adjustScrollTop = vi.spyOn(scroll, 'adjustScrollTop')
       const ref = expose.current!.virtualHistory.measureRef('item-1')
 
@@ -382,12 +441,12 @@ describe('useVirtualHistory offset cache reuse', () => {
     })
 
     try {
-      await delay(20)
+      await settle(expose)
       expose.current!.scroll!.scrollTo(3)
-      await delay(20)
+      await settle(expose)
 
       instance.rerender(React.createElement(Harness, { expose, initialHeights, items: after }))
-      await delay(40)
+      await settle(expose)
 
       expect(expose.current!.scroll!.getScrollTop()).toBe(6)
     } finally {
@@ -411,11 +470,11 @@ describe('useVirtualHistory offset cache reuse', () => {
     })
 
     try {
-      await delay(20)
+      await settle(expose)
       const scroll = expose.current!.scroll!
 
       scroll.scrollTo(29)
-      await delay(20)
+      await settle(expose)
       instance.rerender(React.createElement(Harness, { expose, initialHeights, items: after }))
 
       expect(scroll.getScrollTop()).toBe(32)
@@ -445,16 +504,16 @@ describe('useVirtualHistory offset cache reuse', () => {
     })
 
     try {
-      await delay(20)
+      await settle(expose)
       const scroll = expose.current!.scroll!
 
       scroll.scrollTo(0)
-      await delay(20)
+      await settle(expose)
       scroll.scrollTo(5)
       const adjustScrollTop = vi.spyOn(scroll, 'adjustScrollTop')
 
       instance.rerender(React.createElement(Harness, { columns: 80, expose, initialHeights, items }))
-      await delay(40)
+      await settle(expose)
 
       expect(adjustScrollTop).not.toHaveBeenCalled()
       expect(scroll.getScrollTop()).toBe(5)
@@ -483,11 +542,11 @@ describe('useVirtualHistory offset cache reuse', () => {
     })
 
     try {
-      await delay(20)
+      await settle(expose)
       const scroll = expose.current!.scroll!
 
       scroll.scrollTo(5)
-      await delay(20)
+      await settle(expose)
       const adjustScrollTop = vi.spyOn(scroll, 'adjustScrollTop')
 
       const replacementCache = new Map<string, number>([
@@ -503,7 +562,7 @@ describe('useVirtualHistory offset cache reuse', () => {
           items: incoming
         })
       )
-      await delay(40)
+      await settle(expose)
 
       expect(adjustScrollTop).not.toHaveBeenCalled()
       expect(scroll.getScrollTop()).toBe(5)
@@ -528,18 +587,31 @@ describe('useVirtualHistory offset cache reuse', () => {
     })
 
     try {
-      await delay(20)
+      await settle(expose)
       const scroll = expose.current!.scroll!
 
       scroll.scrollTo(0)
-      await delay(20)
+      await settle(expose)
       scroll.scrollTo(5)
+
+      // Settle the window, then target the topmost mounted row: it is the row
+      // that sits above the committed viewport and is driven to unmount, which
+      // is the measure-at-unmount path this test pins. Targeting a fixed index
+      // made the test depend on where the window happened to have settled.
+      await waitFor(() => {
+        const vh = expose.current!.virtualHistory
+
+        return scroll.getScrollTop() === 5 && (vh.offsets[vh.start + 1] ?? 0) <= 5
+      }, 'a mounted row above the viewport')
+
       const adjustScrollTop = vi.spyOn(scroll, 'adjustScrollTop')
       const staleHeights = new Map(initialHeights)
+      const target = items[expose.current!.virtualHistory.start]!
 
-      staleHeights.set(items[0]!.key, 1)
+      staleHeights.set(target.key, 1)
       instance.rerender(React.createElement(Harness, { expose, initialHeights: staleHeights, items }))
-      await delay(40)
+
+      await waitFor(() => adjustScrollTop.mock.calls.length > 0, 'the unmount compensation')
 
       expect(adjustScrollTop).toHaveBeenCalledOnce()
       expect(adjustScrollTop).toHaveBeenCalledWith(1)
@@ -569,16 +641,16 @@ describe('useVirtualHistory offset cache reuse', () => {
     })
 
     try {
-      await delay(20)
+      await settle(expose)
       expose.current!.scroll!.scrollTo(3)
-      await delay(20)
+      await settle(expose)
 
       instance.rerender(React.createElement(Harness, { expose, initialHeights, items: visibleChanged }))
-      await delay(40)
+      await settle(expose)
       expect(expose.current!.scroll!.getScrollTop()).toBe(3)
 
       instance.rerender(React.createElement(Harness, { expose, initialHeights, items: belowChanged }))
-      await delay(40)
+      await settle(expose)
       expect(expose.current!.scroll!.getScrollTop()).toBe(3)
     } finally {
       instance.unmount()
@@ -601,11 +673,11 @@ describe('useVirtualHistory offset cache reuse', () => {
     })
 
     try {
-      await delay(20)
+      await settle(expose)
       const adjustScrollTop = vi.spyOn(expose.current!.scroll!, 'adjustScrollTop')
 
       instance.rerender(React.createElement(Harness, { expose, initialHeights, items: after }))
-      await delay(40)
+      await settle(expose)
 
       expect(adjustScrollTop).not.toHaveBeenCalled()
       expect(expose.current!.scroll!.isSticky()).toBe(true)
@@ -629,9 +701,9 @@ describe('useVirtualHistory offset cache reuse', () => {
     })
 
     try {
-      await delay(20)
+      await settle(expose)
       instance.rerender(React.createElement(Harness, { expose, items: afterShrink }))
-      await delay(20)
+      await settle(expose)
 
       const scroll = expose.current!.scroll!
       const transcriptHeight = expose.current!.virtualHistory.offsets[afterShrink.length] ?? 0
@@ -640,7 +712,7 @@ describe('useVirtualHistory offset cache reuse', () => {
       expect(scroll.getScrollTop()).toBe(transcriptHeight - scroll.getViewportHeight())
 
       scroll.scrollBy(-1)
-      await delay(80)
+      await settle(expose)
 
       expect(scroll.getPendingDelta()).toBe(0)
       expect(viewportIsMounted(afterShrink, expose.current!.virtualHistory, scroll)).toBe(true)

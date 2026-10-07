@@ -124,6 +124,12 @@ describe('virtual height estimates', () => {
     const elapsed = performance.now() - t0
 
     expect(rows).toBeLessThanOrEqual(800)
-    expect(elapsed).toBeLessThan(50)
+    // The cap is the contract: ten times the text must not add a row, so the
+    // rebuild cost cannot grow with turn length. Deterministic — no wall clock.
+    expect(wrappedLines('x'.repeat(10_000_000), 80)).toBeLessThanOrEqual(rows)
+    // Liveness only. The loop bails at the row cap, so this is orders of
+    // magnitude of headroom; the repo requires timing bounds >= 2s precisely so
+    // a loaded runner cannot fail them (a 50ms bound did, at load ~24).
+    expect(elapsed).toBeLessThan(2_000)
   })
 })

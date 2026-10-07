@@ -1,10 +1,22 @@
 import { mkdtempSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Readable } from 'node:stream'
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { performHeapDump } from './memory.js'
+
+// v8.getHeapSnapshot() serializes the worker's entire heap: hundreds of ms to
+// seconds per call, growing with the heap, and nothing else here stubs it.
+// These tests pin the auto-heapdump opt-in gate and the retention prune — not
+// v8's serializer — so stand in a tiny synthetic stream. Without this, the
+// tests that dump more than once (three truthy spellings; the retention case)
+// raced the 5s budget under load and reported a timeout, not a gate failure.
+vi.mock('node:v8', async importOriginal => ({
+  ...(await importOriginal<typeof import('node:v8')>()),
+  getHeapSnapshot: () => Readable.from(['{"snapshot":true}'])
+}))
 
 const ENV_KEYS = ['SHIINA_AUTO_HEAPDUMP', 'SHIINA_HEAPDUMP_DIR', 'SHIINA_HEAPDUMP_MAX_BYTES'] as const
 
