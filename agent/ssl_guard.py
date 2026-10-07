@@ -59,7 +59,23 @@ def verify_ca_bundle() -> None:
         import certifi
     except Exception as exc:
         raise _ssl_err(f"certifi is not importable: {exc}") from exc
-    _validate_bundle_path("certifi", str(certifi.where()), require_substantial=True)
+
+    bundle_path = str(certifi.where())
+    if not os.path.exists(bundle_path):
+        import importlib
+        try:
+            importlib.reload(certifi)
+            bundle_path = str(certifi.where())
+        except Exception:
+            pass
+
+    if not os.path.exists(bundle_path):
+        for candidate in ("/etc/ssl/cert.pem", "/etc/ssl/certs/ca-certificates.crt"):
+            if os.path.exists(candidate):
+                bundle_path = candidate
+                break
+
+    _validate_bundle_path("certifi", bundle_path, require_substantial=True)
 
 
 # ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
