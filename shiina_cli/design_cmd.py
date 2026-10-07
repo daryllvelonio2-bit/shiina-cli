@@ -62,8 +62,8 @@ _DESIGN_KEYS: tuple[tuple[str, str], ...] = (
     ("layout.regions.<name>", "boolean region override: rails, dock, pet, statusRule, fileChanges, "
                               "agentsDock, todoUnderPrompt, stickyPrompt, scrollbar, sideColumn, "
                               "ledger"),
-    ("layout.sections.<name>", "hidden | collapsed | expanded for thinking, tools, subagents, "
-                               "activity")
+    ("layout.sections.<name>", "hidden | collapsed | live | expanded for thinking, tools, subagents, "
+                               "activity (live = open during the turn, folds to one row when it settles)")
 )
 
 

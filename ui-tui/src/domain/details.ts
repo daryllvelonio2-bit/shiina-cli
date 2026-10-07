@@ -1,28 +1,31 @@
 import type { DetailsMode, SectionName, SectionVisibility } from '../types.js'
 
-const MODES = ['hidden', 'collapsed', 'expanded'] as const
+const MODES = ['hidden', 'collapsed', 'live', 'expanded'] as const
 
 export const SECTION_NAMES = ['thinking', 'tools', 'subagents', 'activity'] as const
 
 // Out-of-the-box per-section defaults — applied when the user hasn't pinned
 // an explicit override and layered ABOVE the global details_mode:
 //
-//   - thinking / tools: expanded — stream open so the turn reads like a
-//     live transcript (reasoning + tool calls side by side) instead of a
-//     wall of chevrons the user has to click every turn.
+//   - thinking / tools: live — open while the turn is running (reasoning and
+//     tool calls read as a live transcript), then fold to a single header row
+//     the moment the turn settles. `expanded` stays open for good; `collapsed`
+//     never auto-opens.
 //   - activity: hidden — ambient meta (gateway hints, terminal-parity
 //     nudges, background notifications) is noise for typical use.  Tool
 //     failures still render inline on the failing tool row, and ambient
 //     errors/warnings surface via the floating-alert backstop when every
 //     panel resolves to hidden.
 //   - subagents: not set — falls through to the global details_mode so
-//     Spawn trees stay under a chevron until a delegation actually happens.
+//     spawn trees stay under a chevron until a delegation actually happens.
 //
-// Opt out of any of these with `display.sections.<name>` in config.yaml
-// or at runtime via `/details <name> collapsed|hidden`.
+// Every one of these is design-driven: a design's `layout.sections` block
+// (e.g. designs/codex.yaml) overrides them, and `display.sections.<name>` in
+// config.yaml or `/details <name> live|collapsed|hidden|expanded` pins one at
+// runtime.
 const SECTION_DEFAULTS: SectionVisibility = {
-  thinking: 'expanded',
-  tools: 'expanded',
+  thinking: 'live',
+  tools: 'live',
   activity: 'hidden'
 }
 
@@ -91,3 +94,15 @@ export const detailsRequested = (sections?: SectionVisibility, commandOverride =
   !!commandOverride || Object.keys(sections ?? {}).length > 0
 
 export const nextDetailsMode = (m: DetailsMode): DetailsMode => MODES[(MODES.indexOf(m) + 1) % MODES.length]!
+
+/** Does a section render open on mount?
+ *
+ *  - `expanded` — yes, always (an explicit "keep this in my face").
+ *  - `live`     — only for the in-progress turn's block; a settled row folds
+ *                 to its single header line (`isLive`).
+ *  - `collapsed` / `hidden` — no.
+ *
+ *  `isLive` is the renderer's own signal that this row belongs to the running
+ *  turn (`preferExpandedThinking`), not a user preference. */
+export const opensByDefault = (mode: DetailsMode, isLive: boolean): boolean =>
+  mode === 'expanded' || (mode === 'live' && isLive)

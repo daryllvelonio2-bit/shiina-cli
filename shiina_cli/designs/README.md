@@ -247,7 +247,8 @@ layout:
     sideColumn: false     # reserved right-hand instrument column
     ledger: true          # the persistent step list
 
-  sections:               # hidden | collapsed | expanded, per progress section
+  sections:               # hidden | collapsed | live | expanded, per progress section
+                          # live = open during the turn, folds to one row when it settles
     thinking: collapsed
     tools: expanded
     subagents: expanded

@@ -7,7 +7,7 @@ import spinners, { type BrailleSpinnerName } from 'unicode-animations'
 import { $uiState } from '../app/uiStore.js'
 import { THINKING_COT_MAX, THINKING_TRAIL_MAX_CHARS, THINKING_TRAIL_MAX_LINES } from '../config/limits.js'
 import { type DesignIndent, headerEmphasis, headerLabel, headerLead } from '../design.js'
-import { sectionMode } from '../domain/details.js'
+import { opensByDefault, sectionMode } from '../domain/details.js'
 import {
   buildSubagentTree,
   fmtTokens,
@@ -827,13 +827,13 @@ export const ToolTrail = memo(function ToolTrail({
     [commandOverride, detailsMode, layoutSections, sections]
   )
 
-  // Live gate: the in-progress turn's block (liveDetails → preferExpandedThinking)
-  // renders open; a settled row mounts collapsed to one line.
-  const thinkingDefaultExpanded =
-    visible.thinking === 'expanded' && (preferExpandedThinking || commandOverride || sections?.thinking === 'expanded')
-
-  const toolsDefaultExpanded =
-    visible.tools === 'expanded' && (preferExpandedThinking || commandOverride || sections?.tools === 'expanded')
+  // Open defaults come from the section MODE (design/layout/YAML-driven):
+  // `live` opens the running turn's block and folds it once settled,
+  // `expanded` keeps it open for good. No mode is hardcoded here — see
+  // `layout.sections` in the design YAML (designs/codex.yaml).
+  const thinkingDefaultExpanded = opensByDefault(visible.thinking, preferExpandedThinking)
+  const toolsDefaultExpanded = opensByDefault(visible.tools, preferExpandedThinking)
+  const subagentsDefaultExpanded = opensByDefault(visible.subagents, preferExpandedThinking)
 
   // An explicit `/details` expand or design maxLines=null/0 shows the whole chain of thought;
   // otherwise respect the design's maxLines (defaults to undefined = full/unlimited).
@@ -861,9 +861,9 @@ export const ToolTrail = memo(function ToolTrail({
   // sticks (see the no-OR-at-effect-time warning above, #14968).
   const [openThinking, setOpenThinking] = useState(thinkingDefaultExpanded || reasoningAlwaysVisible)
   const [openTools, setOpenTools] = useState(toolsDefaultExpanded)
-  const [openSubagents, setOpenSubagents] = useState(visible.subagents === 'expanded')
-  const [deepSubagents, setDeepSubagents] = useState(visible.subagents === 'expanded')
-  const [openMeta, setOpenMeta] = useState(visible.activity === 'expanded')
+  const [openSubagents, setOpenSubagents] = useState(subagentsDefaultExpanded)
+  const [deepSubagents, setDeepSubagents] = useState(subagentsDefaultExpanded)
+  const [openMeta, setOpenMeta] = useState(opensByDefault(visible.activity, preferExpandedThinking))
 
   useEffect(() => {
     if (!tools.length || (visible.tools !== 'expanded' && !openTools)) {
@@ -892,9 +892,9 @@ export const ToolTrail = memo(function ToolTrail({
 
     setOpenThinking(thinkingDefaultExpanded)
     setOpenTools(toolsDefaultExpanded)
-    setOpenSubagents(visible.subagents === 'expanded')
-    setOpenMeta(visible.activity === 'expanded')
-  }, [thinkingDefaultExpanded, toolsDefaultExpanded, visible])
+    setOpenSubagents(subagentsDefaultExpanded)
+    setOpenMeta(opensByDefault(visible.activity, preferExpandedThinking))
+  }, [subagentsDefaultExpanded, thinkingDefaultExpanded, toolsDefaultExpanded, visible])
 
   // `collapsed` is an auto preference: keep the panel open while reasoning
   // is live (stream pulses keep `reasoningActive` true) and collapse it the
@@ -931,15 +931,15 @@ export const ToolTrail = memo(function ToolTrail({
       setOpenTools(false)
     }
 
-    if (visible.subagents !== 'expanded') {
+    if (!subagentsDefaultExpanded) {
       setOpenSubagents(false)
       setDeepSubagents(false)
     }
 
-    if (visible.activity !== 'expanded') {
+    if (!opensByDefault(visible.activity, false)) {
       setOpenMeta(false)
     }
-  }, [busy, thinkingAuto, visible])
+  }, [busy, subagentsDefaultExpanded, thinkingAuto, visible])
 
   const cot = useMemo(() => thinkingPreview(reasoning, 'full', THINKING_COT_MAX), [reasoning])
 
@@ -1386,7 +1386,14 @@ export const ToolTrail = memo(function ToolTrail({
       </Box>
     ) : null
   }
-  const isSingleSetOpen = openThinking || openTools || openSubagents || openMeta
+  // Only a section that actually HAS content may hold the unified block open —
+  // a stale/leftover flag on an absent section used to force every settled row
+  // open (the design's `subagents: expanded` default did exactly that).
+  const isSingleSetOpen =
+    (hasThinking && openThinking) ||
+    (hasTools && openTools) ||
+    (hasSubagents && openSubagents) ||
+    (activity.length > 0 && openMeta)
 
   const toggleUnified = () => {
     const next = !isSingleSetOpen

@@ -144,7 +144,7 @@ _WS_ORPHAN_INTERRUPT_REAP_POLL_S = 1.0
 _WS_ORPHAN_INTERRUPT_REAP_MAX_POLLS = 60
 _TURN_SETTLE_BEFORE_CLOSE_SECONDS = 5.0
 _DETAIL_SECTION_NAMES = ("thinking", "tools", "subagents", "activity")
-_DETAIL_MODES = frozenset({"hidden", "collapsed", "expanded"})
+_DETAIL_MODES = frozenset({"hidden", "collapsed", "live", "expanded"})
 
 # ── Async RPC dispatch: slow handlers (seconds to minutes) would leave approval.respond and
 # session.interrupt unread in the stdin pipe, so only THESE go to a small thread pool; everything else

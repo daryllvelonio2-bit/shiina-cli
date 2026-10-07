@@ -87,6 +87,26 @@ describe('a settled trail stays closed', () => {
 
     trail.instance.unmount()
   })
+
+  it('honours `tools: live` from the design YAML — open while live, folded when settled', async () => {
+    // The design's layout.sections block (designs/codex.yaml) is the knob:
+    // `live` folds a finished turn to its one-line header, `expanded` keeps it.
+    const settled = mountTrail({ layoutSections: { tools: 'live' }, reasoning: COT })
+
+    await flush()
+
+    expect(settled.text()).not.toMatch(/terminal/i)
+
+    settled.instance.unmount()
+
+    const live = mountTrail({ layoutSections: { tools: 'live' }, preferExpandedThinking: true, reasoning: COT })
+
+    await flush()
+
+    expect(live.text()).toMatch(/terminal/i)
+
+    live.instance.unmount()
+  })
 })
 
 describe('reasoning is a window, not a wall', () => {

@@ -116,8 +116,10 @@ layout:
     stickyPrompt: false
     todoUnderPrompt: false
   sections:
-    # In-progress actions/tools/thinking expand live during generation, and auto-fold when completed.
+    # Per-section progress visibility. live = open while the turn runs, then
+    # fold to a single header row once it settles; expanded = stay open;
+    # collapsed = header only; hidden = never render.
     activity: hidden
-    subagents: expanded
-    thinking: expanded
-    tools: expanded
+    subagents: live
+    thinking: live
+    tools: live

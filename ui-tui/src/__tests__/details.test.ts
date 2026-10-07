@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest'
 
-import { isSectionName, parseDetailsMode, resolveSections, SECTION_NAMES, sectionMode } from '../domain/details.js'
+import {
+  isSectionName,
+  opensByDefault,
+  parseDetailsMode,
+  resolveSections,
+  SECTION_NAMES,
+  sectionMode
+} from '../domain/details.js'
 
 describe('parseDetailsMode', () => {
   it('accepts the canonical modes case-insensitively', () => {
     expect(parseDetailsMode('hidden')).toBe('hidden')
     expect(parseDetailsMode(' COLLAPSED ')).toBe('collapsed')
     expect(parseDetailsMode('Expanded')).toBe('expanded')
+    expect(parseDetailsMode(' LIVE ')).toBe('live')
   })
 
   it('rejects junk', () => {
@@ -71,6 +79,25 @@ describe('resolveSections', () => {
   })
 })
 
+describe('opensByDefault', () => {
+  it('opens `live` only for the running turn, and `expanded` always', () => {
+    expect(opensByDefault('live', true)).toBe(true)
+    expect(opensByDefault('live', false)).toBe(false)
+    expect(opensByDefault('expanded', true)).toBe(true)
+    expect(opensByDefault('expanded', false)).toBe(true)
+    expect(opensByDefault('collapsed', true)).toBe(false)
+    expect(opensByDefault('hidden', true)).toBe(false)
+  })
+
+  it('a design/layout sections block in the YAML decides the mode', () => {
+    // designs/codex.yaml sets layout.sections.tools: live — the layout layer
+    // wins over the built-in default, and a user pin still wins over both.
+    expect(sectionMode('tools', 'collapsed', undefined, false, { tools: 'live' })).toBe('live')
+    expect(sectionMode('tools', 'collapsed', { tools: 'expanded' }, false, { tools: 'live' })).toBe('expanded')
+    expect(sectionMode('subagents', 'collapsed', undefined, false, { subagents: 'live' })).toBe('live')
+  })
+})
+
 describe('sectionMode', () => {
   it('falls back to the global mode for sections without a built-in default', () => {
     expect(sectionMode('subagents', 'collapsed', {})).toBe('collapsed')
@@ -78,11 +105,11 @@ describe('sectionMode', () => {
     expect(sectionMode('subagents', 'hidden', {})).toBe('hidden')
   })
 
-  it('streams thinking + tools expanded by default for persisted config values', () => {
-    expect(sectionMode('thinking', 'collapsed', {})).toBe('expanded')
-    expect(sectionMode('thinking', 'hidden', undefined)).toBe('expanded')
-    expect(sectionMode('tools', 'collapsed', {})).toBe('expanded')
-    expect(sectionMode('tools', 'hidden', undefined)).toBe('expanded')
+  it('defaults thinking + tools to `live` (open during the turn, folded when settled)', () => {
+    expect(sectionMode('thinking', 'collapsed', {})).toBe('live')
+    expect(sectionMode('thinking', 'hidden', undefined)).toBe('live')
+    expect(sectionMode('tools', 'collapsed', {})).toBe('live')
+    expect(sectionMode('tools', 'hidden', undefined)).toBe('live')
   })
 
   it('hides the activity panel by default for persisted config values', () => {

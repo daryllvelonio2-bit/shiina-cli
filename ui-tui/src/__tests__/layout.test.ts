@@ -168,12 +168,13 @@ describe('layout regions', () => {
 describe('layout progress defaults', () => {
   it('workbench pins the built-in defaults, so existing users see no change', () => {
     // The compatibility guard: workbench's progress profile must stay exactly
-    // what SECTION_DEFAULTS used to be (thinking/tools expanded, activity
-    // hidden, subagents falling through to the global mode).
+    // the built-in SECTION_DEFAULTS (thinking/tools live — open during the
+    // turn, folded once settled — activity hidden, subagents falling through
+    // to the global mode).
     expect(layoutSections('workbench')).toEqual({
       activity: 'hidden',
-      thinking: 'expanded',
-      tools: 'expanded'
+      thinking: 'live',
+      tools: 'live'
     })
   })
 
@@ -183,8 +184,8 @@ describe('layout progress defaults', () => {
 
     expect(new Set(shapes).size).toBe(LAYOUT_IDS.length)
     expect(layoutSections('minimal').thinking).toBe('collapsed')
-    expect(layoutSections('timeline').tools).toBe('expanded')
-    expect(layoutSections('studio').subagents).toBe('expanded')
+    expect(layoutSections('timeline').tools).toBe('live')
+    expect(layoutSections('studio').subagents).toBe('live')
   })
 
   it('layers under the user, never over them', () => {
