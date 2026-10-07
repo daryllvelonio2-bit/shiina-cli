@@ -863,7 +863,8 @@ export const ToolTrail = memo(function ToolTrail({
   const [openTools, setOpenTools] = useState(toolsDefaultExpanded)
   const [openSubagents, setOpenSubagents] = useState(subagentsDefaultExpanded)
   const [deepSubagents, setDeepSubagents] = useState(subagentsDefaultExpanded)
-  const [openMeta, setOpenMeta] = useState(opensByDefault(visible.activity, preferExpandedThinking))
+  const activityDefaultExpanded = opensByDefault(visible.activity, preferExpandedThinking)
+  const [openMeta, setOpenMeta] = useState(activityDefaultExpanded)
 
   useEffect(() => {
     if (!tools.length || (visible.tools !== 'expanded' && !openTools)) {
@@ -879,9 +880,15 @@ export const ToolTrail = memo(function ToolTrail({
   // this re-sync was clobbering the reasoningAlwaysVisible mount value above
   // right after mount, collapsing a just-opened MoA reference panel under
   // `thinking: hidden` before the user ever saw it (#64701). Skip only the
-  // very first run; every subsequent `visible` change (the case this effect
-  // exists for) still re-syncs without the override, so a manual collapse
-  // still sticks per the no-OR-at-effect-time rule above.
+  // very first run; every subsequent mode change (the case this effect exists
+  // for) still re-syncs without the override, so a manual collapse still
+  // sticks per the no-OR-at-effect-time rule above.
+  //
+  // Deps are the RESOLVED MODES, never the `visible` object: `layoutSections()`
+  // returns a fresh object every render (appLayout computes it inline), so an
+  // object dep made this fire on every repaint and reset the panel to its
+  // default — a panel the user opened folded itself again a few hundred ms
+  // later, mid-turn and while idle.
   const skippedInitialSync = useRef(false)
   useEffect(() => {
     if (!skippedInitialSync.current) {
@@ -893,8 +900,8 @@ export const ToolTrail = memo(function ToolTrail({
     setOpenThinking(thinkingDefaultExpanded)
     setOpenTools(toolsDefaultExpanded)
     setOpenSubagents(subagentsDefaultExpanded)
-    setOpenMeta(opensByDefault(visible.activity, preferExpandedThinking))
-  }, [subagentsDefaultExpanded, thinkingDefaultExpanded, toolsDefaultExpanded, visible])
+    setOpenMeta(activityDefaultExpanded)
+  }, [activityDefaultExpanded, subagentsDefaultExpanded, thinkingDefaultExpanded, toolsDefaultExpanded])
 
   // `collapsed` is an auto preference: keep the panel open while reasoning
   // is live (stream pulses keep `reasoningActive` true) and collapse it the
