@@ -37,6 +37,14 @@ const ESC = String.fromCharCode(27)
 const CSI_RE = new RegExp(`${ESC}\\[[0-?]*[ -/]*[@-~]`, 'g')
 const OSC_RE = new RegExp(`${ESC}\\][\\s\\S]*?(?:${BEL}|${ESC}\\\\)`, 'g')
 
+// OSC 8 may be terminated by BEL, or by ST (ESC backslash) on terminals whose
+// escape syntax asks for it — kitty, per termio/osc.ts `osc()`. Which one is
+// emitted depends on the terminal detected from the environment, so asserting
+// BEL alone made these tests pass or fail by the developer's $TERM. The target
+// is the contract; the terminator is not.
+const endsOsc8 = (ansi: string, target: string) =>
+  ansi.includes(`${target}${BEL}`) || ansi.includes(`${target}${ESC}\\`)
+
 // The escape stream exactly as it reaches the terminal, OSC sequences and
 // all — the only view that can prove an OSC 8 hyperlink was emitted.
 const renderAnsi = (node: React.ReactNode) => {
@@ -305,7 +313,7 @@ describe('Md link labels', () => {
     const url = 'https://connect.example.com/link/lk_9f2c1d7e'
     const ansi = renderAnsi(md(`Connect link: ${url}`))
 
-    expect(ansi).toContain(`;${url}${BEL}`)
+    expect(endsOsc8(ansi, `;${url}`)).toBe(true)
     expect(ansi).toContain(`${ESC}]8;`)
   })
 
@@ -328,7 +336,7 @@ describe('Md link labels', () => {
     const ansi = renderAnsi(md(`[Trip details](${url})`))
 
     expect(stripAnsi(ansi.replace(OSC_RE, ''))).toContain('Trip details')
-    expect(ansi).toContain(`;${url}${BEL}`)
+    expect(endsOsc8(ansi, `;${url}`)).toBe(true)
   })
 
   it('never lets a fetched page title replace the URL', async () => {

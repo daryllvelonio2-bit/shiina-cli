@@ -168,7 +168,11 @@ describe('thinkingPreview over-bound tail', () => {
   it('retains the live tail when reasoning exceeds the clean bound', () => {
     const TAIL = '<<<LIVE_TAIL_MARKER>>>'
     // Slightly above the 24k clean-tail bound, so the implementation must trim.
-    const reasoning = 'A'.repeat(25_000) + '\n' + TAIL
+    // Word-separated filler (the shape real streamed reasoning has): an
+    // unbroken character run makes cleanThinkingText's status regexes backtrack
+    // quadratically, which measures the regex engine, not the tail bound.
+    const FILLER = 'the quick brown fox jumps over the lazy dog '
+    const reasoning = FILLER.repeat(Math.ceil(25_000 / FILLER.length)).slice(0, 25_000) + '\n' + TAIL
     const result = thinkingPreview(reasoning, 'full')
     expect(result).toContain(TAIL)
     // The bounded window is shorter than the 25k prefix, but the tail remains.

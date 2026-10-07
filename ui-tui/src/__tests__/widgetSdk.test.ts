@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
+// render-to-screen pulls in the whole renderer; the test below imported it
+// lazily, so the first load was billed to that test's 5s budget and timed out
+// on a loaded runner. Import it at collection time (not test-budgeted) instead.
+import { renderToScreen } from '../../packages/shiina-ink/src/ink/render-to-screen.js'
+
 import { getOverlayState, resetOverlayState } from '../app/overlayStore.js'
 import { dialogTestApp, gridTestApp } from '../sdk/apps/index.js'
 import { closeWidget, dispatchWidgetInput, launchWidget, openWidget } from '../sdk/host.js'
@@ -60,7 +65,6 @@ describe('widget SDK host', () => {
   it('a widget that throws in render shows an error chip, not a dead TUI', async () => {
     const { defineWidgetApp } = await import('../sdk/registry.js')
     const { AmbientDock } = await import('../sdk/host.js')
-    const { renderToScreen } = await import('../../packages/shiina-ink/src/ink/render-to-screen.js')
     const { createElement } = await import('react')
 
     defineWidgetApp({

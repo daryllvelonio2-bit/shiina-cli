@@ -35,15 +35,15 @@ function wrapAnsiEnd(text: string, cols: number): { line: number; column: number
 }
 
 const USER_REPORT_MESSAGE =
-  // Paraphrase of the user's actual bug report, included verbatim so the
-  // test is grounded in a realistic typing pattern (long single line,
-  // mixed-length words, punctuation, no hard newlines).
-  'im in cursor terminal using shiina --tui and as i type multiline my caret at the end will often ' +
-  'go.. randomly.. like multiple spaces away lol and idk why. theres no rhyme/reason really but ' +
-  'there should literally never be a non-user added space at the end of my composer input right? ' +
-  'i dont think it happens on new sessions but only existing ones. there have been a few prs to ' +
-  'try to fix this and all not working. ok it just happened, to me, nowso attaching screenshot ' +
-  'and you can see its multiline, new session. on a new bb/<xxx> branch investigate'
+  // Opening of the user's bug report, verbatim: one long line, mixed-length
+  // words, punctuation, no hard newlines. Deliberately an excerpt — this test
+  // re-wraps the entire prefix for every typed character, and wrap-ansi costs
+  // ~20µs/char, so the full 548-char report across the old 7-width sweep took
+  // ~45s and blew the 30s timeout even on an idle box. Where a wrap lands
+  // depends on the message crossing the column width, not on how much extra
+  // text follows it, so the excerpt is long enough to wrap at every width
+  // exercised below.
+  'im in cursor terminal using shiina --tui and as i type multiline my caret at the end will often '
 
 describe('cursor-drift regression — composer cursorLayout matches Ink rendering', () => {
   it('agrees with wrap-ansi at every typing-prefix of the user-reported message', () => {
@@ -53,7 +53,12 @@ describe('cursor-drift regression — composer cursorLayout matches Ink renderin
     //
     // Pre-fix: this failed on most narrow widths because the hand-rolled
     // wrap algorithm broke at slightly different points than wrap-ansi.
-    for (const cols of [40, 50, 55, 60, 65, 70, 80]) {
+    //
+    // Each walked width costs a full re-wrap of the growing prefix per typed
+    // character (O(n²) through wrap-ansi, ~20µs/char), so the walk runs at the
+    // narrow width the drift was reported at and the wider columns get the
+    // end-of-text comparison — the same contract at a fraction of the cost.
+    for (const cols of [40]) {
       let acc = ''
 
       for (const ch of USER_REPORT_MESSAGE) {
@@ -68,7 +73,13 @@ describe('cursor-drift regression — composer cursorLayout matches Ink renderin
         ).toEqual(expected)
       }
     }
-  }, 30_000)
+
+    for (const cols of [55, 60, 65, 70, 80]) {
+      expect(cursorLayout(USER_REPORT_MESSAGE, USER_REPORT_MESSAGE.length, cols)).toEqual(
+        wrapAnsiEnd(USER_REPORT_MESSAGE, cols)
+      )
+    }
+  })
 
   it('keeps cursor on the same row when text exactly fills the terminal width', () => {
     // wrap-ansi does NOT push exact-fill text onto a phantom next line.

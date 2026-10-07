@@ -1,3 +1,10 @@
+// Warm the textInput module graph once at collection time. Each test below
+// re-imports it after vi.resetModules() to re-evaluate its platform-dependent
+// constants; without this warm-up the FIRST such import pays the whole
+// transform/execute cost of React plus the full ink bundle inside the 5s test
+// budget, and times out on a loaded runner. Collection is not test-budgeted.
+import '../components/textInput.js'
+
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const originalPlatform = process.platform

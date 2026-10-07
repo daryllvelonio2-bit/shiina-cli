@@ -1,3 +1,10 @@
+// Warm the theme module graph once at collection time. Every test below
+// re-imports '../theme.js' after vi.resetModules() to re-evaluate it against a
+// stubbed env; without this warm-up the FIRST such import pays the whole
+// transform cost inside the 5s test budget and times out on a loaded runner
+// (a load artifact reported as a failure, burying the real assertion).
+import '../theme.js'
+
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // `theme.js` reads `process.env` at module-load to compute DEFAULT_THEME,
