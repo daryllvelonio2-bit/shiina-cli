@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { DEFAULT_GLYPHS } from '../design.js'
 import {
   buildSubagentTree,
   descendantIds,
@@ -16,6 +17,8 @@ import {
   widthByDepth
 } from '../lib/subagentTree.js'
 import type { SubagentProgress } from '../types.js'
+
+const SEP = DEFAULT_GLYPHS.dotSeparator
 
 const makeItem = (overrides: Partial<SubagentProgress> & Pick<SubagentProgress, 'id' | 'index'>): SubagentProgress => ({
   depth: 0,
@@ -142,19 +145,22 @@ describe('fmtCost + fmtTokens', () => {
 describe('formatSummary with tokens', () => {
   it('includes tokens but not cost', () => {
     expect(
-      formatSummary({
-        activeCount: 0,
-        costUsd: 0.42,
-        descendantCount: 3,
-        filesTouched: 0,
-        hotness: 0,
-        inputTokens: 8000,
-        maxDepthFromHere: 2,
-        outputTokens: 2000,
-        totalDuration: 30,
-        totalTools: 14
-      })
-    ).toBe('d2 · 3 agents · 14 tools · 30s · 10k tok')
+      formatSummary(
+        {
+          activeCount: 0,
+          costUsd: 0.42,
+          descendantCount: 3,
+          filesTouched: 0,
+          hotness: 0,
+          inputTokens: 8000,
+          maxDepthFromHere: 2,
+          outputTokens: 2000,
+          totalDuration: 30,
+          totalTools: 14
+        },
+        SEP
+      )
+    ).toBe(`d2${SEP}3 agents${SEP}14 tools${SEP}30s${SEP}10k tok`)
   })
 })
 
@@ -353,20 +359,23 @@ describe('formatSummary', () => {
   }
 
   it('collapses zero-valued components', () => {
-    expect(formatSummary({ ...emptyTotals, descendantCount: 1 })).toBe('d0 · 1 agent')
+    expect(formatSummary({ ...emptyTotals, descendantCount: 1 }, SEP)).toBe(`d0${SEP}1 agent`)
   })
 
   it('emits rich summary with all pieces', () => {
     expect(
-      formatSummary({
-        ...emptyTotals,
-        activeCount: 2,
-        descendantCount: 7,
-        maxDepthFromHere: 3,
-        totalDuration: 134,
-        totalTools: 124
-      })
-    ).toBe('d3 · 7 agents · 124 tools · 2m 14s · ⚡2')
+      formatSummary(
+        {
+          ...emptyTotals,
+          activeCount: 2,
+          descendantCount: 7,
+          maxDepthFromHere: 3,
+          totalDuration: 134,
+          totalTools: 124
+        },
+        SEP
+      )
+    ).toBe(`d3${SEP}7 agents${SEP}124 tools${SEP}2m 14s${SEP}⚡2`)
   })
 })
 

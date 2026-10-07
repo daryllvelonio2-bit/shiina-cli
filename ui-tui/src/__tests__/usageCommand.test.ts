@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { sessionCommands } from '../app/slash/commands/session.js'
 import type { SessionUsageResponse } from '../gatewayTypes.js'
+import { DEFAULT_THEME } from '../theme.js'
 
 const usageCommand = sessionCommands.find(cmd => cmd.name === 'usage')!
 
@@ -28,7 +29,11 @@ const buildCtx = (results: Record<string, unknown>) => {
     guardedErr: vi.fn(),
     sid: 'sid-1',
     stale: () => false,
-    transcript: { page: vi.fn(), panel, sys }
+    transcript: { page: vi.fn(), panel, sys },
+    // The two-bar usage model renders the active design's separator + meter
+    // cells, so the fake carries the real (default) theme like the live
+    // SlashRunCtx does.
+    ui: { theme: DEFAULT_THEME }
   }
 
   const run = async (arg: string) => {

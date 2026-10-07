@@ -474,7 +474,7 @@ const renderTable = (k: number, rows: string[][], t: Theme, cols?: number) => {
       return (
         <Box flexDirection="column" key={k} paddingLeft={TABLE_PADDING_LEFT}>
           <Text bold color={t.color.accent} wrap="wrap-trim">
-            {normalizedRows[0]!.map(h => stripInlineMarkup(h)).join(' · ')}
+            {normalizedRows[0]!.map(h => stripInlineMarkup(h)).join(t.design.glyphs.dotSeparator)}
           </Text>
         </Box>
       )
@@ -999,7 +999,7 @@ function MdImpl({ cols, compact, t, text }: MdProps) {
 
           nodes.push(
             <Text key={`${key}-def-${i}`} wrap="wrap-trim">
-              <Text color={t.color.muted}> · </Text>
+              <Text color={t.color.muted}>{t.design.glyphs.dotSeparator}</Text>
               <MdInline color={t.color.text} t={t} text={def} />
             </Text>
           )

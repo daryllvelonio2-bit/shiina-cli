@@ -4,6 +4,12 @@
  * colors with theme tones; everything auto-scales to the series' min/max.
  */
 
+/**
+ * Chart cells are a DATA ENCODING, not chrome: this ramp plus the meter cells
+ * below are the chart layer's scale for a number, so they stay literal. The
+ * design tokens own the chrome (see the CELL note in
+ * `__tests__/noHardcodedLiterals.test.ts`).
+ */
 const BLOCKS = '▁▂▃▄▅▆▇█'
 
 const normalize = (series: number[], window: number): { min: number; range: number; window: number[] } => {

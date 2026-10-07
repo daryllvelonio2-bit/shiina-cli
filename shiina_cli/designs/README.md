@@ -172,6 +172,9 @@ design:
     off: "○"              # unavailable / not-authenticated
     selected: "*"         # the currently-selected entry
     separator: " │ "      # status-rule segment separator (include spacing)
+    dotSeparator: " · "   # inline separator: compact meta lines and list joins (include spacing)
+    barFill: "█"          # a filled meter cell (usage / context bars)
+    barEmpty: "░"         # the unfilled remainder of a meter
     statusHead: "─ "      # leading status-rule dash (include trailing space)
     chain: "⛓"            # subagent / delegation count
     cache: "◎"            # cache-hit readout
@@ -194,6 +197,7 @@ design:
     railTee: "├"          # a tree rail that continues below the row
     railElbow: "└"        # a tree rail that ends at the row
     scrollThumb: "┃"      # the scrollbar thumb (a heavier vertical than the track)
+    rulerTick: "┼"        # a major tick on a timeline ruler
 
   status_bar:
     # Order AND allowlist. Omit the key (or set null) for the built-in set.

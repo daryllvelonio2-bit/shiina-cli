@@ -389,7 +389,7 @@ export function ClarifyPrompt({ cols = 80, onAnswer, onCancel, onQuestionAnswer,
         </Box>
 
         <Text color={t.color.muted}>
-          Enter send · Esc {choices.length ? 'back' : 'cancel'} ·{' '}
+          Enter send{t.design.glyphs.dotSeparator}Esc {choices.length ? 'back' : 'cancel'}{t.design.glyphs.dotSeparator.trimEnd()}{' '}
           {isMac ? 'Cmd+C copy · Cmd+V paste · Ctrl+C cancel' : 'Ctrl+C cancel'}
         </Text>
       </Box>

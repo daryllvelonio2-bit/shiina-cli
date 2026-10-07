@@ -229,7 +229,7 @@ export const opsCommands: SlashCommand[] = [
                 {
                   rows: checkpoints.map((c, idx) => [
                     `${idx + 1}. ${c.hash.slice(0, 10)}`,
-                    [c.timestamp, c.message].filter(Boolean).join(' · ') || '(no metadata)'
+                    [c.timestamp, c.message].filter(Boolean).join(ctx.ui.theme.design.glyphs.dotSeparator) || '(no metadata)'
                   ])
                 }
               ])
@@ -657,7 +657,7 @@ export const opsCommands: SlashCommand[] = [
 
               panel(`Browse Skills${pageNum > 1 ? ` — p${pageNum}` : ''}`, [
                 { rows },
-                ...(footer.length ? [{ text: footer.join(' · ') }] : [])
+                ...(footer.length ? [{ text: footer.join(ctx.ui.theme.design.glyphs.dotSeparator) }] : [])
               ])
             })
           )

@@ -14,6 +14,7 @@ import { DEV_CREDITS_MODE } from '../config/env.js'
 import { FACES } from '../content/faces.js'
 import { VERBS } from '../content/verbs.js'
 import { flankFill } from '../design.js'
+import type { DesignGlyphs } from '../design.js'
 import { fmtDuration } from '../domain/messages.js'
 import { stickyPromptFromViewport } from '../domain/viewport.js'
 import { buildSubagentTree, treeTotals, widthByDepth } from '../lib/subagentTree.js'
@@ -105,22 +106,24 @@ const indicatorFrameWidth = (style: IndicatorStyle): number => {
 // `unicode` is a bare 1-col braille spinner with no verb, while kaomoji/emoji/
 // ascii add a fixed-width verb; any style adds a bounded elapsed-time tail.
 // Mirrors FaceTicker's `frame + verbSegment + durationSegment` layout.
-export const busyIndicatorWidth = (style: IndicatorStyle, hasDuration: boolean): number => {
+export const busyIndicatorWidth = (style: IndicatorStyle, hasDuration: boolean, dotSeparator: string): number => {
   const { showVerb } = renderIndicator(style, 0)
   const verb = showVerb ? 1 + VERB_PAD_LEN : 0
-  // ` · ` plus the bounded clock (e.g. `59m 59s`).
-  const duration = hasDuration ? stringWidth(' · ') + MAX_DURATION_WIDTH : 0
+  // The separator plus the bounded clock (e.g. `59m 59s`).
+  const duration = hasDuration ? stringWidth(dotSeparator) + MAX_DURATION_WIDTH : 0
 
   return indicatorFrameWidth(style) + verb + duration
 }
 
 function FaceTicker({
   color,
+  dotSeparator,
   startedAt,
   style,
   verbOverride
 }: {
   color: string
+  dotSeparator: string
   startedAt?: null | number
   style: IndicatorStyle
   verbOverride?: string
@@ -177,7 +180,7 @@ function FaceTicker({
   // verb segment is hidden (e.g. `unicode` spinner style).  When the verb
   // IS shown, its trailing padding already provides the gap, so the extra
   // space is harmless.
-  const durationSegment = startedAt ? ` · ${fmtDuration(now - startedAt)}` : ''
+  const durationSegment = startedAt ? `${dotSeparator}${fmtDuration(now - startedAt)}` : ''
 
   return (
     <Text color={color}>
@@ -256,11 +259,11 @@ function noticeColor(level: Notice['level'], t: Theme): string {
   return t.color.accent
 }
 
-function ctxBar(pct: number | undefined, w = 10) {
+function ctxBar(pct: number | undefined, glyphs: DesignGlyphs, w = 10) {
   const p = Math.max(0, Math.min(100, pct ?? 0))
   const filled = Math.round((p / 100) * w)
 
-  return '█'.repeat(filled) + '░'.repeat(w - filled)
+  return glyphs.barFill.repeat(filled) + glyphs.barEmpty.repeat(w - filled)
 }
 
 // `minLeftContent` is the display width of the high-priority left segments
@@ -478,7 +481,7 @@ export function StatusRule({
           : ''
       : ''
 
-  const bar = !segs.compactCtx && usage.context_max && ok('context_pct') ? ctxBar(pct) : ''
+  const bar = !segs.compactCtx && usage.context_max && ok('context_pct') ? ctxBar(pct, t.design.glyphs) : ''
   const modelText = modelLabel(model, modelReasoningEffort, modelFast)
 
   // Battery read-out — the first (pinned) status-bar element when enabled.
@@ -505,7 +508,7 @@ export function StatusRule({
   // (kaomoji is wide + verb; unicode is a bare 1-col spinner). When a notice
   // occupies the slot it reserves only `noticeReserve` (it shrinks/truncates).
   const slotWidth = busy
-    ? busyIndicatorWidth(indicatorStyle, turnStartedAt != null)
+    ? busyIndicatorWidth(indicatorStyle, turnStartedAt != null, t.design.glyphs.dotSeparator)
     : showNotice
       ? noticeReserve
       : stringWidth(status)
@@ -618,6 +621,7 @@ export function StatusRule({
           {busy ? (
             <FaceTicker
               color={statusColor}
+              dotSeparator={t.design.glyphs.dotSeparator}
               startedAt={turnStartedAt}
               style={indicatorStyle}
               verbOverride={compacting ? 'compacting' : undefined}

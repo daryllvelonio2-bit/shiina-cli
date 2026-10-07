@@ -141,7 +141,7 @@ export function PetPicker({ gw, maxWidth, onClose, t }: PetPickerProps) {
       </Text>
 
       <Text color={t.color.muted} wrap="truncate-end">
-        {query ? `filter: ${query}` : 'type to filter'} · {view.length} pet{view.length === 1 ? '' : 's'}
+        {query ? `filter: ${query}` : 'type to filter'}{t.design.glyphs.dotSeparator}{view.length} pet{view.length === 1 ? '' : 's'}
       </Text>
 
       {offset > 0 && <Text color={t.color.muted}> ↑ {offset} more</Text>}

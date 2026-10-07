@@ -26,14 +26,19 @@ export const shortProject = (projectName: string, max = 18) => {
 // Falls back to the plain cwd/branch label when the session sits in no named
 // project, and when space is tight the project name wins (it's the identity the
 // user recognizes) with the cwd/branch dropped.
-export const fmtProjectCwdBranch = (cwd: string, branch: null | string, projectName?: null | string, max = 40) => {
+export const fmtProjectCwdBranch = (
+  cwd: string,
+  branch: null | string,
+  projectName: null | string | undefined,
+  separator: string,
+  max = 40
+) => {
   const project = shortProject(projectName || '')
 
   if (!project) {
     return fmtCwdBranch(cwd, branch, max)
   }
 
-  const separator = ' · '
   const remaining = max - project.length - separator.length
 
   if (remaining < 8) {
@@ -57,6 +62,7 @@ export const composeTabTitle = (
   sessionName: string,
   model: string,
   cwd: string,
+  separator: string,
   maxName = 28
 ): string => {
   const name = sessionName.trim()
@@ -64,5 +70,5 @@ export const composeTabTitle = (
 
   const segments = [shortName, model, cwd].filter(Boolean)
 
-  return segments.length ? `${marker} ${segments.join(' · ')}` : marker
+  return segments.length ? `${marker} ${segments.join(separator)}` : marker
 }

@@ -51,11 +51,11 @@ _DESIGN_KEYS: tuple[tuple[str, str], ...] = (
     ("design.indent.last", "lead before the final child (default '\u2514\u2500 ')"),
     ("design.spacing.<name>", "overlayPadX, overlayPadY, panelPadX, panelPadY, insetPadX, insetPadY, "
                               "rowGap, sectionGap — override the density scale individually"),
-    ("design.glyphs.<name>", "active, alert, blocked, bullet, busy, cache, chain, check, "
+    ("design.glyphs.<name>", "active, alert, barEmpty, barFill, blocked, bullet, busy, cache, chain, check, "
                              "checkboxOff, checkboxOn, chevronClosed, chevronOpen, cross, disclosure, "
-                             "dot, ellipsis, focus, halt, idle, latency, off, partial, pending, progress, "
-                             "railElbow, railTee, railVertical, resume, scrollThumb, selected, separator, "
-                             "statusHead, timeout, tps, waiting, warn"),
+                             "dot, dotSeparator, ellipsis, focus, halt, idle, latency, off, partial, pending, "
+                             "progress, railElbow, railTee, railVertical, resume, rulerTick, scrollThumb, "
+                             "selected, separator, statusHead, timeout, tps, waiting, warn"),
     ("design.status_bar.segments", "list of status fields, or null for the built-in order"),
     ("spinner.think", "animation names, e.g. [dna, helix, snake]"),
     ("spinner.tool", "animation names, e.g. [rain, columns, fillsweep]"),

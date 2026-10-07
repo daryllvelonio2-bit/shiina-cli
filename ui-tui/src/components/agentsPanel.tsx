@@ -26,7 +26,7 @@ export function AgentsPanelView({
   const summary = `${t.design.glyphs.chevronClosed} ${running} live agents`
   const hints = ' · Ctrl+T expand · F7 restore'
   const activityWidth = cols - stringWidth(summary + hints) - 3
-  const activity = rows[0]?.detail && activityWidth >= 12 ? ` · ${compactPreview(rows[0].detail, activityWidth)}` : ''
+  const activity = rows[0]?.detail && activityWidth >= 12 ? `${t.design.glyphs.dotSeparator}${compactPreview(rows[0].detail, activityWidth)}` : ''
 
   return (
     <Box

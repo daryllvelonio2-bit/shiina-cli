@@ -675,8 +675,8 @@ export function useMainApp(gw: GatewayClient) {
   useTerminalTitle(
     model
       ? {
-          tab: composeTabTitle(marker, ui.sessionTitle, '', ''),
-          window: composeTabTitle(marker, ui.sessionTitle, model, tabCwd ? shortCwd(tabCwd, 24) : '')
+          tab: composeTabTitle(marker, ui.sessionTitle, '', '', ui.theme.design.glyphs.dotSeparator),
+          window: composeTabTitle(marker, ui.sessionTitle, model, tabCwd ? shortCwd(tabCwd, 24) : '', ui.theme.design.glyphs.dotSeparator)
         }
       : 'Shiina'
   )
@@ -1384,7 +1384,7 @@ export function useMainApp(gw: GatewayClient) {
       // Cap the status-bar cwd/branch label tighter than the shared default so
       // it doesn't dominate the bar; the status rule reserves the left-side
       // essentials and truncates this further on narrow terminals.
-      cwdLabel: fmtProjectCwdBranch(cwd, gitBranch, ui.info?.project?.name, 28),
+      cwdLabel: fmtProjectCwdBranch(cwd, gitBranch, ui.info?.project?.name, ui.theme.design.glyphs.dotSeparator, 28),
       goodVibesTick,
       lastTurnEndedAt: ui.sid ? lastTurnEndedAt : null,
       sessionStartedAt: ui.sid ? sessionStartedAt : null,

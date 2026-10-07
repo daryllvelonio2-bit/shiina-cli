@@ -201,6 +201,7 @@ export function isRunning(item: Pick<SubagentProgress, 'status'>): boolean {
   return item.status === 'running' || item.status === 'queued'
 }
 
+// Sparkline ramp — a data encoding (see the CELL note in the literal guard), not chrome.
 const SPARK_RAMP = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'] as const
 
 /**
@@ -234,7 +235,7 @@ export function sparkline(values: readonly number[]): string {
 /**
  * Format totals into a compact one-line summary: `d2 · 7 agents · 124 tools · 2m 14s`
  */
-export function formatSummary(totals: SubagentAggregate): string {
+export function formatSummary(totals: SubagentAggregate, separator: string): string {
   const pieces = [`d${Math.max(0, totals.maxDepthFromHere)}`]
   pieces.push(`${totals.descendantCount} agent${totals.descendantCount === 1 ? '' : 's'}`)
 
@@ -256,7 +257,7 @@ export function formatSummary(totals: SubagentAggregate): string {
     pieces.push(`⚡${totals.activeCount}`)
   }
 
-  return pieces.join(' · ')
+  return pieces.join(separator)
 }
 
 /** Compact dollar amount: `$0.02`, `$1.34`, `$12.4` — never > 5 chars beyond the `$`. */
