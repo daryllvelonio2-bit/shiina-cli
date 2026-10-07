@@ -394,3 +394,6 @@ core.*
 # QA gate reports (scripts/qa_gate.py)
 .qa/
 
+# Personal Obsidian vault (local only, never commit)
+/vault/
+

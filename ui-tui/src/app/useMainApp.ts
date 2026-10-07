@@ -10,7 +10,7 @@ import {
 } from '@shiina/ink'
 import { JSON_RPC_METHOD_NOT_FOUND, type ServerRequest } from '@shiina/shared/json-rpc-channel'
 import { useStore } from '@nanostores/react'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { DASHBOARD_TUI_MODE, STARTUP_RESUME_ID } from '../config/env.js'
 import { WHEEL_SCROLL_STEP } from '../config/limits.js'
@@ -358,85 +358,7 @@ export function useMainApp(gw: GatewayClient) {
     return next
   }, [])
 
-  // Dynamic windowing of history rows:
-  // When turn limit is active, show the latest N turns, and prepend older turns as user scrolls up.
-  // When an older turn prepends, compensate the scroll offset so the viewport doesn't jump to the top.
-  const INITIAL_TURNS = 10
-  const EXPAND_TURNS = 20
-  const [loadedTurns, setLoadedTurns] = useState(INITIAL_TURNS)
-  const lastLoadedTurnsRef = useRef(loadedTurns)
-
-  // Identify conversation turn start boundaries (user messages or top-level commands)
-  const turnIndices = useMemo(() => {
-    const indices: number[] = []
-    for (let i = 0; i < historyItems.length; i++) {
-      const msg = historyItems[i]!
-      if (msg.role === 'user' || (msg.kind && msg.kind !== 'intro')) {
-        indices.push(i)
-      }
-    }
-    return indices
-  }, [historyItems])
-
-  // Subscribe to scroll position to dynamically expand loaded turns when scrolling near the top
-  useEffect(() => {
-    const s = scrollRef.current
-    if (!s) return
-
-    return s.subscribe(() => {
-      if (s.isSticky()) {
-        if (loadedTurns !== INITIAL_TURNS) {
-          setLoadedTurns(INITIAL_TURNS)
-        }
-        return
-      }
-      const top = s.getScrollTop()
-      // If user scrolls within 5 rows of top and we have more older turns, load 20 more
-      if (top <= 5 && turnIndices.length > loadedTurns) {
-        setLoadedTurns(prev => Math.min(turnIndices.length, prev + EXPAND_TURNS))
-      }
-    })
-  }, [loadedTurns, turnIndices.length])
-
-  // When loadedTurns increases (prepended older messages), preserve user's relative viewport
-  // so the screen doesn't jump to the top of the newly prepended history.
-  useLayoutEffect(() => {
-    if (loadedTurns > lastLoadedTurnsRef.current) {
-      const s = scrollRef.current
-      if (s && !s.isSticky()) {
-        const top = s.getScrollTop()
-        // If we expanded while user was looking at the top of the previous slice,
-        // keep them anchored near that previous position
-        if (top <= 5) {
-          s.scrollBy(20)
-        }
-      }
-    }
-    lastLoadedTurnsRef.current = loadedTurns
-  }, [loadedTurns])
-
-  const visibleHistoryItems = useMemo(() => {
-    if (turnIndices.length <= loadedTurns) {
-      return historyItems
-    }
-    // Take the start index of the earliest turn within the window (the MOST RECENT loadedTurns)
-    const turnIndexToKeep = turnIndices[turnIndices.length - loadedTurns] ?? 0
-    return historyItems.slice(turnIndexToKeep)
-  }, [historyItems, loadedTurns, turnIndices])
-
-  // Reset or adjust loadedTurns: only expand, never clamp down during scroll
-  // When user is firmly sticky at the bottom and idle, reset to INITIAL_TURNS
-  useEffect(() => {
-    const s = scrollRef.current
-    if (!s) return
-
-    return s.subscribe(() => {
-      // If sticky at the bottom, reset back to initial window
-      if (s.isSticky() && loadedTurns !== INITIAL_TURNS) {
-        setLoadedTurns(INITIAL_TURNS)
-      }
-    })
-  }, [loadedTurns])
+  const visibleHistoryItems = historyItems
 
   // Wrapped row heights are width-dependent. Cached layout outlives a resize
   // and lands sticky-scroll at the stale max, cutting off the tail. The
