@@ -827,10 +827,15 @@ export const ToolTrail = memo(function ToolTrail({
   const toolsDefaultExpanded =
     visible.tools === 'expanded' && (preferExpandedThinking || commandOverride || sections?.tools === 'expanded')
 
-  // An explicit `/details` expand shows the whole chain of thought; the default is
-  // a capped window (see Thinking).
+  // An explicit `/details` expand or design maxLines=null/0 shows the whole chain of thought;
+  // otherwise respect the design's maxLines (defaults to undefined = full/unlimited).
+  const designMaxLines = t.design.thinking?.maxLines
   const thinkingMaxLines =
-    commandOverride || sections?.thinking === 'expanded' ? undefined : THINKING_TRAIL_MAX_LINES
+    commandOverride || sections?.thinking === 'expanded'
+      ? undefined
+      : designMaxLines === 0 || designMaxLines === null
+        ? undefined
+        : designMaxLines ?? undefined
 
   const [now, setNow] = useState(() => Date.now())
   // Local toggles own the open state once mounted.  Init from the resolved

@@ -67,6 +67,9 @@ design:
     branch: "  "
     last: "  "
 
+  thinking:
+    maxLines: null       # null or 0 = unlimited, display all thinking lines without capping
+
   spacing:
     insetPadX: 1
 

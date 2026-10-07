@@ -239,6 +239,11 @@ export interface DesignIndent {
 
 export const DEFAULT_INDENT: DesignIndent = { branch: '  ', last: '  ', stem: '  ', unit: '  ' }
 
+export interface DesignThinking {
+  /** Maximum lines to display in the thinking trail. 0 or null = unlimited / show all. */
+  maxLines?: number | null
+}
+
 export interface Design {
   borders: DesignBorders
   density: DesignDensity
@@ -248,6 +253,7 @@ export interface Design {
   indent: DesignIndent
   spacing: DesignSpacing
   statusBar: DesignStatusBar
+  thinking?: DesignThinking
   colors?: Record<string, string>
 }
 
@@ -259,7 +265,8 @@ export const DEFAULT_DESIGN: Design = {
   header: DEFAULT_HEADER,
   indent: DEFAULT_INDENT,
   spacing: DENSITY_SCALES.compact,
-  statusBar: { segments: null }
+  statusBar: { segments: null },
+  thinking: { maxLines: null }
 }
 
 /**

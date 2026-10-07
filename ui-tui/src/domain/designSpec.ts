@@ -44,6 +44,8 @@ export interface DesignSpec {
     indent?: Partial<DesignIndent>
     /** Per-key overrides on top of the density scale. */
     spacing?: Partial<DesignSpacing>
+    /** Thinking block display preferences (e.g. maxLines). */
+    thinking?: { maxLines?: number | null }
     /** `null` = built-in order and allowlist. */
     status_bar?: { segments?: string[] | null }
   }

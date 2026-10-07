@@ -45,6 +45,7 @@ export const applyDesign = (theme: Theme, spec: DesignSpec | null): Theme => {
   const indent = spec.design?.indent
   const spacing = spec.design?.spacing
   const statusBar = spec.design?.status_bar
+  const thinkingDesign = spec.design?.thinking
   const brand = {
     ...theme.brand,
     ...(spec.prompt ? { prompt: spec.prompt } : {}),
@@ -72,6 +73,7 @@ export const applyDesign = (theme: Theme, spec: DesignSpec | null): Theme => {
       // over the scale the density just installed.
       ...(spacing ? { spacing: { ...(density ? DENSITY_SCALES[density] : design.spacing), ...spacing } } : {}),
       statusBar: statusBar ? { segments: statusBar.segments ?? null } : design.statusBar,
+      thinking: thinkingDesign ? { maxLines: thinkingDesign.maxLines } : design.thinking,
       colors: spec.colors ?? design.colors
     }
   }
