@@ -632,23 +632,11 @@ class CLIStreamMixin:
         console.print(*args, **kwargs)
 
     def _on_tool_gen_start(self, tool_name: str) -> None:
-        """Model began generating tool-call arguments: close open boxes once, then print a status
-        line so a large payload (e.g. 45 KB write_file) doesn't look like a frozen screen.
-
-        Fires once per tool CALL, so a batch of parallel calls to the same tool printed the same
-        line N times (#10478); repeats within one generation batch are coalesced. The set is
-        cleared when a tool actually starts (``tool.started``), i.e. on the next batch."""
-        from cli import _cprint
+        """Model began generating tool-call arguments: close open boxes once."""
         if getattr(self, '_stream_box_opened', False):
             self._flush_stream()
             self._stream_box_opened = False
         self._close_reasoning_box()
-        announced = self.__dict__.setdefault("_tool_gen_announced", set())
-        if tool_name in announced:
-            return
-        announced.add(tool_name)
-        from agent.display import get_tool_emoji
-        _cprint(f"  ┊ {get_tool_emoji(tool_name, default='⚡')} preparing {tool_name}…")
 
     def _on_tool_progress(self, event_type: str, function_name: str = None, preview: str = None, function_args: dict = None, **kwargs):
         """Tool lifecycle events (tool.started / tool.completed / reasoning.* / moa.*).

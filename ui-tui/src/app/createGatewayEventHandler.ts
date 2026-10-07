@@ -1241,10 +1241,6 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
         return
 
       case 'tool.generating':
-        if (ev.payload?.name) {
-          turnController.pushTrail(`drafting ${ev.payload.name}…`)
-        }
-
         return
 
       case 'reaction':

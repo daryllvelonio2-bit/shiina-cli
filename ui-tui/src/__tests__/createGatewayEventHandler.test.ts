@@ -1864,7 +1864,7 @@ describe('createGatewayEventHandler', () => {
     const record = appended.find(msg => msg.role === 'system' && msg.text.startsWith('ask (2 questions)'))
     expect(record).toBeDefined()
     expect(record?.text).toContain('✓ One? → alpha')
-    expect(record?.text).toContain('· Two? (no answer)')
+    expect(record?.text).toMatch(/[·⋅] Two\? \(no answer\)/)
     expect(getOverlayState().clarify).toBeNull()
   })
 

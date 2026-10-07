@@ -17,12 +17,5 @@ def _announce(cli, names):
 def test_repeated_tool_in_one_batch_prints_once():
     cli = _make_cli(tool_progress="off")
     printed = _announce(cli, ["terminal", "terminal", "terminal", "read_file"])
-    assert sum("preparing terminal" in p for p in printed) == 1
-    assert sum("preparing read_file" in p for p in printed) == 1
-    # A tool actually starting closes the batch; the next generation announces again.
-    with patch.object(_scrollback._cli_mod, "_cprint", lambda line: None):
-        cli._on_tool_progress("tool.started", "terminal", "ls", {"command": "ls"})
-    assert sum("preparing terminal" in p for p in _announce(cli, ["terminal"])) == 1
-    # A batch that never reached tool.started (cancel/error) must not mute the next invocation.
-    cli._reset_stream_state()
-    assert sum("preparing terminal" in p for p in _announce(cli, ["terminal"])) == 1
+    # "preparing <tool>…" lines are removed
+    assert sum("preparing" in p for p in printed) == 0
