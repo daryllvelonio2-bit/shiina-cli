@@ -47,7 +47,9 @@ colors:
 prompt: ">"
 
 design:
-  density: compact
+  # `normal` keeps a row of padding inside dialogs/panels (compact
+  # zeroes overlayPadY/panelPadY, which shrinks every popup).
+  density: normal
   # Thin, square boxes — Codex's chrome is not rounded, so this is a real
   # structural choice rather than a restatement of the built-in `round`.
   panel: single

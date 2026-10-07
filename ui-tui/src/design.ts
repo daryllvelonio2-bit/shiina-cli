@@ -259,12 +259,12 @@ export interface Design {
 
 export const DEFAULT_DESIGN: Design = {
   borders: DEFAULT_BORDERS,
-  density: 'compact',
+  density: 'normal',
   flank: 'space',
   glyphs: DEFAULT_GLYPHS,
   header: DEFAULT_HEADER,
   indent: DEFAULT_INDENT,
-  spacing: DENSITY_SCALES.compact,
+  spacing: DENSITY_SCALES.normal,
   statusBar: { segments: null },
   thinking: { maxLines: null }
 }

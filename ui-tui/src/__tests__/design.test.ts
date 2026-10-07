@@ -41,10 +41,12 @@ describe('resolveDesign', () => {
       spacing: { overlayPadX: -1, panelPadX: 99, panelPadY: 1.5, rowGap: '2', sectionGap: 2 }
     })
 
-    expect(design.spacing.overlayPadX).toBe(DEFAULT_DESIGN.spacing.overlayPadX)
-    expect(design.spacing.panelPadX).toBe(DEFAULT_DESIGN.spacing.panelPadX)
-    expect(design.spacing.panelPadY).toBe(DEFAULT_DESIGN.spacing.panelPadY)
-    expect(design.spacing.rowGap).toBe(DEFAULT_DESIGN.spacing.rowGap)
+    // The rejected values fall back to THIS design's density preset (compact),
+    // not to the built-in default's own scale.
+    expect(design.spacing.overlayPadX).toBe(DENSITY_SCALES.compact.overlayPadX)
+    expect(design.spacing.panelPadX).toBe(DENSITY_SCALES.compact.panelPadX)
+    expect(design.spacing.panelPadY).toBe(DENSITY_SCALES.compact.panelPadY)
+    expect(design.spacing.rowGap).toBe(DENSITY_SCALES.compact.rowGap)
     expect(design.spacing.sectionGap).toBe(2)
   })
 
