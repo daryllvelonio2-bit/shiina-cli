@@ -32,6 +32,17 @@ const EMPTY_SCROLLBAR: ScrollbarSnapshot = {
   viewportHeight: 0
 }
 
+// Rows of slack when deciding the viewport sits at the tail. A terminal
+// viewport is a row-height slab of text, so "at the bottom" is the tail
+// within a couple of rows, not an exact scrollTop — the mouse wheel, a
+// click-select and a resize all land a row short. Shared with the scroll
+// heal in useVirtualHistory so the app and ScrollBox can't drift apart on
+// what "at the bottom" means.
+export const VIEWPORT_AT_BOTTOM_SLACK_ROWS = 2
+
+export const viewportIsAtBottom = (top: number, viewportHeight: number, scrollHeight: number): boolean =>
+  top + viewportHeight >= scrollHeight - VIEWPORT_AT_BOTTOM_SLACK_ROWS
+
 export function getViewportSnapshot(s?: ScrollBoxHandle | null): ViewportSnapshot {
   if (!s) {
     return EMPTY
@@ -43,11 +54,11 @@ export function getViewportSnapshot(s?: ScrollBoxHandle | null): ViewportSnapsho
   const cachedScrollHeight = Math.max(viewportHeight, s.getScrollHeight())
   let scrollHeight = cachedScrollHeight
   const bottom = top + viewportHeight
-  let atBottom = s.isSticky() || bottom >= scrollHeight - 2
+  let atBottom = s.isSticky() || viewportIsAtBottom(top, viewportHeight, scrollHeight)
 
   if (!atBottom) {
     scrollHeight = Math.max(viewportHeight, s.getFreshScrollHeight?.() ?? cachedScrollHeight)
-    atBottom = s.isSticky() || bottom >= scrollHeight - 2
+    atBottom = s.isSticky() || viewportIsAtBottom(top, viewportHeight, scrollHeight)
   }
 
   return {

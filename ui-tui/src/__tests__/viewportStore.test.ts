@@ -4,10 +4,35 @@ import {
   getScrollbarSnapshot,
   getViewportSnapshot,
   scrollbarSnapshotKey,
+  viewportIsAtBottom,
   viewportSnapshotKey
 } from '../lib/viewportStore.js'
 
 describe('viewportStore', () => {
+  // One definition of "at the bottom" for the whole app: the tail within a
+  // couple of rows. ScrollBox restores stickiness only on an EXACT bottom
+  // position, so a viewport left a row short (wheel tremor, click-select,
+  // resize) reported "not at bottom" here and the tail follow stopped —
+  // new streaming output landed below the viewport until a submit re-pinned.
+  it('calls the tail within a couple of rows "at the bottom"', () => {
+    expect(viewportIsAtBottom(0, 20, 20)).toBe(true)
+    expect(viewportIsAtBottom(0, 20, 21)).toBe(true)
+    expect(viewportIsAtBottom(0, 20, 22)).toBe(true)
+    expect(viewportIsAtBottom(0, 20, 23)).toBe(false)
+  })
+
+  it('reports atBottom for a tail viewport that is scrolled short', () => {
+    const handle = {
+      getPendingDelta: () => 0,
+      getScrollHeight: () => 42,
+      getScrollTop: () => 20,
+      getViewportHeight: () => 20,
+      isSticky: () => false
+    }
+
+    expect(getViewportSnapshot(handle as any).atBottom).toBe(true)
+  })
+
   it('normalizes absent scroll handles', () => {
     expect(getViewportSnapshot(null)).toEqual({
       atBottom: true,

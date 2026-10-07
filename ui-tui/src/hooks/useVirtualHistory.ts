@@ -1,4 +1,6 @@
 import type { ScrollBoxHandle } from '@shiina/ink'
+
+import { viewportIsAtBottom } from '../lib/viewportStore.js'
 import {
   type RefObject,
   useCallback,
@@ -10,6 +12,8 @@ import {
   useSyncExternalStore
 } from 'react'
 
+// A manual scroll this recent is still in progress; don't re-pin under the user.
+const MANUAL_SCROLL_WINDOW_MS = 1200
 const ESTIMATE = 4
 // Overscan was 40 (= viewport) which is way more than needed when heights
 // are well-estimated.  Cutting in half saves ~20 mounted items per scroll
@@ -296,7 +300,7 @@ export function useVirtualHistory(
   const target = safeUnsignedGeometry(top + pendingDelta)
   const vp = safeUnsignedGeometry(scrollRef.current?.getViewportHeight() ?? 0)
   const sticky = scrollRef.current?.isSticky() ?? true
-  const recentManual = Date.now() - (scrollRef.current?.getLastManualScrollAt() ?? 0) < 1200
+  const recentManual = Date.now() - (scrollRef.current?.getLastManualScrollAt() ?? 0) < MANUAL_SCROLL_WINDOW_MS
 
   // During a freeze, drop the frozen range if items shrank past its start
   // (/clear, compaction) — clamping would collapse to an empty mount and
@@ -649,6 +653,20 @@ export function useVirtualHistory(
       ) {
         metrics.current = next
         dirty = true
+      }
+
+      // Heal a tail viewport left a row or two short. The app calls itself "at
+      // the bottom" with a small tolerance (viewportStore.getViewportSnapshot),
+      // but ScrollBox only restores stickiness on an EXACT bottom position — so
+      // after a wheel tremor or a click-select at the tail the flag stays false,
+      // the view stops following, and new streaming output is written below the
+      // viewport until a submit re-pins it. Re-pin when the tolerant test says
+      // we're at the tail and the user isn't mid-scroll.
+      const freshHeight = s.getFreshScrollHeight()
+      const atTail = viewportIsAtBottom(next.top, next.vp, freshHeight)
+
+      if (!next.sticky && atTail && Date.now() - s.getLastManualScrollAt() >= MANUAL_SCROLL_WINDOW_MS) {
+        s.scrollToBottom()
       }
     }
 
