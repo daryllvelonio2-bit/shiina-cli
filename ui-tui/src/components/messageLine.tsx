@@ -14,6 +14,7 @@ import { boundedLiveRenderText, compactPreview, isPasteBackedText } from '../lib
 import type { Theme } from '../theme.js'
 import type { ActiveTool, DetailsMode, Msg, SectionVisibility } from '../types.js'
 
+import { headerEmphasis, headerLabel } from '../design.js'
 import { Md } from './markdown.js'
 import { StreamingMd } from './streamingMarkdown.js'
 import { ToolTrail } from './thinking.js'
@@ -306,10 +307,10 @@ export const MessageLine = memo(function MessageLine({
       {showResponseSeparator && (
         <Box marginBottom={1}>
           <NoSelect flexShrink={0} fromLeftEdge width={gutterWidth}>
-            <Text color={t.color.border}>{`${t.design.glyphs.railElbow}${t.design.borders.rule} `}</Text>
+            <Text color={t.color.border}>{t.design.indent.last || `${t.design.glyphs.railElbow}${t.design.borders.rule} `}</Text>
           </NoSelect>
-          <Text bold color={t.color.accent}>
-            Response
+          <Text {...headerEmphasis(t.design.header)} color={t.color.accent}>
+            {headerLabel(t.design.header, 'Response')}
           </Text>
         </Box>
       )}

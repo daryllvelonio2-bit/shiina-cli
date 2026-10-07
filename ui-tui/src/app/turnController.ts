@@ -638,7 +638,8 @@ class TurnController {
       .filter(Boolean)
       .join('\n\n')
 
-    const finalThinking = [savedReasoning.trim(), segmentThinking].filter(Boolean).join('\n\n').trim()
+    // If segments already contain reasoning, don't duplicate it into finalDetails
+    const finalThinking = segmentThinking ? '' : savedReasoning.trim()
 
     const finalDetails: Msg = {
       kind: 'trail',

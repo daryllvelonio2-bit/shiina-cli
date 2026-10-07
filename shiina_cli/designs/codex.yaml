@@ -66,12 +66,18 @@ design:
   rule: "─"
 
   # Structure: blank air beside a title (never a drawn line), a header led by a
-  # rule dash and set dim, and the default stepped tree underneath.
+  # rule dash and set dim, and flat indentation (no tree branching lines).
   flank: space
   header:
     case: none
     emphasis: dim
-    marker: rule
+    marker: none
+
+  indent:
+    unit: "  "
+    stem: "  "
+    branch: "  "
+    last: "  "
 
   spacing:
     insetPadX: 1
@@ -91,6 +97,7 @@ design:
     progress: "⏺"
     selected: "❯"
     separator: "  "          # dim air, not a drawn divider
+    statusHead: ""           # no rule dash beside the header
     waiting: "◦"
 
   status_bar:
