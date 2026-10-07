@@ -8,7 +8,7 @@ name: codex
 description: Codex-style — neutral and dim, minimal chrome, square boxes, flat tree.
 
 colors:
-  accent: "#7aa2f7"          # the one real colour: the prompt and active marker
+  accent: "#8fd694"          # user prompt, cursor, and active accents
   border: "#4b4b4b"          # boxes are structure, not decoration
   completionBg: "#2a2a2a"
   completionCurrentBg: "#3a3a3a"
@@ -19,7 +19,7 @@ colors:
   diffRemoved: "#321d24"
   diffRemovedWord: "#fca5a5"
   error: "#f7768e"
-  label: "#9ca3af"
+  label: "#8fd694"
   muted: "#8b8b8b"           # genuinely dim — Codex leans on this hard
   ok: "#8fd694"
   primary: "#8fd694"
