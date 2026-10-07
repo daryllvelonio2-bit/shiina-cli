@@ -27,6 +27,14 @@ describe('resolveDesign', () => {
     expect(resolveDesign({}).spacing).toEqual(DENSITY_SCALES.normal)
   })
 
+  it('keeps vertical padding inside dialogs and panels in the built-in default', () => {
+    // A compact default zeroes overlayPadY/panelPadY, which visually shrinks
+    // every popup (approval, secret, sudo, vault unlock) — the regression this
+    // guards. The contract is "dialogs breathe", not a specific density name.
+    expect(DEFAULT_DESIGN.spacing.overlayPadY).toBeGreaterThan(0)
+    expect(DEFAULT_DESIGN.spacing.panelPadY).toBeGreaterThan(0)
+  })
+
   it('overrides individual spacing tokens on top of the density scale', () => {
     const design = resolveDesign({ density: 'compact', spacing: { overlayPadX: 3 } })
 

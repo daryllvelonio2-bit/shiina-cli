@@ -83,11 +83,9 @@ export function PromptZone({
 
   if (overlay.approval) {
     return (
-      <Box marginTop={-1}>
-        <PromptCell cols={cols} id="approval">
-          <ApprovalPrompt cols={cols} onChoice={onApprovalChoice} req={overlay.approval} t={theme} />
-        </PromptCell>
-      </Box>
+      <PromptCell cols={cols} id="approval">
+        <ApprovalPrompt cols={cols} onChoice={onApprovalChoice} req={overlay.approval} t={theme} />
+      </PromptCell>
     )
   }
 
