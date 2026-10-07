@@ -347,6 +347,11 @@ interface AllowlistEntry {
 
 const ALLOWLIST: AllowlistEntry[] = [
   {
+    path: 'theme.ts',
+    literals: ['›'],
+    reason: 'Default brand icon and tool prefix glyphs aligned with codex design tokens.'
+  },
+  {
     path: 'lib/text.ts',
     literals: ['\u2713', '\u2717'],
     reason: 'Pinned tool-trail wire protocol marks (TOOL_TRAIL_OK / TOOL_TRAIL_ERR) for transcript persistence.'

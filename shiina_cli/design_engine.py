@@ -124,10 +124,8 @@ def _find_file(name: str) -> Tuple[Optional[Path], str]:
 
 
 def _builtin_names() -> List[str]:
-    try:
-        return sorted(p.stem for p in _builtin_designs_dir().glob("*.yaml"))
-    except OSError:
-        return []
+    """Strictly codex only — all other designs are removed."""
+    return ["codex"]
 
 
 def _user_names() -> List[str]:

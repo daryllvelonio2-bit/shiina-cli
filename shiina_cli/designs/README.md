@@ -19,10 +19,10 @@ losing it. `shiina design init` copies the built-ins into your folder to edit.
 ```yaml
 # ~/.shiina/config.yaml
 display:
-  design: timeline
+  design: codex
 ```
 
-Or live, from inside the TUI: `/design timeline` (bare `/design` cycles,
+Or live, from inside the TUI: `/design codex` (bare `/design` cycles,
 `/design status` reports). Independent of `display.layout` — a design may also
 carry a region/progress profile, but you can pair any design with any layout.
 

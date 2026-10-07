@@ -259,13 +259,13 @@ export function themeToneHex(tone: string): string {
 // ── Defaults ─────────────────────────────────────────────────────────
 
 const BRAND: ThemeBrand = {
-  name: 'Shiina Agent',
-  icon: '★',
-  prompt: '❯',
+  name: 'Shiina',
+  icon: '›',
+  prompt: '>',
   welcome: 'Type your message or /help for commands.',
   goodbye: 'Goodbye!',
-  tool: '┊',
-  helpHeader: '(^_^)? Commands'
+  tool: '›',
+  helpHeader: 'Commands'
 }
 
 const cleanPromptSymbol = (s: string | undefined, fallback: string) => {
@@ -377,26 +377,23 @@ export function buildPalette(seeds: ThemeSeeds, isLight: boolean): ThemeColors {
 }
 
 export const DARK_SEEDS: ThemeSeeds = {
-  accent: '#38bdf8',
-  // The classic Shiina navy surfaces are IDENTITY, not derivation drift —
-  // keep them as explicit fill seeds (the ladder derives them for skins
-  // that don't care).
-  activeRow: '#243b55',
-  bg: '#101014',
-  border: '#3b82f6',
-  error: '#ef5350',
-  ok: '#4caf50',
-  primary: '#60a5fa',
-  prompt: '#FFF8DC',
-  selection: '#1e3a5f',
-  shellDollar: '#38bdf8',
-  statusBad: '#ef5350',
-  statusCritical: '#FF6B6B',
-  statusGood: '#8FBC8F',
-  statusWarn: '#60a5fa',
-  surface: '#1a1a2e',
-  text: '#FFF8DC',
-  warn: '#38bdf8'
+  accent: '#8fd694',
+  activeRow: '#3a3a3a',
+  bg: '#181825',
+  border: '#4b4b4b',
+  error: '#f7768e',
+  ok: '#8fd694',
+  primary: '#8fd694',
+  prompt: '#8fd694',
+  selection: '#3a3a3a',
+  shellDollar: '#7aa2f7',
+  statusBad: '#f7768e',
+  statusCritical: '#f7768e',
+  statusGood: '#8fd694',
+  statusWarn: '#e0af68',
+  surface: '#2a2a2a',
+  text: '#d4d4d4',
+  warn: '#e0af68'
 }
 
 // Light-terminal seeds: darker golds/ambers that stay legible on white.

@@ -68,322 +68,81 @@ def _wings(*glyphs) -> List[List[str]]:
 
 # Branding shared by every Shiina-named built-in (mono/daylight override help_header).
 _SHIINA_BRANDING: Dict[str, str] = {
-    "agent_name": "Shiina Agent",
-    "symbol": "★",
-    "icon": "★",
-    "welcome": "Welcome to Shiina CLI! Type your message or /help for commands.",
+    "agent_name": "Shiina",
+    "symbol": "›",
+    "icon": "›",
+    "welcome": "Type your message or /help for commands.",
     "goodbye": "Goodbye!",
     "response_label": " Shiina ",
-    "prompt_symbol": "❯",
-    "help_header": "(^_^)? Available Commands",
+    "prompt_symbol": ">",
+    "help_header": "Available Commands",
 }
 
+def _codex_skin_dict() -> Dict[str, Any]:
+    try:
+        from shiina_cli.design_engine import load_design
+        design = load_design("codex")
+        c = dict(design.colors or {})
+    except Exception:
+        c = {}
+    return {
+        "name": "codex",
+        "description": "Codex — pure YAML-driven configuration",
+        "colors": {
+            "background": c.get("background", ""),
+            "banner_border": c.get("border", "#4b4b4b"),
+            "banner_title": c.get("accent", "#8fd694"),
+            "banner_accent": c.get("accent", "#8fd694"),
+            "banner_dim": c.get("muted", "#8b8b8b"),
+            "banner_text": c.get("text", "#d4d4d4"),
+            "ui_accent": c.get("accent", "#8fd694"),
+            "ui_label": c.get("label", "#8fd694"),
+            "ui_text": c.get("text", "#d4d4d4"),
+            "ui_border": c.get("border", "#4b4b4b"),
+            "ui_tool": c.get("tool", "#9ca3af"),
+            "ui_thinking": c.get("thinking", "#6b7280"),
+            "ui_ok": c.get("ok", "#8fd694"),
+            "ui_error": c.get("error", "#f7768e"),
+            "ui_warn": c.get("warn", "#e0af68"),
+            "diff_added": c.get("diffAdded", "#1c2e24"),
+            "diff_removed": c.get("diffRemoved", "#321d24"),
+            "diff_added_word": c.get("diffAddedWord", "#86efac"),
+            "diff_removed_word": c.get("diffRemovedWord", "#fca5a5"),
+            "syntax_string": c.get("syntaxString", "#8fd694"),
+            "syntax_number": c.get("syntaxNumber", "#e0af68"),
+            "syntax_keyword": c.get("syntaxKeyword", "#7aa2f7"),
+            "syntax_comment": c.get("syntaxComment", "#6b7280"),
+            "prompt": c.get("prompt", "#8fd694"),
+            "input_rule": c.get("border", "#4b4b4b"),
+            "response_border": c.get("border", "#4b4b4b"),
+            "status_bar_bg": c.get("statusBg", "#2a2a2a"),
+            "status_bar_text": c.get("statusFg", "#d4d4d4"),
+            "status_bar_strong": c.get("accent", "#8fd694"),
+            "status_bar_dim": c.get("muted", "#8b8b8b"),
+            "status_bar_good": c.get("statusGood", "#8fd694"),
+            "status_bar_warn": c.get("statusWarn", "#e0af68"),
+            "status_bar_bad": c.get("statusBad", "#f7768e"),
+            "status_bar_critical": c.get("statusCritical", "#f7768e"),
+            "session_label": c.get("sessionLabel", "#9ca3af"),
+            "session_border": c.get("sessionBorder", "#4b4b4b"),
+            "completion_menu_bg": c.get("completionBg", "#2a2a2a"),
+            "completion_menu_current_bg": c.get("completionCurrentBg", "#3a3a3a"),
+            "selection_bg": c.get("selectionBg", "#3a3a3a"),
+            "shell_dollar": c.get("shellDollar", "#7aa2f7"),
+            "voice_status_bg": c.get("statusBg", "#2a2a2a"),
+        },
+        "spinner": {},
+        "branding": _SHIINA_BRANDING,
+        "tool_prefix": "›",
+    }
+
 _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
-    "default": {
-        "name": "default", "description": "Classic Shiina — clean startup, blue theme",
-        # Dark-authored; values match the TUI's DARK_THEME so both render the same blue.
-        "colors": {
-            "background": "#1a1a2e", "banner_border": "#3b82f6", "banner_title": "#60a5fa",
-            "banner_accent": "#38bdf8", "banner_dim": "#5c7cfa", "banner_text": "#FFF8DC",
-            "ui_accent": "#38bdf8", "ui_label": "#60a5fa", "ui_text": "#FFF8DC",
-            "ui_border": "#3b82f6", "ui_tool": "#38bdf8", "ui_thinking": "#5c7cfa",
-            "ui_ok": "#4caf50", "ui_error": "#ef5350", "ui_warn": "#38bdf8",
-            "diff_added": "#4caf50", "diff_removed": "#ef5350",
-            "diff_added_word": "#8FBC8F", "diff_removed_word": "#FF6B6B",
-            "syntax_string": "#38bdf8", "syntax_number": "#FFF8DC",
-            "syntax_keyword": "#60a5fa", "syntax_comment": "#5c7cfa",
-            "prompt": "#FFF8DC", "input_rule": "#3b82f6", "response_border": "#60a5fa",
-            "status_bar_bg": "#1a1a2e", "status_bar_text": "#C0C0C0",
-            "status_bar_strong": "#60a5fa", "status_bar_dim": "#4a6fa5",
-            "status_bar_good": "#8FBC8F", "status_bar_warn": "#60a5fa", "status_bar_bad": "#ef5350",
-            "status_bar_critical": "#FF6B6B", "session_label": "#60a5fa",
-            "session_border": "#3b82f6", "completion_menu_bg": "#1a1a2e",
-            "completion_menu_current_bg": "#243b55", "selection_bg": "#1e3a5f",
-            "shell_dollar": "#38bdf8", "voice_status_bg": "#1a1a2e"},
-        "spinner": {},  # empty = hardcoded defaults in display.py
-        "branding": _SHIINA_BRANDING,
-        "tool_prefix": "┊"},
-    "shiina": {
-        "name": "shiina", "description": "Shiina Agent — clean startup, blue theme",
-        "colors": {
-            "background": "#1a1a2e", "banner_border": "#3b82f6", "banner_title": "#60a5fa",
-            "banner_accent": "#38bdf8", "banner_dim": "#5c7cfa", "banner_text": "#FFF8DC",
-            "ui_accent": "#38bdf8", "ui_label": "#60a5fa", "ui_text": "#FFF8DC",
-            "ui_border": "#3b82f6", "ui_tool": "#38bdf8", "ui_thinking": "#5c7cfa",
-            "ui_ok": "#4caf50", "ui_error": "#ef5350", "ui_warn": "#38bdf8",
-            "diff_added": "#4caf50", "diff_removed": "#ef5350",
-            "diff_added_word": "#8FBC8F", "diff_removed_word": "#FF6B6B",
-            "syntax_string": "#38bdf8", "syntax_number": "#FFF8DC",
-            "syntax_keyword": "#60a5fa", "syntax_comment": "#5c7cfa",
-            "prompt": "#FFF8DC", "input_rule": "#3b82f6", "response_border": "#60a5fa",
-            "status_bar_bg": "#1a1a2e", "status_bar_text": "#C0C0C0",
-            "status_bar_strong": "#60a5fa", "status_bar_dim": "#4a6fa5",
-            "status_bar_good": "#8FBC8F", "status_bar_warn": "#60a5fa", "status_bar_bad": "#ef5350",
-            "status_bar_critical": "#FF6B6B", "session_label": "#60a5fa",
-            "session_border": "#3b82f6", "completion_menu_bg": "#1a1a2e",
-            "completion_menu_current_bg": "#243b55", "selection_bg": "#1e3a5f",
-            "shell_dollar": "#38bdf8", "voice_status_bg": "#1a1a2e"},
-        "spinner": {},
-        "branding": _SHIINA_BRANDING,
-        "tool_prefix": "┊"},
-    "ares": {
-        "name": "ares", "description": "War-god theme — crimson and bronze",
-        "colors": {
-            "banner_border": "#A93333", "banner_title": "#C7A96B", "banner_accent": "#DD4A3A",
-            "banner_dim": "#905151", "banner_text": "#F1E6CF", "ui_accent": "#DD4A3A",
-            "ui_label": "#C7A96B", "ui_ok": "#4caf50", "ui_error": "#ef5350", "ui_warn": "#ffa726",
-            "prompt": "#F1E6CF", "input_rule": "#A93333", "response_border": "#C7A96B",
-            "status_bar_bg": "#2A1212", "status_bar_text": "#F1E6CF",
-            "status_bar_strong": "#C7A96B", "status_bar_dim": "#756054",
-            "status_bar_good": "#7BC96F", "status_bar_warn": "#C7A96B", "status_bar_bad": "#DD4A3A",
-            "status_bar_critical": "#EF5350", "session_label": "#C7A96B",
-            "session_border": "#6E584B", "completion_menu_bg": "#2A1212",
-            "completion_menu_current_bg": "#5C221D", "selection_bg": "#692620",
-            "shell_dollar": "#DD4A3A", "voice_status_bg": "#2A1212"},
-        "spinner": {
-            "waiting_faces": ["(⚔)", "(⛨)", "(▲)", "(<>)", "(/)"],
-            "thinking_faces": ["(⚔)", "(⛨)", "(▲)", "(⌁)", "(<>)"],
-            "thinking_verbs": [
-                "forging", "marching", "sizing the field", "holding the line",
-                "hammering plans", "tempering steel", "plotting impact", "raising the shield"],
-            "wings": _wings("⚔", "▲", ("╸", "╺"), "⛨")},
-        "branding": _branding("Ares", "⚔", "Farewell, warrior! ⚔"),
-        "tool_prefix": "╎",
-        "banner_logo": """[bold #A3261F] █████╗ ██████╗ ███████╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
-[bold #B73122]██╔══██╗██╔══██╗██╔════╝██╔════╝      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝[/]
-[#C93C24]███████║██████╔╝█████╗  ███████╗█████╗███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║[/]
-[#D84A28]██╔══██║██╔══██╗██╔══╝  ╚════██║╚════╝██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║[/]
-[#E15A2D]██║  ██║██║  ██║███████╗███████║      ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║[/]
-[#EB6C32]╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝      ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝[/]""",
-        "banner_hero": """[#9F1C1C]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣤⣤⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#9F1C1C]⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⣿⠟⠻⣿⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#C7A96B]⠀⠀⠀⠀⠀⠀⠀⣠⣾⡿⠋⠀⠀⠀⠙⢿⣷⣄⠀⠀⠀⠀⠀⠀⠀[/]
-[#C7A96B]⠀⠀⠀⠀⠀⢀⣾⡿⠋⠀⠀⢠⡄⠀⠀⠙⢿⣷⡀⠀⠀⠀⠀⠀[/]
-[#DD4A3A]⠀⠀⠀⠀⣰⣿⠟⠀⠀⠀⣰⣿⣿⣆⠀⠀⠀⠻⣿⣆⠀⠀⠀⠀[/]
-[#DD4A3A]⠀⠀⠀⢰⣿⠏⠀⠀⢀⣾⡿⠉⢿⣷⡀⠀⠀⠹⣿⡆⠀⠀⠀[/]
-[#9F1C1C]⠀⠀⠀⣿⡟⠀⠀⣠⣿⠟⠀⠀⠀⠻⣿⣄⠀⠀⢻⣿⠀⠀⠀[/]
-[#9F1C1C]⠀⠀⠀⣿⡇⠀⠀⠙⠋⠀⠀⚔⠀⠀⠙⠋⠀⠀⢸⣿⠀⠀⠀[/]
-[#6B1717]⠀⠀⠀⢿⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⡿⠀⠀⠀[/]
-[#6B1717]⠀⠀⠀⠘⢿⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣾⡿⠃⠀⠀⠀[/]
-[#C7A96B]⠀⠀⠀⠀⠈⠻⣿⣷⣦⣤⣀⣀⣤⣤⣶⣿⠿⠋⠀⠀⠀⠀[/]
-[#C7A96B]⠀⠀⠀⠀⠀⠀⠀⠉⠛⠿⠿⠿⠿⠛⠉⠀⠀⠀⠀⠀⠀⠀[/]
-[#DD4A3A]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⚔⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[dim #6B1717]⠀⠀⠀⠀⠀⠀⠀⠀war god online⠀⠀⠀⠀⠀⠀⠀⠀[/]""",
-    },
-    "mono": {
-        "name": "mono", "description": "Monochrome — clean grayscale",
-        "colors": {
-            "banner_border": "#5E5E5E", "banner_title": "#e6edf3", "banner_accent": "#aaaaaa",
-            "banner_dim": "#606060", "banner_text": "#c9d1d9", "ui_accent": "#aaaaaa",
-            "ui_label": "#888888", "ui_ok": "#888888", "ui_error": "#cccccc", "ui_warn": "#999999",
-            "prompt": "#c9d1d9", "input_rule": "#606060", "response_border": "#aaaaaa",
-            "status_bar_bg": "#1F1F1F", "status_bar_text": "#C9D1D9",
-            "status_bar_strong": "#E6EDF3", "status_bar_dim": "#777777",
-            "status_bar_good": "#B5B5B5", "status_bar_warn": "#AAAAAA", "status_bar_bad": "#D0D0D0",
-            "status_bar_critical": "#F0F0F0", "session_label": "#888888",
-            "session_border": "#5E5E5E", "completion_menu_bg": "#1F1F1F",
-            "completion_menu_current_bg": "#464646", "selection_bg": "#505050",
-            "shell_dollar": "#aaaaaa", "voice_status_bg": "#1F1F1F"},
-        "spinner": {},
-        "branding": {**_SHIINA_BRANDING, "help_header": "[?] Available Commands"},
-        "tool_prefix": "┊"},
-    "slate": {
-        "name": "slate", "description": "Cool blue — developer-focused",
-        "colors": {
-            "banner_border": "#4169e1", "banner_title": "#7eb8f6", "banner_accent": "#8EA8FF",
-            "banner_dim": "#545E6B", "banner_text": "#c9d1d9", "ui_accent": "#7eb8f6",
-            "ui_label": "#8EA8FF", "ui_ok": "#63D0A6", "ui_error": "#F7A072", "ui_warn": "#e6a855",
-            "prompt": "#c9d1d9", "input_rule": "#4169e1", "response_border": "#7eb8f6",
-            "status_bar_bg": "#151C2F", "status_bar_text": "#C9D1D9",
-            "status_bar_strong": "#7EB8F6", "status_bar_dim": "#5D6672",
-            "status_bar_good": "#63D0A6", "status_bar_warn": "#E6A855", "status_bar_bad": "#F7A072",
-            "status_bar_critical": "#FF7A7A", "session_label": "#7eb8f6",
-            "session_border": "#545E6B", "completion_menu_bg": "#151C2F",
-            "completion_menu_current_bg": "#324867", "selection_bg": "#3A5375",
-            "shell_dollar": "#7eb8f6", "voice_status_bg": "#151C2F"},
-        "spinner": {}, "branding": _SHIINA_BRANDING, "tool_prefix": "┊"},
-    "daylight": {
-        "name": "daylight",
-        "description": "Light theme for bright terminals with dark text and cool blue accents",
-        "colors": {
-            "banner_border": "#2563EB", "banner_title": "#0F172A", "banner_accent": "#1D4ED8",
-            "banner_dim": "#475569", "banner_text": "#111827", "ui_accent": "#2563EB",
-            "ui_label": "#0F766E", "ui_ok": "#15803D", "ui_error": "#B91C1C", "ui_warn": "#B45309",
-            "prompt": "#111827", "input_rule": "#6E94BE", "response_border": "#2563EB",
-            "status_bar_bg": "#E5EDF8", "status_bar_text": "#111827",
-            "status_bar_strong": "#2563EB", "status_bar_dim": "#838890",
-            "status_bar_good": "#15803D", "status_bar_warn": "#B45309", "status_bar_bad": "#B45309",
-            "status_bar_critical": "#B91C1C", "session_label": "#1D4ED8",
-            "session_border": "#64748B", "completion_menu_bg": "#F8FAFC",
-            "completion_menu_current_bg": "#DBEAFE", "completion_menu_meta_bg": "#EEF2FF",
-            "completion_menu_meta_current_bg": "#BFDBFE", "selection_bg": "#D3E0FB",
-            "shell_dollar": "#2563EB", "voice_status_bg": "#E5EDF8"},
-        "spinner": {},
-        "branding": {**_SHIINA_BRANDING, "help_header": "[?] Available Commands"},
-        "tool_prefix": "│"},
-    "warm-lightmode": {
-        "name": "warm-lightmode",
-        "description": "Warm light mode — dark brown/gold text for light terminal backgrounds",
-        "colors": {
-            "banner_border": "#8B6914", "banner_title": "#5C3D11", "banner_accent": "#8B4513",
-            "banner_dim": "#8B7355", "banner_text": "#2C1810", "ui_accent": "#8B4513",
-            "ui_label": "#5C3D11", "ui_ok": "#2E7D32", "ui_error": "#C62828", "ui_warn": "#E65100",
-            "prompt": "#2C1810", "input_rule": "#8B6914", "response_border": "#8B6914",
-            "status_bar_bg": "#F5F0E8", "status_bar_text": "#2C1810",
-            "status_bar_strong": "#8B4513", "status_bar_dim": "#8A8F98",
-            "status_bar_good": "#2E7D32", "status_bar_warn": "#E65100", "status_bar_bad": "#DA4D00",
-            "status_bar_critical": "#C62828", "session_label": "#5C3D11",
-            "session_border": "#A0845C", "completion_menu_bg": "#F5EFE0",
-            "completion_menu_current_bg": "#E8DCC8", "completion_menu_meta_bg": "#F0E8D8",
-            "completion_menu_meta_current_bg": "#DFCFB0", "selection_bg": "#E8DAD0",
-            "shell_dollar": "#8B4513", "voice_status_bg": "#F5F0E8"},
-        "spinner": {}, "branding": _SHIINA_BRANDING, "tool_prefix": "┊"},
-    "poseidon": {
-        "name": "poseidon", "description": "Ocean-god theme — deep blue and seafoam",
-        "colors": {
-            "banner_border": "#2A6FB9", "banner_title": "#A9DFFF", "banner_accent": "#5DB8F5",
-            "banner_dim": "#44638F", "banner_text": "#EAF7FF", "ui_accent": "#5DB8F5",
-            "ui_label": "#A9DFFF", "ui_ok": "#4caf50", "ui_error": "#ef5350", "ui_warn": "#ffa726",
-            "prompt": "#EAF7FF", "input_rule": "#2A6FB9", "response_border": "#5DB8F5",
-            "status_bar_bg": "#0F2440", "status_bar_text": "#EAF7FF",
-            "status_bar_strong": "#A9DFFF", "status_bar_dim": "#52708A",
-            "status_bar_good": "#6ED7B0", "status_bar_warn": "#5DB8F5", "status_bar_bad": "#3576BC",
-            "status_bar_critical": "#D94F4F", "session_label": "#A9DFFF",
-            "session_border": "#496884", "completion_menu_bg": "#0F2440",
-            "completion_menu_current_bg": "#254D73", "selection_bg": "#2A587F",
-            "shell_dollar": "#5DB8F5", "voice_status_bg": "#0F2440"},
-        "spinner": {
-            "waiting_faces": ["(≈)", "(Ψ)", "(∿)", "(◌)", "(◠)"],
-            "thinking_faces": ["(Ψ)", "(∿)", "(≈)", "(⌁)", "(◌)"],
-            "thinking_verbs": [
-                "charting currents", "sounding the depth", "reading foam lines",
-                "steering the trident", "tracking undertow", "plotting sea lanes",
-                "calling the swell", "measuring pressure"],
-            "wings": _wings("≈", "Ψ", "∿", "◌")},
-        "branding": _branding("Poseidon", "Ψ", "Fair winds! Ψ"),
-        "tool_prefix": "│",
-        "banner_logo": """[bold #B8E8FF]██████╗  ██████╗ ███████╗███████╗██╗██████╗  ██████╗ ███╗   ██╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
-[bold #97D6FF]██╔══██╗██╔═══██╗██╔════╝██╔════╝██║██╔══██╗██╔═══██╗████╗  ██║      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝[/]
-[#75C1F6]██████╔╝██║   ██║███████╗█████╗  ██║██║  ██║██║   ██║██╔██╗ ██║█████╗███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║[/]
-[#4FA2E0]██╔═══╝ ██║   ██║╚════██║██╔══╝  ██║██║  ██║██║   ██║██║╚██╗██║╚════╝██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║[/]
-[#2E7CC7]██║     ╚██████╔╝███████║███████╗██║██████╔╝╚██████╔╝██║ ╚████║      ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║[/]
-[#1B4F95]╚═╝      ╚═════╝ ╚══════╝╚══════╝╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═══╝      ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝[/]""",
-        "banner_hero": """[#2A6FB9]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#5DB8F5]⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣾⣿⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#5DB8F5]⠀⠀⠀⠀⠀⠀⠀⢠⣿⠏⠀Ψ⠀⠹⣿⡄⠀⠀⠀⠀⠀⠀⠀[/]
-[#A9DFFF]⠀⠀⠀⠀⠀⠀⠀⣿⡟⠀⠀⠀⠀⠀⢻⣿⠀⠀⠀⠀⠀⠀⠀[/]
-[#A9DFFF]⠀⠀⠀≈≈≈≈≈⣿⡇⠀⠀⠀⠀⠀⢸⣿≈≈≈≈≈⠀⠀⠀[/]
-[#5DB8F5]⠀⠀⠀⠀⠀⠀⠀⣿⡇⠀⠀⠀⠀⠀⢸⣿⠀⠀⠀⠀⠀⠀⠀[/]
-[#2A6FB9]⠀⠀⠀⠀⠀⠀⠀⢿⣧⠀⠀⠀⠀⠀⣼⡿⠀⠀⠀⠀⠀⠀⠀[/]
-[#2A6FB9]⠀⠀⠀⠀⠀⠀⠀⠘⢿⣷⣄⣀⣠⣾⡿⠃⠀⠀⠀⠀⠀⠀⠀[/]
-[#153C73]⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣿⣿⡿⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#153C73]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#5DB8F5]⠀⠀⠀⠀⠀≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈⠀⠀⠀⠀⠀[/]
-[#A9DFFF]⠀⠀⠀⠀⠀⠀≈≈≈≈≈≈≈≈≈≈≈≈≈⠀⠀⠀⠀⠀⠀[/]
-[dim #153C73]⠀⠀⠀⠀⠀⠀⠀deep waters hold⠀⠀⠀⠀⠀⠀⠀[/]""",
-    },
-    "sisyphus": {
-        "name": "sisyphus", "description": "Sisyphean theme — austere grayscale with persistence",
-        "colors": {
-            "banner_border": "#B7B7B7", "banner_title": "#F5F5F5", "banner_accent": "#E7E7E7",
-            "banner_dim": "#5C5C5C", "banner_text": "#D3D3D3", "ui_accent": "#E7E7E7",
-            "ui_label": "#D3D3D3", "ui_ok": "#919191", "ui_error": "#E7E7E7", "ui_warn": "#B7B7B7",
-            "prompt": "#F5F5F5", "input_rule": "#656565", "response_border": "#B7B7B7",
-            "status_bar_bg": "#202020", "status_bar_text": "#D3D3D3",
-            "status_bar_strong": "#F5F5F5", "status_bar_dim": "#6D6D6D",
-            "status_bar_good": "#B7B7B7", "status_bar_warn": "#D3D3D3", "status_bar_bad": "#E7E7E7",
-            "status_bar_critical": "#F5F5F5", "session_label": "#919191",
-            "session_border": "#656565", "completion_menu_bg": "#202020",
-            "completion_menu_current_bg": "#585858", "selection_bg": "#666666",
-            "shell_dollar": "#E7E7E7", "voice_status_bg": "#202020"},
-        "spinner": {
-            "waiting_faces": ["(◉)", "(◌)", "(◬)", "(⬤)", "(::)"],
-            "thinking_faces": ["(◉)", "(◬)", "(◌)", "(○)", "(●)"],
-            "thinking_verbs": [
-                "finding traction", "measuring the grade", "resetting the boulder",
-                "counting the ascent", "testing leverage", "setting the shoulder",
-                "pushing uphill", "enduring the loop"],
-            "wings": _wings("◉", "◬", "◌", "⬤")},
-        "branding": _branding("Sisyphus", "◉", "The boulder waits. ◉"),
-        "tool_prefix": "│",
-        "banner_logo": """[bold #F5F5F5]███████╗██╗███████╗██╗   ██╗██████╗ ██╗  ██╗██╗   ██╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
-[bold #E7E7E7]██╔════╝██║██╔════╝╚██╗ ██╔╝██╔══██╗██║  ██║██║   ██║██╔════╝      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝[/]
-[#D7D7D7]███████╗██║███████╗ ╚████╔╝ ██████╔╝███████║██║   ██║███████╗█████╗███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║[/]
-[#BFBFBF]╚════██║██║╚════██║  ╚██╔╝  ██╔═══╝ ██╔══██║██║   ██║╚════██║╚════╝██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║[/]
-[#8F8F8F]███████║██║███████║   ██║   ██║     ██║  ██║╚██████╔╝███████║      ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║[/]
-[#626262]╚══════╝╚═╝╚══════╝   ╚═╝   ╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚══════╝      ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝[/]""",
-        "banner_hero": """[#B7B7B7]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#D3D3D3]⠀⠀⠀⠀⠀⠀⠀⣠⣾⣿⣿⣿⣿⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#E7E7E7]⠀⠀⠀⠀⠀⠀⣾⣿⣿⣿⣿⣿⣿⣿⣷⠀⠀⠀⠀⠀⠀⠀[/]
-[#F5F5F5]⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠀⠀⠀⠀[/]
-[#E7E7E7]⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀[/]
-[#D3D3D3]⠀⠀⠀⠀⠀⠀⠘⢿⣿⣿⣿⣿⣿⡿⠃⠀⠀⠀⠀⠀⠀⠀[/]
-[#B7B7B7]⠀⠀⠀⠀⠀⠀⠀⠀⠙⠿⣿⠿⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#919191]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#656565]⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#656565]⠀⠀⠀⠀⠀⠀⠀⠀⣰⣿⣿⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#4A4A4A]⠀⠀⠀⠀⠀⠀⠀⣰⣿⣿⣿⣿⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#4A4A4A]⠀⠀⠀⠀⠀⣀⣴⣿⣿⣿⣿⣿⣿⣦⣀⠀⠀⠀⠀⠀⠀[/]
-[#656565]⠀⠀⠀━━━━━━━━━━━━━━━━━━━━━━━⠀⠀⠀[/]
-[dim #4A4A4A]⠀⠀⠀⠀⠀⠀⠀⠀⠀the boulder⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]""",
-    },
-    "charizard": {
-        "name": "charizard", "description": "Volcanic theme — burnt orange and ember",
-        "colors": {
-            "banner_border": "#C75B1D", "banner_title": "#FFD39A", "banner_accent": "#F29C38",
-            "banner_dim": "#C58A45", "banner_text": "#FFF0D4", "ui_accent": "#F29C38",
-            "ui_label": "#FFD39A", "ui_ok": "#4caf50", "ui_error": "#ef5350", "ui_warn": "#ffa726",
-            "prompt": "#FFF0D4", "input_rule": "#C75B1D", "response_border": "#F29C38",
-            "status_bar_bg": "#2B160E", "status_bar_text": "#FFF0D4",
-            "status_bar_strong": "#FFD39A", "status_bar_dim": "#826144",
-            "status_bar_good": "#6BCB77", "status_bar_warn": "#F29C38", "status_bar_bad": "#E2832B",
-            "status_bar_critical": "#EF5350", "session_label": "#FFD39A",
-            "session_border": "#7B593A", "completion_menu_bg": "#0B0503",
-            "completion_menu_current_bg": "#4A1B07", "completion_menu_meta_bg": "#120806",
-            "completion_menu_meta_current_bg": "#5A260D", "selection_bg": "#5A260D",
-            "shell_dollar": "#F29C38", "voice_status_bg": "#2B160E"},
-        "spinner": {
-            "waiting_faces": ["(✦)", "(▲)", "(◇)", "(<>)", "(🔥)"],
-            "thinking_faces": ["(✦)", "(▲)", "(◇)", "(⌁)", "(🔥)"],
-            "thinking_verbs": [
-                "banking into the draft", "measuring burn", "reading the updraft",
-                "tracking ember fall", "setting wing angle", "holding the flame core",
-                "plotting a hot landing", "coiling for lift"],
-            "wings": _wings("✦", "▲", "◌", "◇")},
-        "branding": _branding("Charizard", "✦", "Flame out! ✦"),
-        "tool_prefix": "│",
-        "banner_logo": """[bold #FFF0D4] ██████╗██╗  ██╗ █████╗ ██████╗ ██╗███████╗ █████╗ ██████╗ ██████╗        █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
-[bold #FFD39A]██╔════╝██║  ██║██╔══██╗██╔══██╗██║╚══███╔╝██╔══██╗██╔══██╗██╔══██╗      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝[/]
-[#F29C38]██║     ███████║███████║██████╔╝██║  ███╔╝ ███████║██████╔╝██║  ██║█████╗███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║[/]
-[#E2832B]██║     ██╔══██║██╔══██║██╔══██╗██║ ███╔╝  ██╔══██║██╔══██╗██║  ██║╚════╝██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║[/]
-[#C75B1D]╚██████╗██║  ██║██║  ██║██║  ██║██║███████╗██║  ██║██║  ██║██████╔╝      ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║[/]
-[#7A3511] ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝       ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝[/]""",
-        "banner_hero": """[#FFD39A]⠀⠀⠀⠀⠀⠀⠀⠀⣀⣤⠶⠶⠶⣤⣀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#F29C38]⠀⠀⠀⠀⠀⠀⣴⠟⠁⠀⠀⠀⠀⠈⠻⣦⠀⠀⠀⠀⠀⠀[/]
-[#F29C38]⠀⠀⠀⠀⠀⣼⠏⠀⠀⠀✦⠀⠀⠀⠀⠹⣧⠀⠀⠀⠀⠀[/]
-[#E2832B]⠀⠀⠀⠀⢰⡟⠀⠀⣀⣤⣤⣤⣀⠀⠀⠀⢻⡆⠀⠀⠀⠀[/]
-[#E2832B]⠀⠀⣠⡾⠛⠁⣠⣾⠟⠉⠀⠉⠻⣷⣄⠀⠈⠛⢷⣄⠀⠀[/]
-[#C75B1D]⠀⣼⠟⠀⢀⣾⠟⠁⠀⠀⠀⠀⠀⠈⠻⣷⡀⠀⠻⣧⠀[/]
-[#C75B1D]⢸⡟⠀⠀⣿⡟⠀⠀⠀🔥⠀⠀⠀⠀⢻⣿⠀⠀⢻⡇[/]
-[#7A3511]⠀⠻⣦⡀⠘⢿⣧⡀⠀⠀⠀⠀⠀⢀⣼⡿⠃⢀⣴⠟⠀[/]
-[#7A3511]⠀⠀⠈⠻⣦⣀⠙⢿⣷⣤⣤⣤⣾⡿⠋⣀⣴⠟⠁⠀⠀[/]
-[#C75B1D]⠀⠀⠀⠀⠈⠙⠛⠶⠤⠭⠭⠤⠶⠛⠋⠁⠀⠀⠀⠀[/]
-[#F29C38]⠀⠀⠀⠀⠀⠀⠀⠀⣰⡿⢿⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#F29C38]⠀⠀⠀⠀⠀⠀⠀⣼⡟⠀⠀⢻⣧⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[dim #7A3511]⠀⠀⠀⠀⠀⠀⠀tail flame lit⠀⠀⠀⠀⠀⠀⠀⠀[/]""",
-    },
-    "caelestia": {
-        "name": "caelestia",
-        "description": "Caelestia dynamic — colour follows your wallpaper; contrast enforced",
-        # Colours are computed at load time from the live desktop scheme (shiina_cli.skin_dynamic);
-        # until one is found this block is empty and every key falls back to the default skin.
-        "colors": {},
-        "spinner": {},
-        "branding": _SHIINA_BRANDING,
-        "tool_prefix": "┊"}}
+    "default": _codex_skin_dict(),
+    "codex": _codex_skin_dict(),
+}
 
 _active_skin: Optional[SkinConfig] = None
-_active_skin_name: str = "shiina"
+_active_skin_name: str = "codex"
 # Routed multiplex profiles: (name, skin) per home key. ``display.skin`` and ``<home>/skins/*.yaml``
 # are per profile, and the relay display name / TUI skin payload are read under each profile's
 # override — one module slot would be last-writer-wins across profiles. Unscoped keeps the module slot.
@@ -449,16 +208,8 @@ def _build_skin_config(data: Dict[str, Any], *, dynamic: bool = False) -> SkinCo
 
 
 def list_skins() -> List[Dict[str, str]]:
-    """List all available skins (built-in + user-installed); user skins never shadow built-ins."""
-    result = [{"name": name, "description": data.get("description", ""), "source": "builtin"}
-              for name, data in _BUILTIN_SKINS.items()]
-    skins_path = _skins_dir()
-    for f in sorted(skins_path.glob("*.yaml")) if skins_path.is_dir() else ():
-        data = _load_skin_from_yaml(f)
-        if data and not any(s["name"] == data.get("name", f.stem) for s in result):
-            result.append({"name": data.get("name", f.stem), "description": data.get("description", ""),
-                           "source": "user"})
-    return result
+    """Strictly codex only — zero built-in layouts or themes."""
+    return [{"name": "codex", "description": "Codex — pure YAML-driven configuration", "source": "builtin"}]
 
 
 def load_skin(name: str) -> SkinConfig:

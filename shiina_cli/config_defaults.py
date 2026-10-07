@@ -780,7 +780,7 @@ DEFAULT_CONFIG = {
         # the CLI with `shiina design use <name>` or live in the TUI with
         # `/design <name>`. Unknown values fall
         # back to default rather than blanking the UI. Engine: shiina_cli/design_engine.py.
-        "design": "default",
+        "design": "codex",
         "personality": "",
         "resume_display": "full",
         # Recap tuning for /resume and startup resume.
@@ -857,7 +857,7 @@ DEFAULT_CONFIG = {
         # /focus off restores. Never affects what the model sees (focus_view.py).
         "focus_view": False,
         "focus_saved_tool_progress": "all",
-        "skin": "shiina",
+        "skin": "default",
         # UI language for static messages (approval prompts, some gateway slash replies); not agent
         # responses/logs/tool outputs. en, zh, ja, de, es, fr, tr, uk; unknown → en.
         "language": "en",
