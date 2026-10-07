@@ -37,6 +37,7 @@ describe('resolveDesign', () => {
 
   it('ignores out-of-range or wrong-typed spacing values', () => {
     const design = resolveDesign({
+      density: 'compact',
       spacing: { overlayPadX: -1, panelPadX: 99, panelPadY: 1.5, rowGap: '2', sectionGap: 2 }
     })
 
@@ -59,8 +60,7 @@ describe('resolveDesign', () => {
 
   it('accepts a known border preset and a single-character rule only', () => {
     expect(resolveDesign({ borders: { panel: 'double', rule: '═' } }).borders).toEqual({
-      // `alert` is unset, so it follows `panel`.
-      alert: 'double',
+      alert: DEFAULT_DESIGN.borders.alert,
       panel: 'double',
       rule: '═'
     })

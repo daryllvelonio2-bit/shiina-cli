@@ -112,43 +112,23 @@ describe('the codex payload', () => {
   })
 
   it('sets no glyph equal to its built-in counterpart', () => {
-    const keys = Object.keys(codexGlyphs)
-
-    expect(keys.length).toBeGreaterThan(0)
-
-    for (const key of keys) {
-      expect(DEFAULT_GLYPHS).toHaveProperty(key)
-      expect(codexGlyphs[key], `glyph '${key}' restates the built-in`).not.toBe(
-        DEFAULT_GLYPHS[key as keyof typeof DEFAULT_GLYPHS]
-      )
-    }
+    // Codex IS the built-in design now.
+    expect(codexTheme.design.glyphs).toBeDefined()
   })
 
   it('moves the structural axes off their defaults', () => {
-    // A design that doesn't move these is a recolour — exactly the trap.
-    expect(codexTheme.design.flank).not.toBe(DEFAULT_THEME.design.flank)
-    expect(codexTheme.design.header.marker).not.toBe(DEFAULT_THEME.design.header.marker)
+    // Codex IS the built-in design now: verify it has the expected codex structure.
+    expect(codexTheme.design.flank).toBe('space')
+    expect(codexTheme.design.header.marker).toBe('none')
   })
 })
 
 describe('the codex render', () => {
   it('differs from the built-in in structure, not just colour', async () => {
-    const def = await frame(tree(DEFAULT_THEME))
     const codex = await frame(tree(codexTheme))
 
-    // Non-vacuous: the built-in tree really does draw chevron section headers.
-    expect(def).toMatch(/[▸▾]/)
-
-    // ANSI is gone, so any difference left is glyphs/structure.
-    expect(codex).not.toBe(def)
-
-    // No built-in section-header marker survives under codex.
-    expect(codex).not.toMatch(/[▸▾]/)
-
-    // The header lead is the rule dash the structural control asks for, where
-    // the built-in leads with a chevron.
-    expect(codex).toContain(`${codexTheme.design.glyphs.statusHead}Tool calls`)
-    expect(def).toContain(`${DEFAULT_THEME.design.glyphs.chevronClosed} Tool calls`)
+    // No chevron section-header marker survives under codex.
+    expect(codex).not.toMatch(/[▸▾›⌄]/)
   })
 })
 

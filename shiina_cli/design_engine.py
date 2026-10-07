@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # The design every other design inherits from, and the one that means
 # "the built-in look" — it declares nothing, so wearing it is a no-op.
-DEFAULT_DESIGN = "default"
+DEFAULT_DESIGN = "codex"
 
 # Guard against a design that (directly or transitively) extends itself.
 _MAX_EXTENDS_DEPTH = 8
@@ -223,7 +223,7 @@ def load_design(name: str) -> DesignConfig:
 
     if data is None:
         if requested != DEFAULT_DESIGN:
-            logger.warning("Design '%s' not found, using default", requested)
+            logger.warning("Design '%s' not found, using default (%s)", requested, DEFAULT_DESIGN)
         data = _resolve_raw(DEFAULT_DESIGN) or {"name": DEFAULT_DESIGN}
 
     colors, prompt, design, spinner, layout = _sections(data)

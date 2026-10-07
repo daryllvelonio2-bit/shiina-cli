@@ -127,45 +127,45 @@ export interface DesignGlyphs {
 }
 
 export const DEFAULT_GLYPHS: DesignGlyphs = {
-  active: '▸',
+  active: '⏺',
   alert: '⚠',
   barEmpty: '░',
   barFill: '█',
   blocked: '⊘',
-  bullet: '●',
+  bullet: '•',
   busy: '⏳',
   cache: '◎',
   chain: '⛓',
-  check: '✓',
+  check: '✔',
   checkboxOff: '☐',
   checkboxOn: '☑',
-  chevronClosed: '▸',
-  chevronOpen: '▾',
-  cross: '✗',
+  chevronClosed: '›',
+  chevronOpen: '⌄',
+  cross: '✘',
   disclosure: '▶',
   dot: '•',
   dotSeparator: ' · ',
-  ellipsis: '…',
+  ellipsis: '⋯',
   focus: '◉',
   halt: '■',
-  idle: '✓',
+  idle: '✔',
   latency: '◷',
-  off: '○',
+  off: '◌',
   partial: '◐',
-  pending: '·',
-  progress: '▶',
-  railElbow: '└',
-  railTee: '├',
-  railVertical: '│',
+  pending: '⋅',
+  progress: '⏺',
+  railElbow: ' ',
+  railTee: ' ',
+  railVertical: ' ',
   resume: '↩',
   rulerTick: '┼',
   scrollThumb: '┃',
-  selected: '*',
-  separator: ' │ ',
-  statusHead: '─ ',
+  selected: '❯',
+  separator: '  ',
+  statusHead: '',
   timeout: '⌛',
   tps: '↑',
-  waiting: '?',
+  waiting: '◦',
   warn: '!'
 }
 
@@ -186,7 +186,7 @@ export interface DesignBorders {
   alert: DesignBorderStyle
 }
 
-export const DEFAULT_BORDERS: DesignBorders = { alert: 'double', panel: 'round', rule: '─' }
+export const DEFAULT_BORDERS: DesignBorders = { alert: 'single', panel: 'single', rule: '─' }
 
 /**
  * Status-rule layout. `segments === null` keeps the built-in order and shows
@@ -218,7 +218,7 @@ export interface DesignHeader {
   marker: DesignHeaderMarker
 }
 
-export const DEFAULT_HEADER: DesignHeader = { case: 'none', emphasis: 'bold', marker: 'chevron' }
+export const DEFAULT_HEADER: DesignHeader = { case: 'none', emphasis: 'dim', marker: 'none' }
 
 /**
  * One nesting step of the tree and ledger chrome.
@@ -237,7 +237,7 @@ export interface DesignIndent {
   last: string
 }
 
-export const DEFAULT_INDENT: DesignIndent = { branch: '├─ ', last: '└─ ', stem: '│ ', unit: '  ' }
+export const DEFAULT_INDENT: DesignIndent = { branch: '  ', last: '  ', stem: '  ', unit: '  ' }
 
 export interface Design {
   borders: DesignBorders
@@ -252,12 +252,12 @@ export interface Design {
 
 export const DEFAULT_DESIGN: Design = {
   borders: DEFAULT_BORDERS,
-  density: 'normal',
-  flank: 'rule',
+  density: 'compact',
+  flank: 'space',
   glyphs: DEFAULT_GLYPHS,
   header: DEFAULT_HEADER,
   indent: DEFAULT_INDENT,
-  spacing: DENSITY_SCALES.normal,
+  spacing: DENSITY_SCALES.compact,
   statusBar: { segments: null }
 }
 

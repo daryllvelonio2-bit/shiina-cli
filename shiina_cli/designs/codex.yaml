@@ -1,23 +1,11 @@
 # codex — neutral, dim, minimal chrome (OpenAI Codex CLI flavour).
 #
-# The read: near-monochrome, almost no accent, secondary text genuinely dim,
-# and as little furniture as possible. What little colour there is only marks
-# state — a soft blue for the prompt, green/amber/red for done/warn/failed.
-#
-# Markers follow Codex's vocabulary: `•` for list items, `⏺` for an action in
-# flight, `✔`/`✘` for its outcome. Tool calls stay folded to one line each so a
-# long turn reads as a list of actions rather than a wall of output.
-#
-# Structure, not just colour: a section header carries NO chevron — it is led by
-# a dim rule dash and set dim rather than bold — a title is flanked by blank air
-# instead of a drawn line, and the boxes are thin and square. Every glyph below
-# differs from the built-in one, so a switch is legible at a glance.
-#
-# `extends: default` means everything not named here is the built-in look.
+# The sole design of Shiina TUI.
+# Near-monochrome, dim secondary text, square boxes, flat indentation,
+# no chevrons or status dashes, minimal status line.
 
 name: codex
-description: Codex-style — neutral and dim, minimal chrome, rule-led dim headers, square boxes.
-extends: default
+description: Codex-style — neutral and dim, minimal chrome, square boxes, flat tree.
 
 colors:
   accent: "#7aa2f7"          # the one real colour: the prompt and active marker

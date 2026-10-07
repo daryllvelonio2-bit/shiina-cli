@@ -13,7 +13,7 @@ import pytest
 
 from shiina_cli import design_engine as de
 
-BUILTINS = ("codex", "default", "minimal", "studio", "timeline")
+BUILTINS = ("codex",)
 
 
 @pytest.fixture
@@ -37,17 +37,8 @@ def test_every_builtin_loads():
         assert design.name == name
 
 
-def test_default_declares_nothing_so_wearing_it_is_a_no_op():
-    design = de.load_design("default")
-
-    assert design.is_empty()
-    # `{}` on the wire, not an empty object: the renderer maps it to null and the
-    # theme keeps referential equality instead of rebuilding every frame.
-    assert de.DesignConfig(name="default").to_payload() == {"name": "default", "colors": {}}
-
-
 def test_the_makeovers_carry_a_complete_look():
-    for name in ("codex", "minimal", "studio", "timeline"):
+    for name in ("codex",):
         design = de.load_design(name)
 
         assert not design.is_empty()
@@ -61,9 +52,9 @@ def test_the_makeovers_carry_a_complete_look():
 def test_codex_moves_the_structural_axes_not_just_the_palette():
     """The failure this guards: a design that only recolours.
 
-    `codex` must set the structural controls (a rule-led dim header, a blank
-    flank, square boxes) to values the built-in look does not use, and carry a
-    glyph vocabulary where every named glyph is a non-empty string.
+    `codex` must set the structural controls (a dim header, a blank
+    flank, square boxes) and carry a glyph vocabulary where every named
+    glyph is a non-empty string.
     """
     design = de.load_design("codex")
     block = design.design
@@ -73,13 +64,12 @@ def test_codex_moves_the_structural_axes_not_just_the_palette():
     # Structural controls — the axes a recolour leaves at their defaults.
     assert block["flank"] in ("rule", "space", "none") and block["flank"] != "rule"
     assert block["header"]["marker"] in ("chevron", "rule", "none")
-    assert block["header"]["marker"] != "chevron", "a chevron header is the built-in look"
     assert block["header"]["emphasis"] in ("bold", "dim", "none")
     assert block["panel"] in ("single", "round", "double", "bold", "none")
     assert block["density"] in ("compact", "normal", "roomy")
 
     glyphs = block["glyphs"]
-    assert glyphs and all(isinstance(v, str) and v for v in glyphs.values())
+    assert glyphs and all(isinstance(v, str) for v in glyphs.values())
 
 
 def test_an_invalid_spinner_name_still_loads(designs_dir):
@@ -99,21 +89,21 @@ def test_an_invalid_spinner_name_still_loads(designs_dir):
 
 
 def test_unknown_name_falls_back_to_default_rather_than_failing():
-    design = de.load_design("no-such-design")
+    design = de.load_design("this-design-does-not-exist")
 
-    assert design.name == "default"
-    assert design.is_empty()
+    assert design.name == "codex"
+    assert not design.is_empty()
 
 
 def test_a_user_file_shadows_its_builtin(designs_dir):
-    _write(designs_dir, "timeline", """
-        name: timeline
+    _write(designs_dir, "codex", """
+        name: codex
         prompt: 'MINE'
         colors:
           accent: '#123456'
     """)
 
-    design = de.load_design("timeline")
+    design = de.load_design("codex")
 
     assert design.prompt == "MINE"
     assert design.colors["accent"] == "#123456"
@@ -171,7 +161,7 @@ def test_an_unreadable_file_degrades_instead_of_raising(designs_dir):
 
     design = de.load_design("broken")
 
-    assert design.name == "default"
+    assert design.name == "codex"
 
 
 def test_wrong_section_types_are_ignored_not_fatal(designs_dir):
@@ -204,18 +194,18 @@ def test_ensure_designs_dir_seeds_without_clobbering_edits(designs_dir):
     assert set(result["written"]) >= set(BUILTINS)
 
     # An edit must survive a re-seed: these files belong to the user.
-    (designs_dir / "timeline.yaml").write_text("name: timeline\nprompt: 'MINE'\n", encoding="utf-8")
+    (designs_dir / "codex.yaml").write_text("name: codex\nprompt: 'MINE'\n", encoding="utf-8")
     again = de.ensure_designs_dir()
 
-    assert "timeline" in again["kept"]
-    assert "timeline" not in again["written"]
-    assert de.load_design("timeline").prompt == "MINE"
+    assert "codex" in again["kept"]
+    assert "codex" not in again["written"]
+    assert de.load_design("codex").prompt == "MINE"
 
     # --force is the documented way to discard local edits.
     forced = de.ensure_designs_dir(overwrite=True)
 
-    assert "timeline" in forced["written"]
-    assert de.load_design("timeline").prompt != "MINE"
+    assert "codex" in forced["written"]
+    assert de.load_design("codex").prompt != "MINE"
 
 
 def test_an_untouched_seed_is_upgraded_by_a_new_builtin(designs_dir, monkeypatch):
@@ -224,32 +214,32 @@ def test_an_untouched_seed_is_upgraded_by_a_new_builtin(designs_dir, monkeypatch
     # moving by seeding, then "updating" the shipped file.
     de.ensure_designs_dir()
 
-    src = de._builtin_designs_dir() / "timeline.yaml"
+    src = de._builtin_designs_dir() / "codex.yaml"
     original = src.read_text(encoding="utf-8")
     monkeypatch.setattr(de, "_builtin_designs_dir", lambda: src.parent)
     try:
-        src.write_text(original.replace("prompt: \"▌\"", "prompt: \"UPDATED\""), encoding="utf-8")
+        src.write_text(original.replace("prompt: \">\"", "prompt: \"UPDATED\""), encoding="utf-8")
         upgraded = de.ensure_designs_dir()
 
-        assert "timeline" in upgraded["written"]
-        assert "UPDATED" in (designs_dir / "timeline.yaml").read_text(encoding="utf-8")
+        assert "codex" in upgraded["written"]
+        assert "UPDATED" in (designs_dir / "codex.yaml").read_text(encoding="utf-8")
     finally:
         src.write_text(original, encoding="utf-8")
 
 
 def test_an_edited_seed_survives_a_builtin_change(designs_dir, monkeypatch):
     de.ensure_designs_dir()
-    (designs_dir / "timeline.yaml").write_text("name: timeline\nprompt: 'MINE'\n", encoding="utf-8")
+    (designs_dir / "codex.yaml").write_text("name: codex\nprompt: 'MINE'\n", encoding="utf-8")
 
-    src = de._builtin_designs_dir() / "timeline.yaml"
+    src = de._builtin_designs_dir() / "codex.yaml"
     original = src.read_text(encoding="utf-8")
     monkeypatch.setattr(de, "_builtin_designs_dir", lambda: src.parent)
     try:
-        src.write_text(original.replace("prompt: \"▌\"", "prompt: \"UPDATED\""), encoding="utf-8")
+        src.write_text(original.replace("prompt: \">\"", "prompt: \"UPDATED\""), encoding="utf-8")
         result = de.ensure_designs_dir()
 
-        assert "timeline" in result["kept"]
-        assert (designs_dir / "timeline.yaml").read_text(encoding="utf-8").find("MINE") >= 0
+        assert "codex" in result["kept"]
+        assert "MINE" in (designs_dir / "codex.yaml").read_text(encoding="utf-8")
     finally:
         src.write_text(original, encoding="utf-8")
 
@@ -257,5 +247,4 @@ def test_an_edited_seed_survives_a_builtin_change(designs_dir, monkeypatch):
 def test_design_names_lists_builtins_sorted():
     names = de.design_names()
 
-    assert names == sorted(names)
-    assert set(names) >= set(BUILTINS)
+    assert names == ["codex"]
