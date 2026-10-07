@@ -1363,6 +1363,83 @@ export const ToolTrail = memo(function ToolTrail({
     })
   }
 
+  if (panels.length > 0) {
+    const isSingleSetOpen = openThinking || openTools || openSubagents || openMeta
+
+    const toggleUnified = () => {
+      const next = !isSingleSetOpen
+      if (hasThinking) setOpenThinking(next)
+      if (hasTools) setOpenTools(next)
+      if (hasSubagents) setOpenSubagents(next)
+      if (activity.length > 0) setOpenMeta(next)
+    }
+
+    const unifiedSummary = [
+      hasThinking ? (thinkingTokensLabel || 'Thinking') : null,
+      hasTools ? `${groups.length} tool${groups.length === 1 ? '' : 's'}` : null,
+      hasSubagents ? `${spawnTotals.descendantCount} agent${spawnTotals.descendantCount === 1 ? '' : 's'}` : null,
+    ].filter(Boolean).join(`, `)
+
+    return (
+      <Box flexDirection="column">
+        <TreeNode
+          branch="last"
+          header={
+            <Box onClick={toggleUnified}>
+              <Text color={t.color.muted} dim={!busy}>
+                <Text color={t.color.accent}>
+                  {headerLead(t.design.header, isSingleSetOpen, t.design.glyphs)}
+                </Text>
+                <Text {...headerEmphasis(t.design.header)} color={t.color.accent}>
+                  {headerLabel(t.design.header, busy ? 'In progress' : 'Steps')}
+                </Text>
+                {unifiedSummary ? (
+                  <Text color={t.color.statusFg} dim>
+                    {'  '}({unifiedSummary})
+                  </Text>
+                ) : null}
+              </Text>
+            </Box>
+          }
+          key="unified-set"
+          open={isSingleSetOpen}
+          t={t}
+        >
+          {rails => (
+            <Box flexDirection="column">
+              {panels.map(panel => (
+                <Box flexDirection="column" key={panel.key}>
+                  {panel.render(rails)}
+                </Box>
+              ))}
+            </Box>
+          )}
+        </TreeNode>
+        {totalTokensLabel ? (
+          <TreeTextRow
+            branch="last"
+            color={t.color.statusFg}
+            content={
+              <>
+                <Text color={t.color.accent}>Σ </Text>
+                {totalTokensLabel}
+              </>
+            }
+            dimColor
+            t={t}
+          />
+        ) : null}
+        {outcome ? (
+          <Box marginTop={1}>
+            <Text color={t.color.muted} dim>
+              {t.design.glyphs.dotSeparator.trim()} {outcome}
+            </Text>
+          </Box>
+        ) : null}
+      </Box>
+    )
+  }
+
   const topCount = panels.length + (totalTokensLabel ? 1 : 0)
 
   return (
