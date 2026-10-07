@@ -5,13 +5,18 @@
 # state — a soft blue for the prompt, green/amber/red for done/warn/failed.
 #
 # Markers follow Codex's vocabulary: `•` for list items, `⏺` for an action in
-# flight, `✓`/`✗` for its outcome. Tool calls stay folded to one line each so a
+# flight, `✔`/`✘` for its outcome. Tool calls stay folded to one line each so a
 # long turn reads as a list of actions rather than a wall of output.
+#
+# Structure, not just colour: a section header carries NO chevron — it is led by
+# a dim rule dash and set dim rather than bold — a title is flanked by blank air
+# instead of a drawn line, and the boxes are thin and square. Every glyph below
+# differs from the built-in one, so a switch is legible at a glance.
 #
 # `extends: default` means everything not named here is the built-in look.
 
 name: codex
-description: Codex-style — neutral and dim, minimal chrome, round composer box, bullet actions.
+description: Codex-style — neutral and dim, minimal chrome, rule-led dim headers, square boxes.
 extends: default
 
 colors:
@@ -54,28 +59,39 @@ prompt: ">"
 
 design:
   density: compact
-  panel: round               # Codex's composer/boxes are rounded
-  alert: round
+  # Thin, square boxes — Codex's chrome is not rounded, so this is a real
+  # structural choice rather than a restatement of the built-in `round`.
+  panel: single
+  alert: single
   rule: "─"
+
+  # Structure: blank air beside a title (never a drawn line), a header led by a
+  # rule dash and set dim, and the default stepped tree underneath.
+  flank: space
+  header:
+    case: none
+    emphasis: dim
+    marker: rule
 
   spacing:
     insetPadX: 1
 
   glyphs:
+    # Every value here differs from the built-in glyph: a marker that merely
+    # restated the default would make "codex is different" a lie.
     active: "⏺"              # an action in flight
     bullet: "•"
-    check: "✓"
+    check: "✔"
     chevronClosed: "›"
     chevronOpen: "⌄"
-    cross: "✗"
-    ellipsis: "…"
-    off: "○"
-    pending: "·"
+    cross: "✘"
+    ellipsis: "⋯"
+    "off": "◌"               # quoted: a bare `off:` key is YAML 1.1 boolean False
+    pending: "⋅"
     progress: "⏺"
-    selected: "*"
-    waiting: "?"
+    selected: "❯"
     separator: "  "          # dim air, not a drawn divider
-    statusHead: "─ "
+    waiting: "◦"
 
   status_bar:
     # Close to Codex's idle status line: what model, where, how many tokens.

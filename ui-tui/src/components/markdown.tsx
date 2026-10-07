@@ -1,6 +1,7 @@
 import { Box, Link, stringWidth, Text } from '@shiina/ink'
 import { Fragment, memo, type ReactNode, useMemo } from 'react'
 
+import { headerLead } from '../design.js'
 import { ensureEmojiPresentation } from '../lib/emoji.js'
 import { normalizeExternalUrl } from '../lib/externalLink.js'
 import { BOX_CLOSE, BOX_OPEN, texToUnicode } from '../lib/mathUnicode.js'
@@ -749,7 +750,7 @@ function MdImpl({ cols, compact, t, text }: MdProps) {
         start('paragraph')
         nodes.push(
           <Text color={t.color.muted} key={key} wrap="wrap-trim">
-            {`${t.design.glyphs.chevronClosed} `}
+            {headerLead(t.design.header, false, t.design.glyphs)}
 
             <Link url={/^(?:\/|[a-z]:[\\/])/i.test(media) ? `file://${media}` : media}>
               <Text color={t.color.accent} underline>
@@ -799,7 +800,7 @@ function MdImpl({ cols, compact, t, text }: MdProps) {
 
         nodes.push(
           <Box flexDirection="column" key={key} paddingLeft={2}>
-            {lang && !isDiff && <Text color={t.color.muted}>{`${t.design.borders.rule} ${lang}`}</Text>}
+            {lang && !isDiff && <Text color={t.color.muted}>{'─ ' + lang}</Text>}
 
             {block.map((l, j) => {
               if (highlighted) {
@@ -1014,11 +1015,7 @@ function MdImpl({ cols, compact, t, text }: MdProps) {
         start('list')
 
         const task = bullet[2]!.match(TASK_RE)
-        const marker = task
-          ? task[1]!.toLowerCase() === 'x'
-            ? t.design.glyphs.checkboxOn
-            : t.design.glyphs.checkboxOff
-          : t.design.glyphs.dot
+        const marker = task ? (task[1]!.toLowerCase() === 'x' ? '☑' : '☐') : '•'
 
         nodes.push(
           <Box key={key} paddingLeft={indentDepth(bullet[1]!) * 2}>
@@ -1067,7 +1064,7 @@ function MdImpl({ cols, compact, t, text }: MdProps) {
             {quoteLines.map((ql, qi) => (
               <Box key={qi} paddingLeft={Math.max(0, ql.depth - 1) * 2}>
                 <Text color={t.color.muted} wrap="wrap-trim">
-                  {t.design.glyphs.railVertical} <MdInline t={t} text={ql.text} />
+                  │ <MdInline t={t} text={ql.text} />
                 </Text>
               </Box>
             ))}
@@ -1103,7 +1100,7 @@ function MdImpl({ cols, compact, t, text }: MdProps) {
         start('paragraph')
         nodes.push(
           <Text color={t.color.muted} key={key} wrap="wrap-trim">
-            {t.design.glyphs.disclosure} {summary}
+            ▶ {summary}
           </Text>
         )
         i++

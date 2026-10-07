@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { applyDesign } from '../domain/applyDesign.js'
 import { resolveDesignSpec } from '../domain/designSpec.js'
 import { layoutRegions, layoutSections } from '../domain/layout.js'
+import { designEquals } from '../design.js'
 import { DEFAULT_THEME } from '../theme.js'
 
 // `applyDesign` + the design-file spec. (`__tests__/design.test.ts` covers
@@ -164,6 +165,54 @@ describe('applyDesign', () => {
 
     expect(themed.color).toBe(DEFAULT_THEME.color)
     expect(themed.design.glyphs).toBe(DEFAULT_THEME.design.glyphs)
+  })
+})
+
+describe('structural overrides', () => {
+  it('carries flank, header and indent through to the theme', () => {
+    const spec = resolveDesignSpec({
+      design: { flank: 'none', header: { case: 'upper', marker: 'rule' }, indent: { unit: '    ' } },
+      name: 'structural'
+    })
+
+    const themed = applyDesign(DEFAULT_THEME, spec)
+
+    expect(themed.design.flank).toBe('none')
+    expect(themed.design.header).toEqual({ ...DEFAULT_THEME.design.header, case: 'upper', marker: 'rule' })
+    expect(themed.design.indent).toEqual({ ...DEFAULT_THEME.design.indent, unit: '    ' })
+    // A facet the design stayed silent about keeps its built-in value.
+    expect(themed.design.header.emphasis).toBe(DEFAULT_THEME.design.header.emphasis)
+  })
+
+  it('accepts `none` as a border style', () => {
+    const themed = applyDesign(DEFAULT_THEME, resolveDesignSpec({ design: { panel: 'none' }, name: 'borderless' }))
+
+    expect(themed.design.borders.panel).toBe('none')
+  })
+
+  it('degrades every malformed structural value to the built-in', () => {
+    // Each block is unusable, so nothing changes and the spec stays null —
+    // exactly the referential-stability contract `uiStore` relies on.
+    expect(resolveDesignSpec({ design: { flank: 'wavy' }, name: 'bad-flank' })).toBeNull()
+    expect(resolveDesignSpec({ design: { header: { case: 'shout', marker: 'star' } }, name: 'bad-header' })).toBeNull()
+    expect(resolveDesignSpec({ design: { indent: { unit: 'x'.repeat(40) } }, name: 'bad-indent' })).toBeNull()
+    expect(resolveDesignSpec({ design: { panel: 'sparkly' }, name: 'bad-panel' })).toBeNull()
+  })
+
+  it('lets two designs differ in structure with no colour, glyph or spacing change', () => {
+    const flat = applyDesign(
+      DEFAULT_THEME,
+      resolveDesignSpec({ design: { flank: 'none', header: { marker: 'none' }, indent: { unit: '' } }, name: 'flat' })
+    )
+    const stepped = applyDesign(
+      DEFAULT_THEME,
+      resolveDesignSpec(
+        { design: { flank: 'rule', header: { marker: 'chevron' }, indent: { unit: '    ' } }, name: 'stepped' }
+      )
+    )
+
+    expect(flat.color).toBe(stepped.color)
+    expect(designEquals(flat.design, stepped.design)).toBe(false)
   })
 })
 

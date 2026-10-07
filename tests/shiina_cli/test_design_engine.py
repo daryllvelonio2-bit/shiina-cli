@@ -13,7 +13,7 @@ import pytest
 
 from shiina_cli import design_engine as de
 
-BUILTINS = ("default", "minimal", "studio", "timeline")
+BUILTINS = ("codex", "default", "minimal", "studio", "timeline")
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ def test_default_declares_nothing_so_wearing_it_is_a_no_op():
 
 
 def test_the_makeovers_carry_a_complete_look():
-    for name in ("minimal", "studio", "timeline"):
+    for name in ("codex", "minimal", "studio", "timeline"):
         design = de.load_design(name)
 
         assert not design.is_empty()
@@ -56,6 +56,46 @@ def test_the_makeovers_carry_a_complete_look():
         assert design.design.get("glyphs"), "a makeover must set a glyph vocabulary"
         assert design.spinner.get("think") and design.spinner.get("tool")
         assert design.layout.get("regions") and design.layout.get("sections")
+
+
+def test_codex_moves_the_structural_axes_not_just_the_palette():
+    """The failure this guards: a design that only recolours.
+
+    `codex` must set the structural controls (a rule-led dim header, a blank
+    flank, square boxes) to values the built-in look does not use, and carry a
+    glyph vocabulary where every named glyph is a non-empty string.
+    """
+    design = de.load_design("codex")
+    block = design.design
+
+    assert not design.is_empty()
+
+    # Structural controls — the axes a recolour leaves at their defaults.
+    assert block["flank"] in ("rule", "space", "none") and block["flank"] != "rule"
+    assert block["header"]["marker"] in ("chevron", "rule", "none")
+    assert block["header"]["marker"] != "chevron", "a chevron header is the built-in look"
+    assert block["header"]["emphasis"] in ("bold", "dim", "none")
+    assert block["panel"] in ("single", "round", "double", "bold", "none")
+    assert block["density"] in ("compact", "normal", "roomy")
+
+    glyphs = block["glyphs"]
+    assert glyphs and all(isinstance(v, str) and v for v in glyphs.values())
+
+
+def test_an_invalid_spinner_name_still_loads(designs_dir):
+    # Animation names are the renderer's business, not the loader's: a typo must
+    # not raise here — thinking.tsx::Spinner falls back to the built-in pick.
+    _write(designs_dir, "typo", """
+        name: typo
+        prompt: '>'
+        spinner:
+          think: [not-a-real-animation]
+          tool: [nope]
+    """)
+
+    design = de.load_design("typo")
+
+    assert design.spinner["think"] == ["not-a-real-animation"]
 
 
 def test_unknown_name_falls_back_to_default_rather_than_failing():

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import unicodeSpinners from 'unicode-animations'
 
 import { artWidth, caduceus, CADUCEUS_WIDTH, logo, LOGO_WIDTH } from '../banner.js'
+import { flankFill } from '../design.js'
 import { flat } from '../lib/text.js'
 import type { Theme } from '../theme.js'
 import type { PanelSection, SessionInfo } from '../types.js'
@@ -70,12 +71,13 @@ const centerIn = (s: string, w: number) => {
   return `${' '.repeat(left)}${f}${' '.repeat(slack - left)}`
 }
 
-const ruleIn = (label: string, w: number, rule: string) => {
+const ruleIn = (label: string, w: number, t: Theme) => {
   const f = clip(label, Math.max(1, w - 4))
   const slack = Math.max(0, w - f.length - 2)
   const left = slack >> 1
+  const fill = (n: number) => flankFill(t.design.flank, t.design.borders.rule, n)
 
-  return `${rule.repeat(left)} ${f} ${rule.repeat(slack - left)}`
+  return `${fill(left)} ${f} ${fill(slack - left)}`
 }
 
 function CompactBanner({ cols, t }: { cols: number; t: Theme }) {
@@ -84,7 +86,7 @@ function CompactBanner({ cols, t }: { cols: number; t: Theme }) {
 
   return (
     <Box flexDirection="column" height={2} marginBottom={1} width={w}>
-      <Text color={t.color.primary}>{ruleIn('shiinaaa', w, t.design.borders.rule)}</Text>
+      <Text color={t.color.primary}>{ruleIn('shiinaaa', w, t)}</Text>
       <Text color={t.color.primary}>{t.design.borders.rule.repeat(w)}</Text>
     </Box>
   )

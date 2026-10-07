@@ -693,7 +693,9 @@ const applyBorderStyles = (node: LayoutNode, style: Styles, resolvedStyle?: Styl
   const resolved = resolvedStyle ?? style
 
   if ('borderStyle' in style) {
-    const borderWidth = style.borderStyle ? 1 : 0
+    // `none` is a border style that reserves no cells: a borderless panel gets
+    // its padding back instead of a blank gutter where the box used to be.
+    const borderWidth = style.borderStyle && style.borderStyle !== 'none' ? 1 : 0
 
     node.setBorder(LayoutEdge.Top, resolved.borderTop !== false ? borderWidth : 0)
     node.setBorder(LayoutEdge.Bottom, resolved.borderBottom !== false ? borderWidth : 0)

@@ -6,6 +6,7 @@ import spinners, { type BrailleSpinnerName } from 'unicode-animations'
 
 import { $uiState } from '../app/uiStore.js'
 import { THINKING_COT_MAX, THINKING_TRAIL_MAX_CHARS, THINKING_TRAIL_MAX_LINES } from '../config/limits.js'
+import { type DesignIndent, headerEmphasis, headerLabel, headerLead } from '../design.js'
 import { sectionMode } from '../domain/details.js'
 import {
   buildSubagentTree,
@@ -27,7 +28,6 @@ import {
   pick,
   splitToolDuration,
   thinkingPreview,
-  TOOL_TRAIL_ERR,
   toolTrailLabel
 } from '../lib/text.js'
 import type { Theme } from '../theme.js'
@@ -55,13 +55,8 @@ type TreeRails = readonly boolean[]
 
 const nextTreeRails = (rails: TreeRails, branch: TreeBranch) => [...rails, branch === 'mid']
 
-const treeLead = (rails: TreeRails, branch: TreeBranch, t: Theme) => {
-  const g = t.design.glyphs
-  const vertical = `${g.railVertical} `
-  const corner = `${branch === 'mid' ? g.railTee : g.railElbow}${t.design.borders.rule} `
-
-  return `${rails.map(on => (on ? vertical : '  ')).join('')}${corner}`
-}
+const treeLead = (rails: TreeRails, branch: TreeBranch, indent: DesignIndent) =>
+  `${rails.map(on => (on ? indent.stem : indent.unit)).join('')}${branch === 'mid' ? indent.branch : indent.last}`
 
 // ── Primitives ───────────────────────────────────────────────────────
 
@@ -80,7 +75,7 @@ function TreeRow({
   stemDim?: boolean
   t: Theme
 }) {
-  const lead = treeLead(rails, branch, t)
+  const lead = treeLead(rails, branch, t.design.indent)
 
   return (
     <Box>
@@ -273,12 +268,13 @@ function Chevron({
   // strength; the chevron keeps it too. They used to render muted+dim, which put
   // the body text (reasoning) visually above its own header.
   const color = chevronColor(t, tone)
+  const header = t.design.header
 
   return (
     <Box onClick={(e: any) => onClick(!!e?.shiftKey || !!e?.ctrlKey)}>
-      <Text bold color={color}>
-        {`${open ? t.design.glyphs.chevronOpen : t.design.glyphs.chevronClosed} `}
-        {title}
+      <Text color={color} {...headerEmphasis(header)}>
+        {headerLead(header, open, t.design.glyphs)}
+        {headerLabel(header, title)}
         {typeof count === 'number' ? <Text color={t.color.muted}> ({count})</Text> : ''}
         {suffix ? (
           <Text color={t.color.statusFg} dim>
@@ -490,7 +486,7 @@ function SubagentAccordion({
               color={t.color.text}
               content={
                 <>
-                  <Text color={t.color.tool}>{t.design.glyphs.bullet} </Text>
+                  <Text color={t.color.tool}>{`${t.design.glyphs.bullet} `}</Text>
                   {line}
                 </>
               }
@@ -967,7 +963,7 @@ export const ToolTrail = memo(function ToolTrail({
 
     if (parsed) {
       groups.push({
-        color: parsed.mark === TOOL_TRAIL_ERR ? t.color.error : t.color.text,
+        color: parsed.mark === '✗' ? t.color.error : t.color.text,
         content: parsed.call,
         details: [],
         key: `tr-${i}`,
@@ -976,9 +972,9 @@ export const ToolTrail = memo(function ToolTrail({
 
       if (parsed.detail) {
         pushDetail({
-          color: parsed.mark === TOOL_TRAIL_ERR ? t.color.error : t.color.muted,
+          color: parsed.mark === '✗' ? t.color.error : t.color.muted,
           content: parsed.detail,
-          dimColor: parsed.mark !== TOOL_TRAIL_ERR,
+          dimColor: parsed.mark !== '✗',
           key: `tr-${i}-d`
         })
       }
@@ -1190,16 +1186,12 @@ export const ToolTrail = memo(function ToolTrail({
           }}
         >
           <Text color={t.color.muted} dim={!thinkingLive}>
-            <Text color={t.color.accent}>{`${openThinking ? t.design.glyphs.chevronOpen : t.design.glyphs.chevronClosed} `}</Text>
-            {thinkingLive ? (
-              <Text bold color={t.color.accent}>
-                Thinking
-              </Text>
-            ) : (
-              <Text bold color={t.color.accent}>
-                Thinking
-              </Text>
-            )}
+            <Text color={t.color.accent}>
+              {headerLead(t.design.header, openThinking, t.design.glyphs)}
+            </Text>
+            <Text {...headerEmphasis(t.design.header)} color={t.color.accent}>
+              {headerLabel(t.design.header, 'Thinking')}
+            </Text>
             {thinkingTokensLabel ? (
               <Text color={t.color.statusFg} dim>
                 {'  '}
@@ -1264,7 +1256,7 @@ export const ToolTrail = memo(function ToolTrail({
                   color={group.color}
                   content={
                     <>
-                      <Text color={t.color.tool}>{t.design.glyphs.bullet} </Text>
+                      <Text color={t.color.tool}>{`${t.design.glyphs.bullet} `}</Text>
                       {toolLabel(group)}
                       {isDelegateGroup ? (
                         <Text color={t.color.statusFg} dim>

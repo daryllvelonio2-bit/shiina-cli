@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  DEFAULT_BORDERS,
   DEFAULT_DESIGN,
   DEFAULT_GLYPHS,
+  DEFAULT_HEADER,
+  DEFAULT_INDENT,
   DENSITY_SCALES,
   designEquals,
   resolveDesign
@@ -83,6 +86,47 @@ describe('resolveDesign', () => {
       'duration'
     ])
   })
+
+  it('parses the flank style and degrades an unknown one', () => {
+    expect(resolveDesign({ flank: 'space' }).flank).toBe('space')
+    expect(resolveDesign({ flank: 'none' }).flank).toBe('none')
+    expect(resolveDesign({ flank: 'wavy' }).flank).toBe(DEFAULT_DESIGN.flank)
+  })
+
+  it('parses each header facet on its own and degrades a bad one', () => {
+    expect(resolveDesign({ header: { case: 'upper', emphasis: 'dim', marker: 'rule' } }).header).toEqual({
+      case: 'upper',
+      emphasis: 'dim',
+      marker: 'rule'
+    })
+    // One bad facet does not drag the others off their default.
+    expect(resolveDesign({ header: { case: 'shout', emphasis: 'dim', marker: 'star' } }).header).toEqual({
+      ...DEFAULT_HEADER,
+      emphasis: 'dim'
+    })
+    expect(resolveDesign({ header: { case: 'lower' } }).header).toEqual({ ...DEFAULT_HEADER, case: 'lower' })
+  })
+
+  it('parses the indent unit and keeps an empty value, because flat is meaningful', () => {
+    expect(resolveDesign({ indent: { unit: '', stem: '', branch: '', last: '' } }).indent).toEqual({
+      unit: '',
+      stem: '',
+      branch: '',
+      last: ''
+    })
+    expect(resolveDesign({ indent: { unit: '    ' } }).indent.unit).toBe('    ')
+    // An implausibly long step is dropped whole rather than exploding every row.
+    expect(resolveDesign({ indent: { unit: 'x'.repeat(20) } }).indent).toEqual(DEFAULT_INDENT)
+  })
+
+  it('accepts `none` as a border style and still rejects an unknown one', () => {
+    expect(resolveDesign({ borders: { alert: 'none', panel: 'none' } }).borders).toEqual({
+      alert: 'none',
+      panel: 'none',
+      rule: DEFAULT_BORDERS.rule
+    })
+    expect(resolveDesign({ borders: { panel: 'sparkly' } }).borders).toEqual(DEFAULT_BORDERS)
+  })
 })
 
 describe('designEquals', () => {
@@ -103,5 +147,15 @@ describe('designEquals', () => {
 
     expect(designEquals(resolveDesign(block), resolveDesign(block))).toBe(true)
     expect(designEquals(DEFAULT_DESIGN, resolveDesign(block))).toBe(false)
+  })
+
+  it('detects a structural difference that changes no colour and no glyph', () => {
+    const restructured = resolveDesign({ flank: 'none', header: { marker: 'none' }, indent: { unit: '' } })
+
+    expect(designEquals(DEFAULT_DESIGN, restructured)).toBe(false)
+  })
+
+  it('detects an alert-border-only difference, which used to slip through', () => {
+    expect(designEquals(DEFAULT_DESIGN, resolveDesign({ borders: { alert: 'none' } }))).toBe(false)
   })
 })

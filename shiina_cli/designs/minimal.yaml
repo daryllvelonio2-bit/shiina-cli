@@ -44,9 +44,24 @@ prompt: ">"
 
 design:
   density: compact
-  panel: single
+  # No box at all: the reading surface has no furniture, so panels use the
+  # borderless style and reclaim the border cells.
+  panel: none
   alert: single
   rule: "-"
+
+  # Structure: no lines beside headers, bare lowercase labels, and a flat tree.
+  flank: none
+  header:
+    case: lower
+    emphasis: dim
+    marker: none
+  indent:
+    unit: ""
+    stem: ""
+    branch: ""
+    last: ""
+
   glyphs:
     active: ">"
     bullet: "-"
