@@ -16,6 +16,9 @@ export const userDisplay = (text: string) => {
   return `${prefix || '(message)'} [long message]`
 }
 
+const CLEAN_IMAGE_DESC_RE =
+  /\[The user attached an image\.(?: Here's what it contains:[\s\S]*?| but [^\]]*?)\]\s*(?:\[If you need a closer look,[^\]]*?\])?\s*/gi
+
 export const toTranscriptMessages = (rows: unknown): Msg[] => {
   if (!Array.isArray(rows)) {
     return []
@@ -29,7 +32,12 @@ export const toTranscriptMessages = (rows: unknown): Msg[] => {
       continue
     }
 
-    const { context, display_kind, name, role, text, timestamp } = row as TranscriptRow
+    const { context, display_kind, name, role, timestamp } = row as TranscriptRow
+    let text = (row as TranscriptRow).text
+
+    if (role === 'user' && typeof text === 'string' && text.includes('[The user attached an image')) {
+      text = text.replace(CLEAN_IMAGE_DESC_RE, '').trim()
+    }
 
     const createdAt =
       typeof timestamp === 'number' && Number.isFinite(timestamp) && timestamp > 0 ? timestamp : undefined

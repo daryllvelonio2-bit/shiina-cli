@@ -178,6 +178,21 @@ _HISTORY_ASSISTANT_DETAIL_KEYS = (
 _HISTORY_ROLES = frozenset({"user", "assistant", "tool", "system"})
 
 
+def _clean_persisted_image_description(text: str) -> str:
+    """Strip pre-analyzed image dump '[The user attached an image. Here's what it contains: ...]'
+    from message text for clean UI rendering on reload/rehydration."""
+    import re
+    if "[The user attached an image" not in text:
+        return text
+    # Strip the description block and any subsequent "[If you need a closer look...]" block
+    cleaned = re.sub(
+        r"\[The user attached an image\.(?: Here's what it contains:[\s\S]*?| but [^\]]*?)\]\s*(?:\[If you need a closer look,[^\]]*?\])?\s*",
+        "",
+        text
+    )
+    return cleaned.strip()
+
+
 def _history_to_messages(history: list[dict]) -> list[dict]:
     messages = []
     tool_call_args = {}
@@ -193,6 +208,9 @@ def _history_to_messages(history: list[dict]) -> list[dict]:
             continue
         content_text = _coerce_message_text(m.get("content"))
         if _is_display_hidden_marker(role, content_text):
+            continue
+        content_text = _clean_persisted_image_description(content_text)
+        if not content_text.strip() and role == "user":
             continue
         if role == "assistant" and m.get("tool_calls"):
             for tc in m["tool_calls"]:

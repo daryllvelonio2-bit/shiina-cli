@@ -58,7 +58,7 @@ class CLIChatTurnMixin:
         agent = self.agent
         if agent is None:
             return None
-        message = self._chat_route_images(message, images)
+        message = self._chat_route_images(message, images, agent=agent)
 
         if isinstance(message, str) and not isinstance(message, TimelineNotification):
             message, blocked = self._chat_expand_context_references(message)
@@ -155,7 +155,7 @@ class CLIChatTurnMixin:
             logging.debug("@ context reference expansion failed: %s", e)
         return message, None
 
-    def _chat_route_images(self, message, images):
+    def _chat_route_images(self, message, images, agent=None):
         """Attach images natively (vision model) or pre-describe them as text; returns the message to send.
 
         "native" → OpenAI-style content parts (adapters translate per provider); "text" →
@@ -195,6 +195,17 @@ class CLIChatTurnMixin:
                 # All images unreadable — fall back to text enrichment.
             except Exception as _img_exc:
                 logging.warning("native image attach failed, falling back to text: %s", _img_exc)
+        # In the CLI, pass the raw text and @image:<path> directives as the persisted override
+        # so the persistent database/history stores clean user text without the massive analysis dump.
+        persist_msg = text
+        if images:
+            from agent.context_references import format_reference_value
+            refs = "\n".join(f"@image:{format_reference_value(p)}" for p in images if p.exists())
+            persist_msg = f"{text}\n{refs}" if text else refs
+
+        if agent is not None:
+            agent._persist_user_message_override = persist_msg
+
         return self._preprocess_images_with_vision(text, images)
 
     def _chat_stage_user_message(self, agent, message):
