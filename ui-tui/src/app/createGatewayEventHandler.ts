@@ -188,7 +188,7 @@ const themesEqual = (a: Theme, b: Theme) => {
 // The text tone resolves through themeToneHex because a limited-palette
 // terminal quantizes it to `ansi256(N)`, which OSC-10 cannot speak.
 const paintTerminalDefaults = (theme: Theme) => {
-  const background = lastSkin?.colors?.background ?? ''
+  const background = theme.design?.colors?.background ?? lastSkin?.colors?.background ?? ''
 
   setTerminalBackground(background)
   setTerminalForeground(isPaintableHex(background) ? themeToneHex(theme.color.text) : '')

@@ -248,6 +248,7 @@ export interface Design {
   indent: DesignIndent
   spacing: DesignSpacing
   statusBar: DesignStatusBar
+  colors?: Record<string, string>
 }
 
 export const DEFAULT_DESIGN: Design = {

@@ -71,7 +71,8 @@ export const applyDesign = (theme: Theme, spec: DesignSpec | null): Theme => {
       // After the density block on purpose: an explicit per-key override wins
       // over the scale the density just installed.
       ...(spacing ? { spacing: { ...(density ? DENSITY_SCALES[density] : design.spacing), ...spacing } } : {}),
-      statusBar: statusBar ? { segments: statusBar.segments ?? null } : design.statusBar
+      statusBar: statusBar ? { segments: statusBar.segments ?? null } : design.statusBar,
+      colors: spec.colors ?? design.colors
     }
   }
 }
