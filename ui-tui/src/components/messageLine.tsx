@@ -111,6 +111,7 @@ export const MessageLine = memo(function MessageLine({
           reasoning={thinking}
           reasoningActive={reasoningActive}
           reasoningAlwaysVisible={msg.isMoaReference}
+          reasoningDuration={msg.thinkingDuration}
           reasoningTokens={msg.thinkingTokens}
           sections={sections}
           t={t}
@@ -187,11 +188,7 @@ export const MessageLine = memo(function MessageLine({
 
     if (msg.kind === 'diff') {
       const bodyWidth = transcriptBodyWidth(cols, msg.role, t.brand.prompt, TERMUX_TUI_MODE)
-      return (
-        <Accordion defaultOpen={false} t={t} title="File changes">
-          <Md cols={bodyWidth} compact={compact} t={t} text={msg.text} />
-        </Accordion>
-      )
+      return <Md cols={bodyWidth} compact={compact} t={t} text={msg.text} />
     }
 
     // ── Collapsible long system message (system prompt, AGENTS.md, etc.) ──
@@ -295,6 +292,7 @@ export const MessageLine = memo(function MessageLine({
             preferExpandedThinking={liveDetails}
             reasoning={thinking}
             reasoningActive={reasoningActive}
+            reasoningDuration={msg.thinkingDuration}
             reasoningTokens={msg.thinkingTokens}
             sections={sections}
             t={t}

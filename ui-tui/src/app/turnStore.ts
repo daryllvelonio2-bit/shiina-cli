@@ -10,6 +10,7 @@ const buildTurnState = (): TurnState => ({
   reasoning: '',
   reasoningActive: false,
   reasoningStreaming: false,
+  reasoningDuration: 0,
   reasoningTokens: 0,
   streamPendingTools: [],
   streamSegments: [],
@@ -80,6 +81,7 @@ export interface TurnState {
   reasoning: string
   reasoningActive: boolean
   reasoningStreaming: boolean
+  reasoningDuration: number
   reasoningTokens: number
   streamPendingTools: string[]
   streamSegments: Msg[]

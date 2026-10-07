@@ -137,6 +137,7 @@ class TurnController {
   private interimBoundaryIndex: null | number = null
   private activityId = 0
   private reasoningStreamingTimer: Timer = null
+  private reasoningStartedAt: number = 0
   private reasoningTimer: Timer = null
   private streamTimer: Timer = null
   private streamDelay = STREAM_IDLE_BATCH_MS
@@ -178,8 +179,9 @@ class TurnController {
     this.activeReasoningText = ''
     this.reasoningSegmentIndex = null
     this.reasoningText = ''
+    this.reasoningStartedAt = 0
     this.toolTokenAcc = 0
-    patchTurnState({ reasoning: '', reasoningTokens: 0, toolTokens: 0 })
+    patchTurnState({ reasoning: '', reasoningDuration: 0, reasoningTokens: 0, toolTokens: 0 })
   }
 
   clearStatusTimer() {
@@ -282,15 +284,17 @@ class TurnController {
 
   endReasoningPhase() {
     this.reasoningStreamingTimer = clear(this.reasoningStreamingTimer)
+    const duration = this.reasoningStartedAt > 0 ? (Date.now() - this.reasoningStartedAt) / 1000 : 0
+    this.reasoningStartedAt = 0
 
     // Seal any open reasoning segment so its isLiveReasoning flag drops the
     // moment the reasoning phase ends — the panel must stop tracking the
     // turn's global reasoningActive, not stay "live" for the rest of the turn.
     if (this.reasoningSegmentIndex !== null) {
-      this.syncReasoningSegment(false)
+      this.syncReasoningSegment(false, duration)
     }
 
-    patchTurnState({ reasoningActive: false, reasoningStreaming: false })
+    patchTurnState({ reasoningActive: false, reasoningStreaming: false, reasoningDuration: duration })
   }
 
   idle() {
@@ -386,18 +390,21 @@ class TurnController {
     })
   }
 
-  private syncReasoningSegment(live = true) {
+  private syncReasoningSegment(live = true, duration?: number) {
     const thinking = this.activeReasoningText.trim()
 
     if (!thinking) {
       return
     }
 
+    const dur = duration !== undefined ? duration : (this.reasoningStartedAt > 0 ? (Date.now() - this.reasoningStartedAt) / 1000 : undefined)
+
     const msg: Msg = {
       kind: 'trail',
       role: 'system',
       text: '',
       thinking,
+      thinkingDuration: dur,
       thinkingTokens: estimateTokensRough(thinking),
       toolTokens: this.toolTokenAcc || undefined,
       ...(live ? { isLiveReasoning: true } : {})
@@ -458,6 +465,9 @@ class TurnController {
   }
 
   pulseReasoningStreaming() {
+    if (!this.reasoningStartedAt) {
+      this.reasoningStartedAt = Date.now()
+    }
     this.reasoningStreamingTimer = clear(this.reasoningStreamingTimer)
     patchTurnState({ reasoningActive: true, reasoningStreaming: true })
 
@@ -843,8 +853,10 @@ class TurnController {
       return
     }
 
-    this.flushStreamingSegment()
-    this.pushInlineDiffSegment(diffText, [this.completeTool(toolId, fallbackName, '', duration, resultText)])
+    const toolLine = this.completeTool(toolId, fallbackName, '', duration, resultText)
+    const combinedLine = diffText ? `${toolLine}\n\`\`\`diff\n${diffText.replace(/^\s*┊[^\n]*\n?/, '').trim()}\n\`\`\`` : toolLine
+    this.pendingSegmentTools = [...this.pendingSegmentTools, combinedLine]
+    this.flushPendingToolsIntoLastSegment()
     this.publishToolState()
   }
 

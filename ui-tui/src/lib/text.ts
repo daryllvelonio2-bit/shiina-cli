@@ -278,12 +278,16 @@ const countNewlines = (text: string, end: number) => {
 
 export const stripTrailingPasteNewlines = (text: string) => (/[^\n]/.test(text) ? text.replace(/\n+$/, '') : text)
 
-export const toolTrailLabel = (name: string) =>
-  name
-    .split('_')
-    .filter(Boolean)
-    .map(p => p[0]!.toUpperCase() + p.slice(1))
-    .join(' ') || name
+export const toolTrailLabel = (name: string) => {
+  if (name.toLowerCase() === 'patch') return 'Patched'
+  return (
+    name
+      .split('_')
+      .filter(Boolean)
+      .map(p => p[0]!.toUpperCase() + p.slice(1))
+      .join(' ') || name
+  )
+}
 
 export const formatToolCall = (name: string, context = '') => {
   const label = toolTrailLabel(name)
@@ -341,25 +345,31 @@ export const isToolTrailResultLine = (line: string) =>
   line.endsWith(` ${TOOL_TRAIL_OK}`) || line.endsWith(` ${TOOL_TRAIL_ERR}`)
 
 export const parseToolTrailResultLine = (line: string) => {
-  if (!isToolTrailResultLine(line)) {
+  const firstLine = line.split('\n')[0] ?? line
+  if (!isToolTrailResultLine(firstLine)) {
     return null
   }
 
-  const mark = line.endsWith(` ${TOOL_TRAIL_ERR}`) ? TOOL_TRAIL_ERR : TOOL_TRAIL_OK
-  const body = line.slice(0, -2)
+  const diffPart = line.includes('\n') ? line.slice(firstLine.length + 1) : ''
+  const mark = firstLine.endsWith(` ${TOOL_TRAIL_ERR}`) ? TOOL_TRAIL_ERR : TOOL_TRAIL_OK
+  const body = firstLine.slice(0, -2)
   const sep = body.indexOf(' :: ')
 
+  let parsedDetail = ''
+  let call = body
   if (sep >= 0) {
-    return { call: body.slice(0, sep), detail: body.slice(sep + 4), mark }
+    call = body.slice(0, sep)
+    parsedDetail = body.slice(sep + 4)
+  } else {
+    const legacy = body.indexOf(': ')
+    if (legacy > 0) {
+      call = body.slice(0, legacy)
+      parsedDetail = body.slice(legacy + 2)
+    }
   }
 
-  const legacy = body.indexOf(': ')
-
-  if (legacy > 0) {
-    return { call: body.slice(0, legacy), detail: body.slice(legacy + 2), mark }
-  }
-
-  return { call: body, detail: '', mark }
+  const detail = [parsedDetail, diffPart].filter(Boolean).join('\n')
+  return { call, detail, mark }
 }
 
 export const splitToolDuration = (call: string) => {

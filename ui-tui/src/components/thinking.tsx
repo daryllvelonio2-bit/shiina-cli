@@ -32,6 +32,7 @@ import {
   toolTrailLabel
 } from '../lib/text.js'
 import type { Theme } from '../theme.js'
+import { Md } from './markdown.js'
 import type {
   ActiveTool,
   ActivityItem,
@@ -200,6 +201,15 @@ function Detail({
   rails = [],
   t
 }: DetailRow & { branch?: TreeBranch; rails?: TreeRails; t: Theme }) {
+  if (typeof content === 'string' && content.includes('```diff')) {
+    return (
+      <TreeRow branch={branch} rails={rails} t={t}>
+        <Box flexDirection="column">
+          <Md cols={80} t={t} text={content} />
+        </Box>
+      </TreeRow>
+    )
+  }
   return <TreeTextRow branch={branch} color={color} content={content} dimColor={dimColor} rails={rails} t={t} />
 }
 
@@ -771,6 +781,7 @@ export const ToolTrail = memo(function ToolTrail({
   reasoningActive = false,
   reasoning = '',
   reasoningAlwaysVisible = false,
+  reasoningDuration = 0,
   reasoningTokens,
   reasoningStreaming = false,
   sections,
@@ -795,6 +806,7 @@ export const ToolTrail = memo(function ToolTrail({
   // `visible.thinking === 'hidden'` — they're the mixture-of-agents process
   // the user opted into, not private model reasoning (#64657).
   reasoningAlwaysVisible?: boolean
+  reasoningDuration?: number
   reasoningTokens?: number
   reasoningStreaming?: boolean
   sections?: SectionVisibility
@@ -899,14 +911,26 @@ export const ToolTrail = memo(function ToolTrail({
       return
     }
 
-    setOpenThinking(reasoningActive)
-  }, [thinkingAuto, reasoningActive])
+    if (reasoningActive) {
+      setOpenThinking(true)
+    } else if (tools.length > 0 || trail.length > 0 || !busy) {
+      setOpenThinking(false)
+    }
+  }, [thinkingAuto, reasoningActive, tools.length, trail.length, busy])
 
   // The loop finished: collapse every section (thinking, tools, subagents, activity) so the
   // whole process reads as one compact summary and only the final message is left in the
   // open. A section the user pinned open via /details stays open; an MoA reference panel is
   // never touched. The next set opens itself (it is the live one).
   const wasBusy = useRef(busy)
+  useEffect(() => {
+    if (visible.tools !== 'collapsed') return
+    if (tools.length > 0 && busy) {
+      setOpenTools(true)
+    } else if (!busy) {
+      setOpenTools(false)
+    }
+  }, [visible.tools, tools.length, busy])
   useEffect(() => {
     const finished = wasBusy.current && !busy
     wasBusy.current = busy
@@ -1080,7 +1104,6 @@ export const ToolTrail = memo(function ToolTrail({
   const toolTokensLabel =
     toolTokens !== undefined && toolTokens > 0 ? `~${compactNumber(toolTokens)} tokens` : undefined
 
-  const totalTokensLabel = tokenCount > 0 && toolTokenCount > 0 ? `~${compactNumber(totalTokenCount)} total` : null
   const delegateGroups = groups.filter(g => g.label.startsWith('Delegate Task'))
   const inlineDelegateKey = hasSubagents && delegateGroups.length === 1 ? delegateGroups[0]!.key : null
 
@@ -1199,7 +1222,14 @@ export const ToolTrail = memo(function ToolTrail({
               {headerLead(t.design.header, openThinking, t.design.glyphs)}
             </Text>
             <Text {...headerEmphasis(t.design.header)} color={t.color.accent}>
-              {headerLabel(t.design.header, 'Thinking')}
+              {headerLabel(
+                t.design.header,
+                thinkingLive
+                  ? 'Thinking'
+                  : reasoningDuration > 0
+                    ? `thought for ${reasoningDuration.toFixed(1)}s`
+                    : 'Thought'
+              )}
             </Text>
             {thinkingTokensLabel ? (
               <Text color={t.color.statusFg} dim>
@@ -1380,6 +1410,17 @@ export const ToolTrail = memo(function ToolTrail({
       hasSubagents ? `${spawnTotals.descendantCount} agent${spawnTotals.descendantCount === 1 ? '' : 's'}` : null,
     ].filter(Boolean).join(`, `)
 
+    const unifiedTitle = (() => {
+      if (hasThinking && !hasTools && !hasSubagents) {
+        return thinkingLive
+          ? 'Thinking'
+          : reasoningDuration > 0
+            ? `thought for ${reasoningDuration.toFixed(1)}s`
+            : 'Thought'
+      }
+      return busy ? 'In progress' : 'Steps'
+    })()
+
     return (
       <Box flexDirection="column">
         <TreeNode
@@ -1391,7 +1432,7 @@ export const ToolTrail = memo(function ToolTrail({
                   {headerLead(t.design.header, isSingleSetOpen, t.design.glyphs)}
                 </Text>
                 <Text {...headerEmphasis(t.design.header)} color={t.color.accent}>
-                  {headerLabel(t.design.header, busy ? 'In progress' : 'Steps')}
+                  {headerLabel(t.design.header, unifiedTitle)}
                 </Text>
                 {unifiedSummary ? (
                   <Text color={t.color.statusFg} dim>
@@ -1415,20 +1456,6 @@ export const ToolTrail = memo(function ToolTrail({
             </Box>
           )}
         </TreeNode>
-        {totalTokensLabel ? (
-          <TreeTextRow
-            branch="last"
-            color={t.color.statusFg}
-            content={
-              <>
-                <Text color={t.color.accent}>Σ </Text>
-                {totalTokensLabel}
-              </>
-            }
-            dimColor
-            t={t}
-          />
-        ) : null}
         {outcome ? (
           <Box marginTop={1}>
             <Text color={t.color.muted} dim>
@@ -1440,7 +1467,7 @@ export const ToolTrail = memo(function ToolTrail({
     )
   }
 
-  const topCount = panels.length + (totalTokensLabel ? 1 : 0)
+  const topCount = panels.length
 
   return (
     <Box flexDirection="column">
@@ -1455,20 +1482,6 @@ export const ToolTrail = memo(function ToolTrail({
           {panel.render}
         </TreeNode>
       ))}
-      {totalTokensLabel ? (
-        <TreeTextRow
-          branch="last"
-          color={t.color.statusFg}
-          content={
-            <>
-              <Text color={t.color.accent}>Σ </Text>
-              {totalTokensLabel}
-            </>
-          }
-          dimColor
-          t={t}
-        />
-      ) : null}
       {outcome ? (
         <Box marginTop={1}>
           <Text color={t.color.muted} dim>

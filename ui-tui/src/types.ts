@@ -153,6 +153,7 @@ export interface Msg {
   // reasoning segments from earlier in the turn carry no flag, so the TUI can
   // tell "the reasoning happening right now" apart from finished blocks.
   isLiveReasoning?: boolean
+  thinkingDuration?: number
   thinkingTokens?: number
   toolTokens?: number
   tools?: string[]
