@@ -192,14 +192,8 @@ SHIINA_AGENT_HELP_GUIDANCE = (
     "Shiina CLI so you don't guess or invent workarounds."
 )
 
-# Variant for sessions without the skills toolset (e.g. Blank Slate): naming skill_view() there would dangle.
-SHIINA_AGENT_HELP_GUIDANCE_NO_SKILLS = (
-    "When the user needs help with Shiina CLI itself — configuring, "
-    "setting up, using, extending, or troubleshooting it — or when you need to understand your own features, "
-    "tools, or capabilities, the documentation at https://shiina-agent.nousresearch.com/docs is the "
-    "authoritative reference and always holds the latest, most up-to-date information. Point the user there "
-    "(or read it yourself if you have a way to fetch web content)."
-)
+# No fallback variant: a session without skill tools has nothing to point at, so
+# the block is simply not emitted (the help text must never name the hosted docs).
 
 
 # Keep the every-session memory scope even when task knowledge cannot be saved as a skill.

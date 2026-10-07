@@ -452,7 +452,6 @@ def test_coding_prompt_orders_shared_context_before_workspace(monkeypatch):
     )
     monkeypatch.setattr(system_prompt, "DEFAULT_AGENT_IDENTITY", "IDENTITY")
     monkeypatch.setattr(system_prompt, "SHIINA_AGENT_HELP_GUIDANCE", "HELP")
-    monkeypatch.setattr(system_prompt, "SHIINA_AGENT_HELP_GUIDANCE_NO_SKILLS", "HELP")
     monkeypatch.setattr(system_prompt, "STEER_CHANNEL_NOTE", "STEER")
     monkeypatch.setattr(system_prompt, "get_shiina_home", lambda: Path("/shiina"))
 
@@ -469,7 +468,6 @@ def test_coding_prompt_orders_shared_context_before_workspace(monkeypatch):
     )
     expected = "\n\n".join((
         "IDENTITY",
-        "HELP",
         "STEER",
         "CODING_STABLE",
         "SYSTEM_MESSAGE",
@@ -498,7 +496,21 @@ def test_coding_prompt_orders_shared_context_before_workspace(monkeypatch):
         prompt = build_system_prompt(agent, system_message="SYSTEM_MESSAGE")
 
     assert prompt == expected
-    assert agent._cached_system_prompt_static == "\n\n".join(expected.split("\n\n")[:4])
+    assert agent._cached_system_prompt_static == "\n\n".join(expected.split("\n\n")[:3])
+
+
+def test_system_prompt_never_names_the_hosted_docs():
+    """No skill tools -> no help block, and no prompt tier sends the model to the
+    hosted docs host (dropped: unreachable from a LAN without DNS for it)."""
+    agent = _make_agent(valid_tool_names=["read_file"], _parallel_tool_call_guidance=False)
+    with (
+        patch("agent.prompt_builder.load_soul_md", return_value=""),
+        patch("agent.prompt_builder.build_environment_hints", return_value=""),
+        patch("agent.prompt_builder.build_context_files_prompt", return_value=""),
+    ):
+        prompt = build_system_prompt(agent)
+
+    assert "nousresearch.com" not in prompt
 
 
 class TestTelegramRichMessagesHint:
@@ -847,7 +859,6 @@ def test_conversation_start_uses_session_start_not_build_time(monkeypatch):
     )
     monkeypatch.setattr(system_prompt, "DEFAULT_AGENT_IDENTITY", "IDENTITY")
     monkeypatch.setattr(system_prompt, "SHIINA_AGENT_HELP_GUIDANCE", "HELP")
-    monkeypatch.setattr(system_prompt, "SHIINA_AGENT_HELP_GUIDANCE_NO_SKILLS", "HELP")
     monkeypatch.setattr(system_prompt, "STEER_CHANNEL_NOTE", "STEER")
     monkeypatch.setattr(system_prompt, "get_shiina_home", lambda: Path("/shiina"))
 

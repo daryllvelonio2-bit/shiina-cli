@@ -2,8 +2,8 @@
 session can't call (Blank Slate audit, Aug 2026).
 
 Covers:
-  * SHIINA_AGENT_HELP_GUIDANCE degrades to the docs-only variant when the
-    skill tools aren't loaded.
+  * SHIINA_AGENT_HELP_GUIDANCE is emitted only with skill tools + the shiina-agent
+    skill, and never names the hosted docs host.
   * execution_guidance_text() never names a web tool (guidance is toolset-neutral).
   * The coding operating brief drops the `todo` sentence when the todo tool
     isn't loaded.
@@ -19,10 +19,9 @@ class TestShiinaAgentHelpGuidance:
         from agent.prompt_builder import SHIINA_AGENT_HELP_GUIDANCE
         assert "skill_view(name='shiina-agent')" in SHIINA_AGENT_HELP_GUIDANCE
 
-    def test_no_skills_variant_has_no_skill_view_reference(self):
-        from agent.prompt_builder import SHIINA_AGENT_HELP_GUIDANCE_NO_SKILLS
-        assert "skill_view" not in SHIINA_AGENT_HELP_GUIDANCE_NO_SKILLS
-        assert "shiina-agent.nousresearch.com/docs" in SHIINA_AGENT_HELP_GUIDANCE_NO_SKILLS
+    def test_help_guidance_never_names_the_hosted_docs(self):
+        from agent.prompt_builder import SHIINA_AGENT_HELP_GUIDANCE
+        assert "nousresearch.com" not in SHIINA_AGENT_HELP_GUIDANCE
 
 
 class TestExecutionGuidanceText:
