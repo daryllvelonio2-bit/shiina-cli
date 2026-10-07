@@ -19,6 +19,7 @@ import {
   widthByDepth
 } from '../lib/subagentTree.js'
 import {
+  TOOL_TRAIL_ERR,
   boundedLiveRenderText,
   compactPreview,
   estimateTokensRough,
@@ -966,7 +967,7 @@ export const ToolTrail = memo(function ToolTrail({
 
     if (parsed) {
       groups.push({
-        color: parsed.mark === '✗' ? t.color.error : t.color.text,
+        color: parsed.mark === TOOL_TRAIL_ERR ? t.color.error : t.color.text,
         content: parsed.call,
         details: [],
         key: `tr-${i}`,
@@ -975,9 +976,9 @@ export const ToolTrail = memo(function ToolTrail({
 
       if (parsed.detail) {
         pushDetail({
-          color: parsed.mark === '✗' ? t.color.error : t.color.muted,
+          color: parsed.mark === TOOL_TRAIL_ERR ? t.color.error : t.color.muted,
           content: parsed.detail,
-          dimColor: parsed.mark !== '✗',
+          dimColor: parsed.mark !== TOOL_TRAIL_ERR,
           key: `tr-${i}-d`
         })
       }

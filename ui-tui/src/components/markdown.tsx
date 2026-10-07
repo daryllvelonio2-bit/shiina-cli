@@ -1015,7 +1015,11 @@ function MdImpl({ cols, compact, t, text }: MdProps) {
         start('list')
 
         const task = bullet[2]!.match(TASK_RE)
-        const marker = task ? (task[1]!.toLowerCase() === 'x' ? '☑' : '☐') : '•'
+        const marker = task
+          ? task[1]!.toLowerCase() === 'x'
+            ? t.design.glyphs.checkboxOn
+            : t.design.glyphs.checkboxOff
+          : t.design.glyphs.dot
 
         nodes.push(
           <Box key={key} paddingLeft={indentDepth(bullet[1]!) * 2}>
@@ -1100,7 +1104,7 @@ function MdImpl({ cols, compact, t, text }: MdProps) {
         start('paragraph')
         nodes.push(
           <Text color={t.color.muted} key={key} wrap="wrap-trim">
-            ▶ {summary}
+            {t.design.glyphs.disclosure} {summary}
           </Text>
         )
         i++

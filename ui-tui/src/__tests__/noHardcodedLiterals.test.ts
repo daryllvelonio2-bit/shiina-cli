@@ -9,8 +9,13 @@
  * never match) and fails on a reintroduced literal, naming the file, the line,
  * the literal, and the fix.
  *
- * Scanned: every `.ts`/`.tsx` under `ui-tui/src` — tests included, because a
- * fixture that hard-codes chrome is how the next component gets one.
+ * Scanned: every `.ts`/`.tsx` under `ui-tui/src` EXCEPT test files — the
+ * `__tests__/` tree and any `*.test.ts(x)` beside its subject. A test asserts
+ * ABOUT chrome, so the literal it names is the ASSERTION, not chrome being
+ * drawn: tokenising it makes the assertion tautological, and exempting each
+ * one buries the allowlist (13 of the first 25 entries were exactly that).
+ * Production chrome is still covered end to end; the injected-literal check
+ * (`todoPanel.tsx`) proves the guard still fires.
  * Allowlisted: the genuinely non-chrome hits in `ALLOWLIST` below, each WITH A
  * REASON. An entry without a reason — or one that matches nothing any more —
  * fails too, so the list cannot rot.
@@ -68,6 +73,9 @@ const SEPARATOR_JSX_RE = /(?:^|[}>])[ \t]*(\u00b7)[ \t]*(?:\{|<|$)/g
  *  a data encoding, not the meter (see ALLOWLIST). */
 const CELL_RE = /['"`][ \t]*([\u2588\u2591]+)[ \t]*['"`]/g
 const RULER_RE = /['"`][ \t]*(\u253c)[ \t]*['"`]/g
+
+/** Test files are assertions ABOUT chrome, not chrome: out of scan scope. */
+const TEST_FILE_RE = /\.test\.tsx?$/
 
 type LiteralKind = 'glyph' | 'borderStyle' | 'boxDrawing' | 'padding' | 'separator' | 'cell' | 'ruler'
 
@@ -315,11 +323,13 @@ const collectSources = (dir: string, out: string[] = []): string[] => {
     const full = join(dir, name)
 
     if (statSync(full).isDirectory()) {
-      if (name !== 'node_modules' && name !== 'dist') {
+      if (name !== 'node_modules' && name !== 'dist' && name !== '__tests__') {
         collectSources(full, out)
       }
     } else if (name.endsWith('.ts') || name.endsWith('.tsx')) {
-      out.push(full)
+      if (!TEST_FILE_RE.test(name)) {
+        out.push(full)
+      }
     }
   }
 
@@ -363,70 +373,6 @@ const ALLOWLIST: AllowlistEntry[] = [
     reason: 'LaTeX-to-Unicode translation table: a mathematical symbol mapping, not chrome.'
   },
   {
-    path: '__tests__/text.test.ts',
-    literals: ['\u2713', '\u2717'],
-    reason:
-      'Pins the PERSISTED tool-trail wire format. The producing marks (TOOL_TRAIL_OK/ERR) are ' +
-      'deliberately pinned to the built-in glyphs so a design switch cannot break parsing of ' +
-      'lines already in the transcript; asserting them through the live token would be ' +
-      'tautological.'
-  },
-  {
-    path: 'lib/text.test.ts',
-    literals: ['\u2713'],
-    reason: 'Ask-preview fixture: the preview string is built from TOOL_TRAIL_OK, a pinned wire mark.'
-  },
-  {
-    path: 'lib/liveProgress.test.ts',
-    literals: ['\u2713'],
-    reason: 'Tool-trail wire-format fixture (the shelf groups trail lines by their result mark).'
-  },
-  {
-    path: 'lib/messages.test.ts',
-    literals: ['\u2713'],
-    reason: 'Tool-trail wire-format fixture (transcript merge groups by result mark).'
-  },
-  {
-    path: '__tests__/createGatewayEventHandler.test.ts',
-    literals: ['\u2713'],
-    reason:
-      'Gateway payload fixtures: backend goal-line and credits copy plus tool-trail marks, i.e. ' +
-      'wire data the TUI receives, not chrome it draws.'
-  },
-  {
-    path: '__tests__/appChromeStatusRule.test.tsx',
-    literals: ['\u2713'],
-    reason:
-      'Credits-notice text arrives from the gateway as payload (the fixture echoes exactly what ' +
-      'the backend sends).'
-  },
-  {
-    path: '__tests__/turnControllerNotice.test.ts',
-    literals: ['\u2022'],
-    reason: 'Credits-notice text arrives from the gateway as payload.'
-  },
-  {
-    path: '__tests__/markdown.test.ts',
-    literals: ['\u2713'],
-    reason:
-      'Markdown table-cell payload fixture: arbitrary cell CONTENT passed through the renderer, ' +
-      'not a chrome marker.'
-  },
-  {
-    path: '__tests__/design.test.ts',
-    literals: ['\u2500\u2500'],
-    reason:
-      'Deliberately INVALID input: a two-character rule must be rejected and fall back to ' +
-      'DEFAULT_DESIGN.borders. The literal is the thing under test.'
-  },
-  {
-    path: '__tests__/design.test.ts',
-    literals: ['\u00b7'],
-    reason:
-      'The separator OVERRIDE is the thing under test (it must survive while an empty glyph ' +
-      'override falls back to the default) — a fixture, not chrome.'
-  },
-  {
     path: 'lib/charts.ts',
     literals: ['\u2588', '\u2591'],
     reason:
@@ -452,23 +398,6 @@ const ALLOWLIST: AllowlistEntry[] = [
       'The same persisted snapshot label as `createGatewayEventHandler` (stored, replayed, sent ' +
       'on the wire), so it cannot read a theme token.'
   },
-  {
-    path: '__tests__/charts.test.ts',
-    literals: ['*'],
-    reason:
-      'Every literal in this file is a chart-layer OUTPUT expectation (sparkline / gauge / hbar ' +
-      'cells) — data-viz fixtures, not chrome.'
-  },
-  {
-    path: '__tests__/petPane.test.tsx',
-    literals: ['\u2588'],
-    reason: 'The pet sprite glyph set — rendered CONTENT (a pet’s pixels), not chrome.'
-  },
-  {
-    path: '__tests__/subagentTree.test.ts',
-    literals: ['\u2588'],
-    reason: 'Pins the sparkline ramp’s top cell — the data encoding, not chrome.'
-  }
 ]
 
 const allows = (violation: Violation, entry: AllowlistEntry): boolean =>
@@ -573,7 +502,7 @@ describe('design literal guard', () => {
   })
 
   it('scans the whole TUI source tree, not an empty list', () => {
-    expect(SOURCES.length).toBeGreaterThan(200)
+    expect(SOURCES.length).toBeGreaterThan(150)
     expect(SOURCES.some(f => f.endsWith('components/appChrome.tsx'))).toBe(true)
     expect(SOURCES.some(f => f.endsWith('design.ts'))).toBe(true)
   })
