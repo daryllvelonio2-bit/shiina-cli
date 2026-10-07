@@ -471,21 +471,7 @@ export const sessionCommands: SlashCommand[] = [
     }
   },
 
-  {
-    help: 'switch theme skin (fires skin.changed)',
-    name: 'skin',
-    run: (arg, ctx) => {
-      if (!arg) {
-        return ctx.gateway
-          .rpc<ConfigGetValueResponse>('config.get', { key: 'skin' })
-          .then(ctx.guarded<ConfigGetValueResponse>(r => ctx.transcript.sys(`skin: ${r.value || 'default'}`)))
-      }
 
-      ctx.gateway
-        .rpc<ConfigSetResponse>('config.set', { key: 'skin', value: arg })
-        .then(ctx.guarded<ConfigSetResponse>(r => r.value && ctx.transcript.sys(`skin → ${r.value}`)))
-    }
-  },
 
   {
     help: 'pick the busy indicator: kaomoji (default), emoji, unicode (braille), or ascii',

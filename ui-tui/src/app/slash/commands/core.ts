@@ -302,27 +302,9 @@ export const coreCommands: SlashCommand[] = [
   },
 
   {
-    help: `switch the structural layout (${LAYOUT_IDS.join(' | ')})`,
-    name: 'layout',
-    run: (arg, ctx) => {
-      const word = arg.trim().toLowerCase()
-      const next =
-        !word || word === 'cycle' || word === 'toggle' ? cycleLayout(ctx.ui.layout) : parseLayout(word)
-
-      if (!next) {
-        return ctx.transcript.sys(`usage: /layout [${LAYOUT_IDS.join('|')}|cycle]`)
-      }
-
-      patchUiState({ layout: next })
-      ctx.gateway.rpc<ConfigSetResponse>('config.set', { key: 'layout', value: next }).catch(() => {})
-
-      queueMicrotask(() => ctx.transcript.sys(`layout ${next}`))
-    }
-  },
-
-  {
-    help: 'switch the visual design (colours, glyphs, borders, prompt, animation)',
+    help: 'switch the visual design (colours, glyphs, layout, borders, prompt, animation)',
     name: 'design',
+    aliases: ['layout', 'skin'],
     run: (arg, ctx) => {
       const { gateway, transcript, ui } = ctx
       const catalog = ui.designs
