@@ -486,7 +486,7 @@ function SubagentAccordion({
               color={t.color.text}
               content={
                 <>
-                  <Text color={t.color.tool}>● </Text>
+                  <Text color={t.color.tool}>{`${t.design.glyphs.bullet} `}</Text>
                   {line}
                 </>
               }
@@ -1186,16 +1186,12 @@ export const ToolTrail = memo(function ToolTrail({
           }}
         >
           <Text color={t.color.muted} dim={!thinkingLive}>
-            <Text color={t.color.accent}>{openThinking ? '▾ ' : '▸ '}</Text>
-            {thinkingLive ? (
-              <Text bold color={t.color.accent}>
-                Thinking
-              </Text>
-            ) : (
-              <Text bold color={t.color.accent}>
-                Thinking
-              </Text>
-            )}
+            <Text color={t.color.accent}>
+              {headerLead(t.design.header, openThinking, t.design.glyphs)}
+            </Text>
+            <Text {...headerEmphasis(t.design.header)} color={t.color.accent}>
+              {headerLabel(t.design.header, 'Thinking')}
+            </Text>
             {thinkingTokensLabel ? (
               <Text color={t.color.statusFg} dim>
                 {'  '}
@@ -1260,7 +1256,7 @@ export const ToolTrail = memo(function ToolTrail({
                   color={group.color}
                   content={
                     <>
-                      <Text color={t.color.tool}>● </Text>
+                      <Text color={t.color.tool}>{`${t.design.glyphs.bullet} `}</Text>
                       {toolLabel(group)}
                       {isDelegateGroup ? (
                         <Text color={t.color.statusFg} dim>

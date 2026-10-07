@@ -1,6 +1,7 @@
 import { Box, Link, stringWidth, Text } from '@shiina/ink'
 import { Fragment, memo, type ReactNode, useMemo } from 'react'
 
+import { headerLead } from '../design.js'
 import { ensureEmojiPresentation } from '../lib/emoji.js'
 import { normalizeExternalUrl } from '../lib/externalLink.js'
 import { BOX_CLOSE, BOX_OPEN, texToUnicode } from '../lib/mathUnicode.js'
@@ -749,7 +750,7 @@ function MdImpl({ cols, compact, t, text }: MdProps) {
         start('paragraph')
         nodes.push(
           <Text color={t.color.muted} key={key} wrap="wrap-trim">
-            {'▸ '}
+            {headerLead(t.design.header, false, t.design.glyphs)}
 
             <Link url={/^(?:\/|[a-z]:[\\/])/i.test(media) ? `file://${media}` : media}>
               <Text color={t.color.accent} underline>

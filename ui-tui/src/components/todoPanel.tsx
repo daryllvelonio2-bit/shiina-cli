@@ -1,6 +1,7 @@
 import { Box, Text } from '@shiina/ink'
 import { memo, useState } from 'react'
 
+import { headerEmphasis, headerLabel, headerLead } from '../design.js'
 import { countPendingTodos } from '../lib/liveProgress.js'
 import { todoGlyph, todoTone, todoTree } from '../lib/todo.js'
 import type { Theme } from '../theme.js'
@@ -57,9 +58,11 @@ export const TodoPanel = memo(function TodoPanel({
     <Box flexDirection="column" marginBottom={1}>
       <Box onClick={handleToggle}>
         <Text color={t.color.muted}>
-          <Text color={t.color.accent}>{effectiveCollapsed ? '▸ ' : '▾ '}</Text>
-          <Text bold color={t.color.accent}>
-            Todo
+          <Text color={t.color.accent}>
+            {headerLead(t.design.header, !effectiveCollapsed, t.design.glyphs)}
+          </Text>
+          <Text {...headerEmphasis(t.design.header)} color={t.color.accent}>
+            {headerLabel(t.design.header, 'Todo')}
           </Text>{' '}
           <Text color={t.color.statusFg} dim>
             ({done}/{todos.length})
