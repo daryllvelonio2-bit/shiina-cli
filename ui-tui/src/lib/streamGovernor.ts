@@ -16,7 +16,9 @@ import { STREAM_LATE_MS, STREAM_MAX_BATCH_MS } from '../config/timing.js'
  * previous commit's work). `floor` is the interaction floor: while the user is
  * typing or scrolling, commits must not be stretched past it.
  */
-export const adaptStreamDelay = (delay: number, cycleMs: number, floor: number): number =>
-  cycleMs > delay + STREAM_LATE_MS
-    ? Math.min(STREAM_MAX_BATCH_MS, Math.max(delay + 1, Math.round(delay * 1.6)))
-    : Math.max(floor, Math.round(delay * 0.85))
+export const adaptStreamDelay = (delay: number, cycleMs: number, floor: number): number => {
+  const boundedDelay = Math.min(STREAM_MAX_BATCH_MS, delay)
+  return cycleMs > boundedDelay + STREAM_LATE_MS
+    ? Math.min(STREAM_MAX_BATCH_MS, Math.max(boundedDelay + 1, Math.round(boundedDelay * 1.6)))
+    : Math.max(floor, Math.round(boundedDelay * 0.85))
+}
