@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { shouldShowResponseSeparator, shouldShowThinkingTrail } from '../components/messageLine.js'
 
 describe('shouldShowResponseSeparator', () => {
-  it('separates assistant response text from visible details', () => {
-    expect(shouldShowResponseSeparator({ role: 'assistant', text: 'final', thinking: 'plan' }, true)).toBe(true)
+  it('is disabled in Codex design', () => {
+    expect(shouldShowResponseSeparator({ role: 'assistant', text: 'final', thinking: 'plan' }, true)).toBe(false)
   })
 
   it('does not add a response separator without details or body text', () => {

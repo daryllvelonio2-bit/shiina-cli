@@ -115,8 +115,8 @@ layout:
     stickyPrompt: false
     todoUnderPrompt: false
   sections:
-    # Actions fold to one line each; reasoning and delegations stay out of the way.
+    # In-progress actions/tools/thinking expand live during generation, and auto-fold when completed.
     activity: hidden
-    subagents: collapsed
-    thinking: collapsed
-    tools: collapsed
+    subagents: expanded
+    thinking: expanded
+    tools: expanded

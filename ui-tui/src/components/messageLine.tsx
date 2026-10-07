@@ -339,8 +339,7 @@ export const MessageLine = memo(function MessageLine({
   )
 })
 
-export const shouldShowResponseSeparator = (msg: Msg, showDetails: boolean): boolean =>
-  msg.role === 'assistant' && showDetails && /\S/.test(msg.text)
+export const shouldShowResponseSeparator = (msg: Msg, showDetails: boolean): boolean => false
 
 // A MoA reference block (msg.isMoaReference) is the user-facing
 // mixture-of-agents process the user opted into, not private model
