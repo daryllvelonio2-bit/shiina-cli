@@ -70,7 +70,13 @@ export const StreamingAssistant = memo(function StreamingAssistant({
 
   return (
     <>
-      {blocks.map(block => {
+      {blocks.map((block, index) => {
+        // Only the NEWEST block is `live`. A block's `live` flag is what keeps a
+        // `live`-mode section open, so passing it to every block left each
+        // finished step expanded until the whole turn settled — one open block
+        // per step, stacked. With it only on the last block, a step folds to its
+        // one-line header the moment the next step appears.
+        const isCurrent = index === blocks.length - 1
         const node = (
           <MessageLine
             cols={cols}
@@ -80,7 +86,7 @@ export const StreamingAssistant = memo(function StreamingAssistant({
             isStreaming={block.isStreaming}
             key={block.key}
             layoutSections={layoutDefaults}
-            liveDetails
+            liveDetails={isCurrent}
             msg={block.msg}
             prev={prev}
             reasoningActive={block.msg.isLiveReasoning === true}
