@@ -800,7 +800,7 @@ function MdImpl({ cols, compact, t, text }: MdProps) {
 
         nodes.push(
           <Box flexDirection="column" key={key} paddingLeft={2}>
-            {lang && !isDiff && <Text color={t.color.muted}>{'─ ' + lang}</Text>}
+            {lang && !isDiff && <Text color={t.color.muted}>{`${t.design.borders.rule} ${lang}`}</Text>}
 
             {block.map((l, j) => {
               if (highlighted) {
@@ -1068,7 +1068,8 @@ function MdImpl({ cols, compact, t, text }: MdProps) {
             {quoteLines.map((ql, qi) => (
               <Box key={qi} paddingLeft={Math.max(0, ql.depth - 1) * 2}>
                 <Text color={t.color.muted} wrap="wrap-trim">
-                  │ <MdInline t={t} text={ql.text} />
+                  <Text color={t.color.border}>{t.design.indent.stem || `${t.design.glyphs.railVertical} `}</Text>
+                  <MdInline t={t} text={ql.text} />
                 </Text>
               </Box>
             ))}
