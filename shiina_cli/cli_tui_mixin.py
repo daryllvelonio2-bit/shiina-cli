@@ -62,29 +62,53 @@ def _term_rows() -> int:
     return shutil.get_terminal_size((100, 24)).lines
 
 
+def _get_panel_box_drawing(kind: str = "panel") -> tuple[str, str, str, str, str, str]:
+    """Return (top_left, top_right, bot_left, bot_right, horiz, vert) for the active design."""
+    try:
+        from shiina_cli.design_engine import get_active_design
+        design = get_active_design().design or {}
+        style = design.get("alert" if kind == "alert" else "panel", "single")
+        rule = design.get("rule", "─")
+    except Exception:
+        style = "single"
+        rule = "─"
+
+    if style == "round":
+        return ("╭", "╮", "╰", "╯", rule, "│")
+    elif style == "double":
+        return ("╔", "╗", "╚", "╝", "═", "║")
+    elif style == "bold":
+        return ("┏", "┓", "┗", "┛", "━", "┃")
+    elif style == "none":
+        return (" ", " ", " ", " ", " ", " ")
+    else:  # single / default
+        return ("┌", "┐", "└", "┘", rule, "│")
+
+
 class _Panel:
     """Fragment accumulator for one bordered overlay panel (``(style, text)`` tuples)."""
 
-    def __init__(self, border: str, box_width: int, title: str = "", title_style: str = ""):
-        from cli import _append_blank_panel_line, _append_panel_line
+    def __init__(self, border: str, box_width: int, title: str = "", title_style: str = "", kind: str = "panel"):
         self.lines, self.border, self.width = [], border, box_width
-        self._row, self._blank = _append_panel_line, _append_blank_panel_line
+        self.tl, self.tr, self.bl, self.br, self.h, self.v = _get_panel_box_drawing(kind)
         if title:
-            # Title inlined into the top rule: ``╭─ Title ───╮``.
-            self.lines.append((border, "╭─ "))
+            # Title inlined into the top rule
+            self.lines.append((border, f"{self.tl}{self.h} "))
             self.lines.append((title_style, title))
-            self.lines.append((border, " " + ("─" * max(0, box_width - len(title) - 3)) + "╮\n"))
+            fill_len = max(0, box_width - len(title) - 3)
+            self.lines.append((border, f" {self.h * fill_len}{self.tr}\n"))
         else:
-            self.lines.append((border, "╭" + ("─" * box_width) + "╮\n"))
+            self.lines.append((border, f"{self.tl}{self.h * box_width}{self.tr}\n"))
 
     def row(self, style: str, text: str) -> None:
-        self._row(self.lines, self.border, style, text, self.width)
+        content = text.ljust(max(0, self.width - 2))
+        self.lines.extend(((self.border, f"{self.v} "), (style, content), (self.border, f" {self.v}\n")))
 
     def blank(self) -> None:
-        self._blank(self.lines, self.border, self.width)
+        self.lines.append((self.border, f"{self.v}{' ' * self.width}{self.v}\n"))
 
     def close(self) -> list:
-        self.lines.append((self.border, "╰" + ("─" * self.width) + "╯\n"))
+        self.lines.append((self.border, f"{self.bl}{self.h * self.width}{self.br}\n"))
         return self.lines
 
 
@@ -166,12 +190,22 @@ class CLITuiMixin:
         choices = state["choices"]
         selected = state.get("selected", 0)
         show_full = state.get("show_full", False)
-        title = "⚠️  Dangerous Command"
+
+        try:
+            from shiina_cli.design_engine import get_active_design
+            d_glyphs = get_active_design().design.get("glyphs", {}) or {}
+            sel_glyph = d_glyphs.get("selected", "❯")
+            alert_glyph = d_glyphs.get("alert", "⚠️ ")
+        except Exception:
+            sel_glyph = "❯"
+            alert_glyph = "⚠️ "
+
+        title = f"{alert_glyph} Dangerous Command".strip()
 
         preview_lines = wrap(description, 60)
         preview_lines.extend(wrap(command, 60))
         for i, choice in enumerate(choices):
-            prefix = '❯ ' if i == selected else '  '
+            prefix = f'{sel_glyph} ' if i == selected else '  '
             label = _APPROVAL_CHOICE_LABELS.get(choice, choice)
             preview_lines.extend(wrap(f"{prefix}{label}", 60, subsequent_indent="  "))
         box_width = _panel_box_width(title, preview_lines)
@@ -182,7 +216,7 @@ class CLITuiMixin:
         if not show_full and "view" in choices and len(cmd_wrapped) > 4:
             cmd_wrapped = cmd_wrapped[:3] + wrap("… (choose Show full command)", inner_text_width)
         choice_labels = [
-            f"{'❯' if i == selected else ' '} {_num_prefix(i)}. {_APPROVAL_CHOICE_LABELS.get(choice, choice)}"
+            f"{sel_glyph if i == selected else ' '} {_num_prefix(i)}. {_APPROVAL_CHOICE_LABELS.get(choice, choice)}"
             for i, choice in enumerate(choices)]
         choice_wrapped = _wrap_rows(wrap, choice_labels, inner_text_width, "    ")
 
@@ -214,7 +248,7 @@ class CLITuiMixin:
 
         # Render title → command → choices → description; description last so any overflow
         # clips the least-critical content, never the command or choices.
-        panel = _Panel('class:approval-border', box_width)
+        panel = _Panel('class:approval-border', box_width, kind="alert")
         panel.row('class:approval-title', title)
         if not use_compact_chrome:
             panel.blank()
@@ -233,16 +267,25 @@ class CLITuiMixin:
         return panel.close()
 
     def _get_tui_prompt_symbols(self) -> tuple[str, str]:
-        """Return ``(normal_prompt, state_suffix)`` for the active skin.
+        """Return ``(normal_prompt, state_suffix)`` for the active skin and design.
 
         ``state_suffix`` is what special states (sudo/secret/approval/agent) render after their
         leading icon. A non-default profile name is prepended (``coder ❯``).
         """
         try:
-            from shiina_cli.skin_engine import get_active_prompt_symbol
-            symbol = get_active_prompt_symbol("❯ ")
+            from shiina_cli.design_engine import get_active_design
+            d_prompt = get_active_design().prompt
+            if d_prompt:
+                symbol = d_prompt
+            else:
+                from shiina_cli.skin_engine import get_active_prompt_symbol
+                symbol = get_active_prompt_symbol("❯ ")
         except Exception:
-            symbol = "❯ "
+            try:
+                from shiina_cli.skin_engine import get_active_prompt_symbol
+                symbol = get_active_prompt_symbol("❯ ")
+            except Exception:
+                symbol = "❯ "
         symbol = (symbol or "❯ ").rstrip() + " "
         try:
             from shiina_cli.profiles import get_active_profile_name

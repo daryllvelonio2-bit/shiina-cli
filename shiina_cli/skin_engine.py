@@ -610,7 +610,7 @@ _STYLE_TEMPLATES = {
 
 
 def get_prompt_toolkit_style_overrides() -> Dict[str, str]:
-    """Return prompt_toolkit style overrides derived from the active skin."""
+    """Return prompt_toolkit style overrides derived from the active skin and design."""
     try:
         skin = get_active_skin()
     except Exception:
@@ -621,6 +621,24 @@ def get_prompt_toolkit_style_overrides() -> Dict[str, str]:
     palette: Dict[str, str] = {}
     for name, key, fallback in _STYLE_PALETTE:
         palette[name] = skin.get_color(key, palette[fallback[1:]] if fallback.startswith("@") else fallback)
+
+    # Blend active design colors onto the CLI prompt_toolkit palette
+    try:
+        from shiina_cli.design_engine import get_active_design
+        design_colors = get_active_design().colors or {}
+        if "border" in design_colors:
+            palette["input_rule"] = design_colors["border"]
+            palette["dim"] = design_colors.get("muted", palette.get("dim", "#8b8b8b"))
+        if "warn" in design_colors:
+            palette["warn"] = design_colors["warn"]
+        if "accent" in design_colors:
+            palette["accent"] = design_colors["accent"]
+            palette["title"] = design_colors["accent"]
+        if "text" in design_colors:
+            palette["text"] = design_colors["text"]
+    except Exception:
+        pass
+
     # This badge paints both sides; foreground-only light remapping destroys its contrast.
     palette["badge_bg"] = skin.colors.get(
         "status_bar_strong", skin.colors.get("banner_title", "#FFD700"))
