@@ -16,6 +16,11 @@ export const LIVE_RENDER_MAX_LINES = 240
 export const VERBOSE_TRAIL_MAX_CHARS = 800
 export const VERBOSE_TRAIL_MAX_LINES = 12
 
+/** Step rows (a tool call or a thought) the live trail shows before the oldest
+ *  roll out. The trail is a live trace, not a log: an unbounded stack pushes the
+ *  answer it accompanies off screen. Older steps stay in the settled transcript. */
+export const VISIBLE_STEP_ROWS = 5
+
 export const LONG_MSG = 300
 export const MAX_HISTORY = 800
 export const THINKING_COT_MAX = 160

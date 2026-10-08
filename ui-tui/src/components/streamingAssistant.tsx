@@ -6,14 +6,14 @@ import { toggleTodoCollapsed, useTurnSelector } from '../app/turnStore.js'
 import { $uiState } from '../app/uiStore.js'
 import { blockRenders } from '../domain/blockLayout.js'
 import { layoutSections } from '../domain/layout.js'
-import { appendToolShelfMessage } from '../lib/liveProgress.js'
+import { appendToolShelfMessage, keepRecentStepRows } from '../lib/liveProgress.js'
 import type { ActiveTool, DetailsMode, Msg, SectionVisibility } from '../types.js'
 
 import { MessageLine } from './messageLine.js'
 import { TodoPanel } from './todoPanel.js'
 
 const groupedSegments = (segments: Msg[]): Msg[] =>
-  segments.reduce<Msg[]>((acc, msg) => appendToolShelfMessage(acc, msg), [])
+  keepRecentStepRows(segments.reduce<Msg[]>((acc, msg) => appendToolShelfMessage(acc, msg), []))
 
 interface LiveBlock {
   isStreaming?: boolean

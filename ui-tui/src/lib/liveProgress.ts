@@ -1,3 +1,4 @@
+import { VISIBLE_STEP_ROWS } from '../config/limits.js'
 import type { Msg, TodoItem } from '../types.js'
 
 export const countPendingTodos = (todos: readonly TodoItem[]) =>
@@ -17,27 +18,6 @@ export const mergeToolShelfInto = (target: Msg, source: Msg): Msg => ({
   tools: [...(target.tools ?? []), ...(source.tools ?? [])]
 })
 
-const isBarrierMessage = (msg: Msg | undefined) => {
-  if (!msg) {
-    return true
-  }
-
-  // Assistant text, user input, intro/panel rows all terminate the shelf.
-  if (msg.kind === 'intro' || msg.kind === 'panel' || msg.kind === 'diff') {
-    return true
-  }
-
-  if (msg.role && msg.role !== 'system') {
-    return true
-  }
-
-  if (msg.text) {
-    return true
-  }
-
-  return false
-}
-
 const isToolCarryingTrail = (msg: Msg | undefined) => Boolean(msg?.kind === 'trail' && !msg.text && msg.tools?.length)
 
 export const appendToolShelfMessage = (prev: readonly Msg[], msg: Msg): Msg[] => {
@@ -45,35 +25,42 @@ export const appendToolShelfMessage = (prev: readonly Msg[], msg: Msg): Msg[] =>
     return [...prev, msg]
   }
 
-  let fallbackHolder: number | null = null
+  // Merge only into the block directly above: a tool result belongs to the step
+  // it follows. Walking further back (past intervening thoughts) pulled a later
+  // tool call into an OLDER `Steps` block, so the trail stopped reading as a
+  // chronological hierarchy — the call appeared above the thoughts that came
+  // between it and its group.
+  const last = prev[prev.length - 1]
 
-  for (let index = prev.length - 1; index >= 0; index--) {
-    const candidate = prev[index]
-
-    if (isToolCarryingTrail(candidate)) {
-      const next = [...prev]
-
-      next[index] = mergeToolShelfInto(candidate!, msg)
-
-      return next
-    }
-
-    if (fallbackHolder === null && canHoldToolShelf(candidate)) {
-      fallbackHolder = index
-    }
-
-    if (isBarrierMessage(candidate)) {
-      break
-    }
+  if (!isToolCarryingTrail(last) && !canHoldToolShelf(last)) {
+    return [...prev, msg]
   }
 
-  if (fallbackHolder !== null) {
-    const next = [...prev]
+  const next = [...prev]
 
-    next[fallbackHolder] = mergeToolShelfInto(prev[fallbackHolder]!, msg)
+  next[next.length - 1] = mergeToolShelfInto(last!, msg)
 
-    return next
+  return next
+}
+
+const isStepRow = (msg: Msg) => msg.kind === 'trail' && Boolean(msg.thinking?.trim() || msg.tools?.length)
+
+/** Keep the newest `max` step rows, dropping the oldest. Non-step rows (text,
+ *  diffs, panels) are never dropped — only the trail rolls. */
+export const keepRecentStepRows = (msgs: readonly Msg[], max: number = VISIBLE_STEP_ROWS): Msg[] => {
+  let drop = msgs.filter(isStepRow).length - max
+
+  if (drop <= 0) {
+    return [...msgs]
   }
 
-  return [...prev, msg]
+  return msgs.filter(msg => {
+    if (drop === 0 || !isStepRow(msg)) {
+      return true
+    }
+
+    drop -= 1
+
+    return false
+  })
 }
