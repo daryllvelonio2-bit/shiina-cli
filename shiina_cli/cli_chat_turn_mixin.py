@@ -200,7 +200,7 @@ class CLIChatTurnMixin:
         persist_msg = text
         if images:
             from agent.context_references import format_reference_value
-            refs = "\n".join(f"@image:{format_reference_value(p)}" for p in images if p.exists())
+            refs = "\n".join(f"@image:{format_reference_value(str(p))}" for p in images if p.exists())
             persist_msg = f"{text}\n{refs}" if text else refs
 
         if agent is not None:
