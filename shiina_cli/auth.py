@@ -684,7 +684,7 @@ def _empty_auth_store() -> Dict[str, Any]:
 _AUTH_STORE_CACHE: Dict[str, Tuple[Tuple[int, int], Dict[str, Any]]] = {}
 
 
-def _load_auth_store(auth_file: Optional[Path] = None) -> Dict[str, Any]:
+def _load_auth_store(auth_file: Optional[Path] = None, *, want_deepcopy: bool = True) -> Dict[str, Any]:
     auth_file = auth_file or _auth_file_path()
     path_key = str(auth_file)
     try:
@@ -704,7 +704,7 @@ def _load_auth_store(auth_file: Optional[Path] = None) -> Dict[str, Any]:
 
     cached = _AUTH_STORE_CACHE.get(path_key)
     if cached is not None and cached[0] == sig:
-        return copy.deepcopy(cached[1])
+        return copy.deepcopy(cached[1]) if want_deepcopy else cached[1]
 
     try:
         raw = json.loads(auth_file.read_text(encoding="utf-8-sig"))
@@ -740,7 +740,16 @@ def _load_auth_store(auth_file: Optional[Path] = None) -> Dict[str, Any]:
                "active_provider": "nous" if providers else None}
 
     _AUTH_STORE_CACHE[path_key] = (sig, copy.deepcopy(res))
-    return copy.deepcopy(res)
+    return copy.deepcopy(res) if want_deepcopy else _AUTH_STORE_CACHE[path_key][1]
+
+
+def _load_auth_store_readonly(auth_file: Optional[Path] = None) -> Dict[str, Any]:
+    """``_load_auth_store()`` without the defensive deepcopy: the cache-hit path through the picker
+    calls this ~400x per build and a full-store copy each time dominated the model list (~10s).
+
+    **Mutating the result (or any nested value) corrupts the in-process cache for every later
+    caller** — only for paths that never write to it; write paths keep ``_load_auth_store()``."""
+    return _load_auth_store(auth_file, want_deepcopy=False)
 
 
 def _save_private_json(target: Path, data: Any, *, fsync_dir: bool = False, **dump_kwargs: Any) -> None:
@@ -881,12 +890,12 @@ def read_credential_pool(provider_id: Optional[str] = None) -> Dict[str, Any]:
 
     A named profile reads only its own ``auth.json``: credentials authenticated at the root are
     not inherited (#111724) — ``shiina -p <name> auth add <provider>`` gives the profile its own."""
-    pool = _load_auth_store().get("credential_pool")
+    pool = _load_auth_store_readonly().get("credential_pool")
     pool = pool if isinstance(pool, dict) else {}
     if provider_id is None:
-        return dict(pool)
+        return copy.deepcopy(pool)
     entries = pool.get(provider_id)
-    return list(entries) if isinstance(entries, list) else []
+    return copy.deepcopy(entries) if isinstance(entries, list) else []
 
 
 _POOL_STATUS_FIELDS = (
@@ -1008,7 +1017,7 @@ def suppress_credential_source(provider_id: str, source: str) -> None:
 def is_source_suppressed(provider_id: str, source: str) -> bool:
     """Check if a credential source has been suppressed by the user."""
     try:
-        return source in _load_auth_store().get("suppressed_sources", {}).get(provider_id, [])
+        return source in _load_auth_store_readonly().get("suppressed_sources", {}).get(provider_id, [])
     except Exception:
         return False
 
