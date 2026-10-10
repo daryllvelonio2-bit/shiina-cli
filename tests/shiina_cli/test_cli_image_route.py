@@ -37,11 +37,28 @@ class TestRouteImagesPersistOverride:
 
         with (
             patch.object(image_routing, "decide_image_input_mode", return_value="text"),
-            patch.object(ShiinaCLI, "_preprocess_images_with_vision", return_value="PRE look"),
+            patch.object(ShiinaCLI, "_preprocess_images_with_vision") as preprocess,
         ):
             message = cli_obj._chat_route_images("look", [img], agent=agent)
 
-        assert message == "PRE look"
+        # Reference by path: the agent analyzes it in-loop with vision_analyze.
+        assert f"[The user attached an image: {img.name}]" in message
+        assert f"image_url: {img}" in message
+        assert message.endswith("look")
         override = agent._persist_user_message_override
         assert override.startswith("look\n@image:")
         assert str(img) in override
+
+    def test_does_not_pre_analyze_before_the_turn(self, tmp_path):
+        """Pre-analyzing ran a second, generic vision pass on the submit path (blocking,
+        and its description still invited the agent to look again) — one analysis per attach."""
+        img = _make_image(tmp_path / "shot.png")
+        cli_obj = _make_cli()
+
+        with (
+            patch.object(image_routing, "decide_image_input_mode", return_value="text"),
+            patch.object(ShiinaCLI, "_preprocess_images_with_vision") as preprocess,
+        ):
+            cli_obj._chat_route_images("look", [img], agent=SimpleNamespace())
+
+        preprocess.assert_not_called()
