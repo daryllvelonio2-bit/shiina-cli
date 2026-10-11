@@ -35,9 +35,23 @@ from shiina_state_ids import new_session_id as mint_session_id
 def _extract_api_content_sidecar(*args, **kwargs):
     from shiina_cli._lazy import _lazy_shim
     return _lazy_shim("agent.turn_context", "extract_api_content_sidecar")(*args, **kwargs)
-from shiina_cli.browser_connect import (
-    DEFAULT_BROWSER_CDP_URL, discover_local_cdp_url, find_free_debug_port, is_browser_debug_ready,
-    launch_chrome_debug, local_port_in_use, manual_chrome_debug_command)
+# Lazy import for browser_connect — pulled on first /browser use to keep startup fast
+_browser_connect_lazy = lambda name: (
+    lambda *a, **k: getattr(__import__("shiina_cli.browser_connect", fromlist=[name]), name)(*a, **k)
+)
+_DEFAULT_BROWSER_CDP_URL = None
+def _get_browser_cdp_default():
+    global _DEFAULT_BROWSER_CDP_URL
+    if _DEFAULT_BROWSER_CDP_URL is None:
+        from shiina_cli.browser_connect import DEFAULT_BROWSER_CDP_URL
+        _DEFAULT_BROWSER_CDP_URL = DEFAULT_BROWSER_CDP_URL
+    return _DEFAULT_BROWSER_CDP_URL
+_local_port_in_use = _browser_connect_lazy("local_port_in_use")
+_find_free_debug_port = _browser_connect_lazy("find_free_debug_port")
+_launch_chrome_debug = _browser_connect_lazy("launch_chrome_debug")
+_manual_chrome_debug_command = _browser_connect_lazy("manual_chrome_debug_command")
+_discover_local_cdp_url = _browser_connect_lazy("discover_local_cdp_url")
+_is_browser_debug_ready = _browser_connect_lazy("is_browser_debug_ready")
 
 
 # Output helpers. Slash-command text is user-visible: every literal below is load-bearing.
@@ -475,25 +489,25 @@ def _launch_default_cdp_browser(port: int):
     None (after printing what went wrong / how to launch manually)."""
     import platform as _plat
     launch_port = port
-    if local_port_in_use(port):
-        launch_port = find_free_debug_port(port)
+    if _local_port_in_use(port):
+        launch_port = _find_free_debug_port(port)
         _pr(f"   ⚠ Port {port} is occupied by another application that isn't a CDP browser",
             f"     (an IDE debugger or dev server may be using it) — launching on port {launch_port} instead...")
     else:
         print("   Chromium-family browser isn't running with remote debugging — attempting to launch...")
-    launch = launch_chrome_debug(launch_port, _plat.system())
+    launch = _launch_chrome_debug(launch_port, _plat.system())
     if not launch.launched:
         print("   ⚠ Could not auto-launch a Chromium-family browser")
         if launch.hint:
             print(f"     {launch.hint}")
-        chrome_cmd = manual_chrome_debug_command(launch_port, _plat.system())
+        chrome_cmd = _manual_chrome_debug_command(launch_port, _plat.system())
         if chrome_cmd:
             _pr("     Launch a Chromium-family browser manually:", f"     {chrome_cmd}")
         else:
             print("     No supported Chromium-family browser executable found in this environment")
         return None
     for _wait in range(10):  # wait for the DevTools discovery endpoint to come up
-        found = discover_local_cdp_url(launch_port, timeout=1.0)
+        found = _discover_local_cdp_url(launch_port, timeout=1.0)
         if found:
             print(f"   ✓ Chromium-family browser launched and listening on port {launch_port}")
             return found
@@ -515,11 +529,11 @@ def _browser_connect(cli, cdp_url: str) -> None:
     print()
     # Already serving CDP? For the default-local URL probe both loopbacks: a squatter
     # on 127.0.0.1:<port> (e.g. an IDE debugger) can push the browser to bind [::1] only.
-    is_default = cdp_url == DEFAULT_BROWSER_CDP_URL
+    is_default = cdp_url == _get_browser_cdp_default()
     if is_default:
-        found = discover_local_cdp_url(port, timeout=1.0)
+        found = _discover_local_cdp_url(port, timeout=1.0)
     else:
-        found = cdp_url if is_browser_debug_ready(cdp_url, timeout=1.0) else None
+        found = cdp_url if _is_browser_debug_ready(cdp_url, timeout=1.0) else None
     if found:
         print(f"   ✓ Chromium-family browser is already listening at {found}")
     elif is_default:
@@ -2139,7 +2153,7 @@ class CLICommandsMixin:
             _browser_use(self, sub.split(None, 1)[1].strip() if " " in sub else "on")
         elif sub.startswith("connect"):
             connect_parts = cmd.strip().split(None, 2)  # ["/browser", "connect", "ws://..."]
-            url = connect_parts[2].strip() if len(connect_parts) > 2 else DEFAULT_BROWSER_CDP_URL
+            url = connect_parts[2].strip() if len(connect_parts) > 2 else _get_browser_cdp_default()
             _browser_connect(self, url)
         elif sub == "disconnect":
             _browser_disconnect(self)
