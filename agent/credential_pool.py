@@ -2489,23 +2489,65 @@ def _seed_tokens_singleton(seed: _Seeder, auth_store: Dict[str, Any]) -> None:
     })
 
 
-def _seed_antigravity_singleton(seed: _Seeder) -> None:
+def _seed_antigravity_singleton(seed: _Seeder, auth_store: Dict[str, Any]) -> None:
+    """Seed the antigravity row from the ``providers.antigravity`` auth.json state.
+
+    Reads the CALLER'S store snapshot: constructing :class:`GoogleOAuthTokenManager` here
+    re-entered ``load_pool("antigravity")`` through ``_load_active_pool_tokens`` — a
+    seed→manager→pool→seed recursion that ran ~110 levels deep on every ``load_pool``
+    (2.7s of every picker build, 141 manager constructions, 424 auth-store deepcopies).
+    Only a token refresh (time-based, below) goes through the manager, outside seeding.
+    """
     try:
-        from agent.antigravity_client import GoogleOAuthTokenManager
-        mgr = GoogleOAuthTokenManager()
-        token = mgr.get_access_token()
-        if token:
-            email = mgr.get_authenticated_email()
-            payload: Dict[str, Any] = {
-                "auth_type": AUTH_TYPE_OAUTH,
-                "access_token": token,
-                "label": email or "Google Antigravity OAuth (agy)",
-            }
-            if email:
-                payload["user_id"] = email
-            if mgr._refresh_token:
-                payload["refresh_token"] = mgr._refresh_token
-            seed.upsert("oauth", payload)
+        from shiina_cli.auth import _load_provider_state
+
+        state = _load_provider_state(auth_store, "antigravity") or {}
+        access = str(state.get("access_token") or "").strip()
+        refresh = str(state.get("refresh_token") or "").strip()
+        tokens = state.get("tokens") if isinstance(state.get("tokens"), dict) else {}
+        access = access or str(tokens.get("access_token") or "").strip()
+        refresh = refresh or str(tokens.get("refresh_token") or "").strip()
+        expires_at = state.get("expires_at") or tokens.get("expiry") or tokens.get("expires_at")
+
+        # Expired singleton: refresh through the manager (network; outside the seeding path's
+        # re-entrancy because _load_active_pool_tokens finds THIS pool already loaded).
+        expired = False
+        if expires_at:
+            try:
+                expiry_val = float(expires_at)
+                expiry_s = expiry_val / 1000.0 if expiry_val > 1e12 else expiry_val
+                expired = expiry_s <= time.time() + 300
+            except (TypeError, ValueError):
+                expired = False
+
+        if not access and not (refresh and expired):
+            return
+
+        token = access
+        email = str(state.get("label") or "").strip() or None
+        if expired and refresh:
+            try:
+                from agent.antigravity_client import GoogleOAuthTokenManager
+                mgr = GoogleOAuthTokenManager(access_token=None, refresh_token=refresh)
+                token = mgr.get_access_token()
+                email = mgr.get_authenticated_email() or email
+            except Exception as exc:
+                logger.debug("Antigravity singleton token refresh failed: %s", exc)
+                return
+
+        if not token:
+            return
+
+        payload: Dict[str, Any] = {
+            "auth_type": AUTH_TYPE_OAUTH,
+            "access_token": token,
+            "label": email or "Google Antigravity OAuth (agy)",
+        }
+        if email:
+            payload["user_id"] = email
+        if refresh:
+            payload["refresh_token"] = refresh
+        seed.upsert("oauth", payload)
     except Exception as exc:
         logger.debug("Antigravity seed failed: %s", exc)
 
@@ -2597,7 +2639,7 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
             return seed.result
         _seed_tokens_singleton(seed, auth_store)
     elif provider in ("antigravity", "agy"):
-        _seed_antigravity_singleton(seed)
+        _seed_antigravity_singleton(seed, auth_store)
     elif provider in ("freebuff", "codebuff", "freebuff-cli"):
         _seed_freebuff_singleton(seed)
     elif provider in ("kiro", "kiro-cli", "kiro-ai", "xkiro"):
