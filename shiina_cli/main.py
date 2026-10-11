@@ -3398,7 +3398,9 @@ def _add_portal_parser(subparsers):
 
 
 def _build_kanban_parser(subparsers):
-    from shiina_cli.kanban import build_parser
+    # kanban_parser directly (NOT shiina_cli.kanban): the parser build runs on every
+    # startup, and kanban.py's module import pulls the whole SQLite dispatch machinery.
+    from shiina_cli.kanban_parser import build_parser
 
     return build_parser(subparsers).set_defaults(func=cmd_kanban)
 

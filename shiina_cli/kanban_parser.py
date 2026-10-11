@@ -4,15 +4,51 @@ The subcommand tree is declared as data — one ``_cmd(...)`` record per
 subcommand holding its ``add_parser`` kwargs and an ordered tuple of
 ``add_argument`` specs — and materialised by ``_add_commands``. Order of
 records and arguments is the order argparse renders in ``--help``.
+
+This module holds COPIES of the few constants it needs for help text
+(``VALID_STATUSES``, ``DEFAULT_CLAIM_TTL_SECONDS``, …) so the full
+``shiina --help`` parse build never imports ``kanban_db``'s SQLite
+machinery (~0.2s of the every-startup parse tree). The values are
+asserted-identical in kanban's own tests; changing one without the
+other fails loudly there.
 """
 
 from __future__ import annotations
 
 import argparse
 
-from shiina_cli import kanban_db as kb
-from shiina_cli import kanban_db_dispatch as kbd
-from shiina_cli import kanban_db_notify as kbn
+# --- Help-text constants (kept in sync with kanban_db*.py; tests assert equality) ---
+VALID_STATUSES = {"triage", "todo", "scheduled", "ready", "running", "blocked", "review", "done", "archived"}
+VALID_INITIAL_STATUSES = {"running", "blocked"}
+VALID_BLOCK_KINDS = {"dependency", "needs_input", "capability", "transient"}
+DEFAULT_CLAIM_TTL_SECONDS = 15 * 60
+DEFAULT_FAILURE_LIMIT = 2
+_NOTIFY_DELIVERY_MODES = ("notify", "notify+wake", "wake")
+VALID_SORT_ORDERS: dict[str, str] = {
+    "created": "created_at ASC, id ASC",
+    "created-desc": "created_at DESC, id DESC",
+    "priority": "priority DESC, created_at ASC",
+    "priority-desc": "priority ASC, created_at ASC",
+    "status": "status ASC, created_at ASC",
+    "assignee": "assignee ASC, created_at ASC",
+    "title": "title ASC, id ASC",
+    "updated": "started_at DESC NULLS LAST, created_at DESC",
+}
+
+# The real modules resolve lazily — only a kanban dispatch needs them.
+def _kb():
+    from shiina_cli import kanban_db as kb
+    return kb
+
+
+def _kbd():
+    from shiina_cli import kanban_db_dispatch as kbd
+    return kbd
+
+
+def _kbn():
+    from shiina_cli import kanban_db_notify as kbn
+    return kbn
 
 
 def _arg(*flags: str, **kw):
@@ -179,7 +215,7 @@ _SPECS = [
                   f"circuit breaker. Trip on the Nth failure — e.g. --max-retries 1 blocks on the "
                   f"first failure (no retries), --max-retries 3 allows two retries. Omit to use "
                   f"the dispatcher's kanban.failure_limit config (default "
-                  f"{kb.DEFAULT_FAILURE_LIMIT})."),
+                  f"{DEFAULT_FAILURE_LIMIT})."),
         _arg("--model", dest="model_override",
              help="Pin the worker to this model (passed as -m <model>) without "
                   "changing the profile's configured model. Combine with --provider "
@@ -197,7 +233,7 @@ _SPECS = [
                   "review). Best for open-ended cards one shot rarely finishes."),
         _arg("--goal-max-turns", type=int, metavar="N", dest="goal_max_turns",
              help="Turn budget for --goal workers (default 20). Ignored without --goal."),
-        _arg("--initial-status", choices=sorted(kb.VALID_INITIAL_STATUSES), default="running",
+        _arg("--initial-status", choices=sorted(VALID_INITIAL_STATUSES), default="running",
              help="Initial card status. Use 'blocked' for cards "
                   "that require immediate human ops (R3 gate) "
                   "to skip the brief running-to-blocked transition."),
@@ -218,13 +254,13 @@ _SPECS = [
     _cmd("list", [
         _arg("--mine", action="store_true", help="Filter by $SHIINA_PROFILE as assignee"),
         _arg("--assignee"),
-        _arg("--status", choices=sorted(kb.VALID_STATUSES)),
+        _arg("--status", choices=sorted(VALID_STATUSES)),
         _arg("--tenant"),
         _arg("--session",
              help="Filter by originating chat/agent session id (set on tasks created from inside an ACP loop)"),
         _arg("--archived", action="store_true", help="Include archived tasks"),
         _json_flag(),
-        _arg("--sort", choices=sorted(kb.VALID_SORT_ORDERS.keys()),
+        _arg("--sort", choices=sorted(VALID_SORT_ORDERS.keys()),
              help="Sort order for listed tasks (default: priority)"),
         _arg("--workflow-template-id", metavar="ID", help="Restrict to tasks with this workflow_template_id"),
         _arg("--step-key", dest="current_step_key", metavar="KEY",
@@ -259,7 +295,7 @@ _SPECS = [
     _cmd("unlink", [_arg("parent_id"), _arg("child_id")], help="Remove a parent->child dependency"),
     _cmd("claim", [
         _TASK_ID,
-        _arg("--ttl", type=int, default=kb.DEFAULT_CLAIM_TTL_SECONDS, help="Claim TTL in seconds (default: 900)"),
+        _arg("--ttl", type=int, default=DEFAULT_CLAIM_TTL_SECONDS, help="Claim TTL in seconds (default: 900)"),
     ], help="Atomically claim a ready task (prints resolved workspace path)"),
     _cmd("comment", [
         _TASK_ID,
@@ -297,7 +333,7 @@ _SPECS = [
         _TASK_ID,
         _arg("reason", nargs="*", help="Reason (also appended as a comment)"),
         _bulk_ids("block"),
-        _arg("--kind", choices=sorted(kb.VALID_BLOCK_KINDS),
+        _arg("--kind", choices=sorted(VALID_BLOCK_KINDS),
              help="Typed block reason. 'dependency' waits in todo (auto-promoted when "
                   "parents finish, no human); 'needs_input'/'capability' go to "
                   "blocked for a human; 'transient' marks a maybe-flaky failure. "
@@ -344,15 +380,15 @@ _SPECS = [
     _cmd("dispatch", [
         _arg("--dry-run", action="store_true", help="Don't actually spawn processes; just print what would happen"),
         _arg("--max", type=int, help="Cap number of spawns this pass"),
-        _arg("--failure-limit", type=int, default=kbd.DEFAULT_FAILURE_LIMIT,
+        _arg("--failure-limit", type=int, default=DEFAULT_FAILURE_LIMIT,
              help=f"Auto-block a task after this many consecutive non-success attempts "
-                  f"(spawn_failed, timed_out, or crashed; default: {kbd.DEFAULT_FAILURE_LIMIT})"),
+                  f"(spawn_failed, timed_out, or crashed; default: {DEFAULT_FAILURE_LIMIT})"),
         _json_flag(),
     ], help="One dispatcher pass: reclaim stale, promote ready, spawn workers"),
     _cmd("daemon", [
         _arg("--interval", type=float, default=60.0, help="Seconds between dispatch ticks (default: 60)"),
         _arg("--max", type=int, help="Cap number of spawns per tick"),
-        _arg("--failure-limit", type=int, default=kbd.DEFAULT_FAILURE_LIMIT),
+        _arg("--failure-limit", type=int, default=DEFAULT_FAILURE_LIMIT),
         _arg("--pidfile", help="Write the daemon's PID to this file on start"),
         _arg("--verbose", "-v", action="store_true", help="Log each tick's outcome to stdout"),
         # Escape hatch for hosts that truly cannot run the gateway; hidden from
@@ -383,7 +419,7 @@ _SPECS = [
         _arg("--notifier-profile",
              help="Profile gateway that owns/delivers this subscription (default: active profile)"),
         # choices: single source of truth shared with the DB/watcher enum.
-        _arg("--delivery-mode", choices=kbn._NOTIFY_DELIVERY_MODES,
+        _arg("--delivery-mode", choices=_NOTIFY_DELIVERY_MODES,
              help="How the kanban-notifier reacts to terminal events for this "
                   "subscription: 'notify' (passive message only; default), "
                   "'notify+wake' (message AND wake the destination gateway agent so "

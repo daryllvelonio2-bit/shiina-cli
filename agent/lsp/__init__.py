@@ -5,6 +5,11 @@ Real language servers (pyright, gopls, ...) run as subprocesses and their
 ``patch`` (wiring: ``FileOperations._check_lint_delta``).  LSP is **gated on git
 workspace detection** so user-home cwd's (e.g. Telegram gateway chats) never
 spawn daemons; ``get_service()`` returns the singleton or ``None`` when disabled.
+
+``LSPService`` (and its asyncio stack, ~0.15s) imports lazily: ``agent.lsp.cli``
+is imported on EVERY ``shiina`` start to attach the ``lsp`` subparser, and the
+parser build must not pay for the service machinery. The name stays importable
+(``from agent.lsp import LSPService``) via a module ``__getattr__``.
 """
 from __future__ import annotations
 
@@ -13,11 +18,9 @@ import logging
 import threading
 from typing import Optional
 
-from agent.lsp.manager import LSPService
-
 logger = logging.getLogger("agent.lsp")
 
-_service: Optional[LSPService] = None
+_service: Optional["LSPService"] = None
 # Routed multiplex profiles (SHIINA_HOME override) each get their own service: ``lsp.*`` config
 # (enabled, servers, idle timeout) is per profile, so one process-wide singleton would let the first
 # profile's settings decide whether every other profile gets diagnostics.
@@ -26,7 +29,19 @@ _atexit_registered = False
 _service_lock = threading.Lock()
 
 
-def _active(svc: Optional[LSPService]) -> Optional[LSPService]:
+def _service_cls() -> type:
+    from agent.lsp.manager import LSPService
+    return LSPService
+
+
+def __getattr__(name: str):
+    # PEP 562: keep ``from agent.lsp import LSPService`` working without the eager import.
+    if name == "LSPService":
+        return _service_cls()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def _active(svc) -> Optional["LSPService"]:
     return svc if (svc is not None and svc.is_active()) else None
 
 
@@ -52,13 +67,13 @@ def get_service() -> Optional[LSPService]:
         home_key = shiina_home_key()
         with _service_lock:
             if home_key not in _services_by_home:
-                _services_by_home[home_key] = LSPService.create_from_config()
+                _services_by_home[home_key] = _service_cls().create_from_config()
                 _register_atexit_once()
             return _active(_services_by_home[home_key])
     if _service is None:
         with _service_lock:
             if _service is None:
-                _service = LSPService.create_from_config()
+                _service = _service_cls().create_from_config()
                 _register_atexit_once()
     return _active(_service)
 
