@@ -1,5 +1,6 @@
 """Agent construction + session-resume display for ``ShiinaCLI``: credential resolution,
 per-turn agent config, first-use build, resume preload + recap. ``cli.py`` helpers are
+from shiina_cli._lazy import _lazy_shim
 imported lazily inside each method (import cycle)."""
 
 from __future__ import annotations

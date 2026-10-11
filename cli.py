@@ -1,3 +1,4 @@
+from shiina_cli._lazy import _lazy_shim
 #!/usr/bin/env python3
 """Shiina Agent CLI — interactive terminal interface (``python cli.py --help`` for usage)."""
 

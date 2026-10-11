@@ -5,6 +5,7 @@ the helpers/handlers via ``from cli import ...`` — cli.py imports this module 
 """
 
 from __future__ import annotations
+from shiina_cli._lazy import _lazy_shim
 
 import argparse
 import atexit
@@ -30,7 +31,10 @@ from rich.panel import Panel
 
 from shiina_constants import display_shiina_home, is_termux as _is_termux_environment
 from shiina_state_ids import new_session_id as mint_session_id
-from agent.turn_context import extract_api_content_sidecar
+# Lazy import for turn_context — pulled on first use to keep startup fast
+def _extract_api_content_sidecar(*args, **kwargs):
+    from shiina_cli._lazy import _lazy_shim
+    return _lazy_shim("agent.turn_context", "extract_api_content_sidecar")(*args, **kwargs)
 from shiina_cli.browser_connect import (
     DEFAULT_BROWSER_CDP_URL, discover_local_cdp_url, find_free_debug_port, is_browser_debug_ready,
     launch_chrome_debug, local_port_in_use, manual_chrome_debug_command)

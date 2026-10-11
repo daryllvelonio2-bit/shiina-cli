@@ -3,6 +3,7 @@ interactive CLI. Mixin bound onto ``ShiinaCLI`` via the MRO; cli.py-internal sym
 LAZILY inside each method (``from cli import ...``) — never at module load (import cycle)."""
 
 from __future__ import annotations
+from shiina_cli._lazy import _lazy_shim
 
 import errno
 import json
@@ -15,7 +16,17 @@ import threading
 import time
 
 from agent.interrupt_compat import request_hard_interrupt
-from shiina_cli.commands_completion import SlashCommandAutoSuggest, SlashCommandCompleter
+# Lazy import for commands_completion — pulled on first use to keep startup fast
+_SlashCommandAutoSuggest = None
+_SlashCommandCompleter = None
+
+def _get_completion_classes():
+    global _SlashCommandAutoSuggest, _SlashCommandCompleter
+    if _SlashCommandAutoSuggest is None:
+        from shiina_cli._lazy import _lazy_shim
+        _SlashCommandAutoSuggest = __import__("shiina_cli.commands_completion", fromlist=["SlashCommandAutoSuggest"]).SlashCommandAutoSuggest
+        _SlashCommandCompleter = __import__("shiina_cli.commands_completion", fromlist=["SlashCommandCompleter"]).SlashCommandCompleter
+    return _SlashCommandAutoSuggest, _SlashCommandCompleter
 from pathlib import Path
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.history import FileHistory
@@ -2380,7 +2391,7 @@ class CLITuiMixin:
         def get_prompt():
             return cli_ref._get_tui_prompt_fragments()
 
-        _completer = SlashCommandCompleter(
+        _completer = _get_completion_classes()[1](
             skill_commands_provider=lambda: get_skill_commands(),
             command_filter=cli_ref._command_available,
             skill_bundles_provider=lambda: get_skill_bundles())
@@ -2398,7 +2409,7 @@ class CLITuiMixin:
             # it off the UI event loop.
             completer=ThreadedCompleter(_completer),
             complete_while_typing=True,
-            auto_suggest=SlashCommandAutoSuggest(history_suggest=AutoSuggestFromHistory(), completer=_completer),
+            auto_suggest=_get_completion_classes()[0](history_suggest=AutoSuggestFromHistory(), completer=_completer),
         )
         # Keep prompt_toolkit on its simple tempfile path: buffer.tempfile = "prompt.md" takes
         # the complex-tempfile branch that re-mkdir()s the mkdtemp() dir and raises EEXIST.
