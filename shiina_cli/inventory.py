@@ -84,6 +84,10 @@ def build_models_payload(
     desktop chat pickers. ``pricing_cache_only``: with ``pricing``, use only values already resident
     in process caches (normal picker opens, while a background worker warms cold endpoints)."""
     from shiina_cli.model_switch import list_authenticated_providers
+    from agent.models_dev import _clear_picker_config_cache, _prime_picker_config_cache
+
+    # Prime the config cache so the first _cfg_get inside list_authenticated_providers is instant.
+    _prime_picker_config_cache()
 
     rows = list_authenticated_providers(
         current_provider=ctx.current_provider, current_base_url=ctx.current_base_url,
@@ -93,6 +97,9 @@ def build_models_payload(
         probe_current_custom_provider=probe_current_custom_provider, for_picker=for_picker,
         excluded_providers=ctx.excluded_providers or [],
     )
+
+    # Clear the picker-scoped config cache so subsequent turns don't hold a stale snapshot.
+    _clear_picker_config_cache()
 
     # Managed local runtime: staged GGUFs are selectable like any provider's models, but
     # list_authenticated_providers can't know about them (no credential — reachability is the

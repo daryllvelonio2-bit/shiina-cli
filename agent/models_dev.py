@@ -190,16 +190,40 @@ def _models_dev_id(provider: str) -> Optional[str]:
     return mdev_id
 
 
+# Module-level config cache for the picker build scope.
+# Invalidated by the caller via `_clear_picker_config_cache()`.
+_PICKER_CONFIG_CACHE: Optional[Dict[str, Any]] = None
+
 _UNKNOWN_CATALOG_PROVIDER_WARNED: set = set()  # (provider, alias) warned once per process
 
 
-def _cfg_get(*keys: str, default: Any) -> Any:
-    """``cfg_get`` over the read-only config; *default* on any failure."""
+def _cfg_get(*keys: str, default: Any = None) -> Any:
+    """``cfg_get`` over the read-only config; *default* on any failure.
+
+    During a picker build, uses a cached config to avoid 8,000+ reloads.
+    """
+    global _PICKER_CONFIG_CACHE
     try:
         from shiina_cli.config import cfg_get, load_config_readonly
-        return cfg_get(load_config_readonly(), *keys, default=default)
+        if _PICKER_CONFIG_CACHE is None:
+            _PICKER_CONFIG_CACHE = load_config_readonly()
+        return cfg_get(_PICKER_CONFIG_CACHE, *keys, default=default)
     except Exception:
         return default
+
+
+def _prime_picker_config_cache() -> None:
+    """Eagerly load the config once so the first _cfg_get is instant."""
+    global _PICKER_CONFIG_CACHE
+    if _PICKER_CONFIG_CACHE is None:
+        from shiina_cli.config import load_config_readonly
+        _PICKER_CONFIG_CACHE = load_config_readonly()
+
+
+def _clear_picker_config_cache() -> None:
+    """Clear the picker-scoped config cache. Call after a picker build completes."""
+    global _PICKER_CONFIG_CACHE
+    _PICKER_CONFIG_CACHE = None
 
 
 def _shiina_path(name: str) -> Path:

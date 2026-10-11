@@ -372,8 +372,8 @@ def _auth_store_has_provider(*keys: str, store: Optional[dict] = None) -> bool:
     one picker scan otherwise re-reads the same auth store ~700x (~12ms deepcopy each)."""
     try:
         if store is None:
-            from shiina_cli.auth import _load_auth_store
-            store = _load_auth_store()
+            from shiina_cli.auth import _load_auth_store_readonly
+            store = _load_auth_store_readonly()
         providers_store = store.get("providers", {})
         return bool(store and any(k in providers_store for k in keys))
     except Exception as exc:
@@ -385,8 +385,8 @@ def _raw_pool_usable(shiina_id: str, *, store: Optional[dict] = None) -> bool:
     """Section-1 pool check: only consult the pool when auth.json lists a raw entry."""
     try:
         if store is None:
-            from shiina_cli.auth import _load_auth_store
-            store = _load_auth_store()
+            from shiina_cli.auth import _load_auth_store_readonly
+            store = _load_auth_store_readonly()
         if store and store.get("credential_pool", {}).get(shiina_id):
             return _credential_pool_is_usable(shiina_id, raw_pool_present=True)
     except Exception:
@@ -684,8 +684,8 @@ def _collect_authed_provider_slugs(
     # ONE auth-store read for the whole scan: the per-provider checks below otherwise re-read
     # the same store ~700x (~12ms deepcopy each = ~8s of the picker open).
     try:
-        from shiina_cli.auth import _load_auth_store
-        _store_snapshot = _load_auth_store()
+        from shiina_cli.auth import _load_auth_store_readonly
+        _store_snapshot = _load_auth_store_readonly()
     except Exception:
         _store_snapshot = None
 
@@ -1260,8 +1260,8 @@ def list_authenticated_providers(
     # ONE auth-store read for the whole build: the per-provider checks in every section
     # otherwise re-read the same store ~700x (~12ms deepcopy each = ~8s of the picker open).
     try:
-        from shiina_cli.auth import _load_auth_store
-        b.store_snapshot = _load_auth_store()
+        from shiina_cli.auth import _load_auth_store_readonly
+        b.store_snapshot = _load_auth_store_readonly()
     except Exception:
         b.store_snapshot = None
 

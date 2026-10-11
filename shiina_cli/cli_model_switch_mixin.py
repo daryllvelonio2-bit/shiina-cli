@@ -245,7 +245,12 @@ def _commit_model_switch(
 
 
 def _show_model_picker(cli, ctx, force_refresh: bool) -> None:
-    """``/model`` with no args: open the picker, or print usage when nothing is authed."""
+    """``/model`` with no args: open the picker, or print usage when nothing is authed.
+
+    Bare ``/model`` serves the disk cache immediately — no live probes. Only
+    ``/model --refresh`` triggers live ``/v1/models`` fetches for providers
+    missing from the cache. This keeps the picker open under 1s on a warm cache.
+    """
     from cli import _cprint
     from shiina_cli.inventory import build_models_payload
     from shiina_cli.providers import get_label
@@ -253,8 +258,9 @@ def _show_model_picker(cli, ctx, force_refresh: bool) -> None:
         if ctx is None:
             raise RuntimeError("inventory context unavailable")
         providers = build_models_payload(
-            ctx, probe_custom_providers=force_refresh,
-            probe_current_custom_provider=not force_refresh,
+            ctx,
+            probe_custom_providers=force_refresh,
+            probe_current_custom_provider=force_refresh,
             capabilities=True,  # the effort step hides itself on reasoning-free routes
         )["providers"]
     except Exception:
