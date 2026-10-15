@@ -3,8 +3,8 @@
 The header value is the *derived* OpenCode SessionID for the conversation's session key,
 never the raw Shiina key: OpenCode's canonical SessionID shape is ``ses_`` + 12 lowercase-hex
 + 14 Base62 characters (30 total), and the Zen free tier rejects any other shape with
-``403 FreeTierError``. ``derive_opencode_session_id()`` hashes the session key into that shape,
-so the same conversation keeps one stable id across every transport and every turn.
+``403 FreeTierError``. ``derive_opencode_session_id()`` mints that encoding once per session key
+and reuses it, so the same conversation keeps one stable id across every transport and every turn.
 """
 
 from __future__ import annotations

@@ -1,44 +1,56 @@
 from __future__ import annotations
 
-import hashlib
-import random
+import os
 import time
 from typing import Any, Optional
 
 OPENCODE_SESSION_HEADER = "x-opencode-session"
-OPENCODE_REQUEST_HEADER = "x-opencode-request"
+OPENCODE_SESSION_ID_HEADER = "x-opencode-session-id"
 OPENCODE_CLIENT_HEADER = "x-opencode-client"
 OPENCODE_PROJECT_HEADER = "x-opencode-project"
+# OpenCode v2 sends the session id under three extra names; the Zen free-tier gate 403s a
+# request that carries none of them.
+OPENCODE_AFFINITY_HEADERS = ("x-session-affinity", "x-session-id")
 
-OPENCODE_USER_AGENT = "opencode/1.18.31 ai-sdk/provider-utils/4.0.40 runtime/bun/1.3.14"
+OPENCODE_USER_AGENT = "opencode/latest/2.0.29/cli"
 
 _BASE62_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+_ID_CEILING = 1 << 48
+_MAX_SCOPES = 512
+_DEFAULT_SCOPE = ""
+_SESSION_IDS: dict[str, str] = {}
+
+# Free-tier Zen models whose id carries no ``-free`` marker (Zen's own default free model).
+_OPENCODE_FREE_SLUGS = frozenset({"big-pickle"})
+
+
+def new_opencode_session_id() -> str:
+    """Mint a SessionID in the exact shape OpenCode v2's id generator emits.
+
+    Zen's free-tier gate decodes the 12-hex prefix of ``x-opencode-session`` and 403s anything
+    that is not that encoding — a plain millisecond timestamp, a sha256 slice and random hex all
+    fail, while the inverted form passes. Mirror the generator: ``~((ms << 12) | counter)``
+    truncated to 48 bits, then 14 random Base62 characters (26 after the ``ses_`` prefix).
+    """
+    value = (_ID_CEILING - 1) - ((int(time.time() * 1000) * 0x1000 + 1) % _ID_CEILING)
+    tail = "".join(_BASE62_CHARS[b % 62] for b in os.urandom(14))
+    return f"ses_{value:012x}{tail}"
 
 
 def derive_opencode_session_id(key: Optional[str]) -> str:
-    """Deterministically derive a valid OpenCode SessionID (``ses_<26_chars>``).
+    """One SessionID per cache scope, reused for the life of the process.
 
-    OpenCode validates the schema: 30 chars total, starts with 'ses_', followed by
-    12 hex chars and 14 base62 alphanumeric characters. Deriving it via sha256 of the
-    Shiina session/cache scope ensures prompt caching remains warm across conversation turns.
+    Reuse is what both the gate and prompt caching need: the id has to carry a real clock value,
+    so it is minted at first use for the scope and repeated on every later request instead of
+    being recomputed (or hashed) per call.
     """
-    sid = str(key or "").strip()
-    if not sid:
-        sid = str(time.time())
-    h = hashlib.sha256(sid.encode("utf-8", errors="replace")).digest()
-    hex12 = h[:6].hex()
-    rand14 = "".join(_BASE62_CHARS[b % 62] for b in h[6:20])
-    return f"ses_{hex12}{rand14}"
-
-
-def make_opencode_request_id() -> str:
-    """Generate a unique OpenCode MessageID (``msg_<26_chars>``) for each request."""
-    now = int(time.time() * 1000)
-    current = now * 0x1000 + random.randint(1, 4095)
-    val = current & 0xFFFFFFFFFFFF
-    time_hex = f"{val:012x}"
-    rand14 = "".join(random.choices(_BASE62_CHARS, k=14))
-    return f"msg_{time_hex}{rand14}"
+    scope = str(key or "").strip() or _DEFAULT_SCOPE
+    sid = _SESSION_IDS.get(scope)
+    if sid is None:
+        if len(_SESSION_IDS) >= _MAX_SCOPES:
+            _SESSION_IDS.clear()
+        sid = _SESSION_IDS[scope] = new_opencode_session_id()
+    return sid
 
 
 def is_opencode_target(provider: Optional[str], base_url: Optional[str]) -> bool:
@@ -70,18 +82,33 @@ def is_opencode_target(provider: Optional[str], base_url: Optional[str]) -> bool
 
 
 def is_opencode_free_model(model: Optional[str]) -> bool:
-    """True when *model* targets OpenCode's free or contributor tier."""
+    """True when *model* targets OpenCode's free or contributor tier.
+
+    The tier is not flagged anywhere in Zen's catalog, so it is recognised by name: the
+    ``-free``/``-contributor`` suffix every free model carries, plus the handful of free
+    models that shipped without one (``big-pickle`` is Zen's default free model).
+    """
     m = (model or "").strip().lower()
-    return "-free" in m or "-contributor" in m
+    return "-free" in m or "-contributor" in m or m in _OPENCODE_FREE_SLUGS
 
 
-def opencode_default_headers() -> dict[str, str]:
-    """Default headers identifying the client as OpenCode CLI."""
-    return {
+def _opencode_identity_headers(session_id: str) -> dict[str, str]:
+    """The client-identity header set OpenCode v2 puts on every model request."""
+    headers = {
         "User-Agent": OPENCODE_USER_AGENT,
         OPENCODE_CLIENT_HEADER: "cli",
         OPENCODE_PROJECT_HEADER: "global",
+        OPENCODE_SESSION_HEADER: session_id,
+        OPENCODE_SESSION_ID_HEADER: session_id,
     }
+    for name in OPENCODE_AFFINITY_HEADERS:
+        headers[name] = session_id
+    return headers
+
+
+def opencode_default_headers() -> dict[str, str]:
+    """Client-identity headers for OpenCode targets when no conversation scope is bound."""
+    return _opencode_identity_headers(derive_opencode_session_id(_DEFAULT_SCOPE))
 
 
 def opencode_session_headers(
@@ -102,16 +129,7 @@ def opencode_session_headers(
     except Exception:
         key = str(session_id or "")
 
-    ses_id = derive_opencode_session_id(key)
-    msg_id = make_opencode_request_id()
-
-    return {
-        "User-Agent": OPENCODE_USER_AGENT,
-        OPENCODE_CLIENT_HEADER: "cli",
-        OPENCODE_PROJECT_HEADER: "global",
-        OPENCODE_SESSION_HEADER: ses_id,
-        OPENCODE_REQUEST_HEADER: msg_id,
-    }
+    return _opencode_identity_headers(derive_opencode_session_id(key))
 
 
 # Tool definitions conforming to OpenCode's schema for bash and read

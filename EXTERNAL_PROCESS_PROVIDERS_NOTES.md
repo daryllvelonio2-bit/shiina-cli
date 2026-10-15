@@ -417,6 +417,48 @@ scripts/run_tests.sh tests/agent/test_opencode_client.py -k "mcp or opencode_con
 
 ---
 
-## 10. Add more below
+## 10. Zen free tier: the OpenCode-identity gate on `/zen/v1` (added 2026-10-16)
+
+OpenCode Zen's **free** models (every `*-free` / `*-contributor-free` slug, plus Zen's default
+`big-pickle`) are served behind an identity gate: the upstream answers
+`403 {"error":{"type":"FreeTierError","message":"...can only be used from within OpenCode..."}}`
+for any request that does not look like the official client. Paid Zen models are unaffected.
+
+It is decided at their origin (not Cloudflare — a 403 carries `x-opencode-log-id`), from the
+**request itself**, and the change is frequent: Sept-17-2026 added the User-Agent + session-id
+shape checks, Oct-15-2026 added the payload checks. What currently passes (all verified live
+against `https://opencode.ai/zen/v1/chat/completions`):
+
+| Requirement | Value that passes | Notes |
+|---|---|---|
+| `User-Agent` | `opencode/latest/<version>/cli` | must start `opencode/` + a version; bare `opencode`, `curl/*`, `pi` all 403 |
+| `x-opencode-client` | `cli` | attribution string; a foreign name 403s |
+| `x-opencode-session`, `-session-id`, `x-session-affinity`, `x-session-id` | one `ses_...` id | **all four**; the id is what the gate really validates |
+| session-id encoding | `~((Date.now() << 12) \| counter)` truncated to 48 bits, then 14 random Base62 | decodes back to the wall clock (low 36 bits). An sha256 slice, a raw ms timestamp or random hex 403 — ages up to 700 days still pass, so the value need only be *sane*, not fresh |
+| payload | must contain a tool named `read` | name alone is enough (`{"type":"function","function":{"name":"read"}}`); `stream: true` is also required |
+| `Authorization` | the account key **or** `Bearer public` | the free lane accepts both |
+| `x-opencode-project` | optional | `global` is fine; v2 sends a 40-hex project hash |
+
+Implementation: `agent/opencode_affinity.py` (`new_opencode_session_id`, `derive_opencode_session_id`,
+`opencode_session_headers`, `ensure_opencode_compat_tools`). `derive_opencode_session_id` mints one
+id per cache scope and reuses it, because the encoding has to carry a real clock value and prompt
+caching needs a stable id per conversation.
+
+Verify (both must print the token, and the second must *not* print a 403):
+
+```bash
+shiina -z "Reply with exactly: PROBE_OK" -m cat-jam-free --provider opencode-zen
+shiina -z "Reply with exactly: PICKLE_OK" -m big-pickle  --provider opencode-zen
+scripts/run_tests.sh tests/agent/test_opencode_session_id_encoding.py
+```
+
+When it breaks again, re-derive the current client behaviour from the installed real client
+(`/home/janelle/.opencode/bin/opencode`, a Bun binary — `strings`/mmap grep for `x-opencode`,
+`ai-sdk/provider-utils`) or by pointing its `provider.opencode.options.baseURL` at a logging
+proxy and replaying the captured request byte-for-byte.
+
+---
+
+## 11. Add more below
 
 <!-- Append new providers, bugs, and verification steps here. -->

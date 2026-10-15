@@ -4,7 +4,7 @@ relay-affinity key — the OpenCode Go relay rejects a request without ``x-openc
 
 The header value is the *derived* OpenCode SessionID for that scope, never the raw scope: OpenCode's
 canonical SessionID shape is ``ses_`` + 12 lowercase-hex + 14 Base62 characters (30 total), and the
-Zen free tier rejects any other shape. ``derive_opencode_session_id()`` hashes the scope into that
+Zen free tier rejects any other shape. ``derive_opencode_session_id()`` mints the scope's id in that
 shape, so one task keeps one stable id across its headless aux calls.
 """
 
